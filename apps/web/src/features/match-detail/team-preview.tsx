@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { Button, Surface, Text } from "@football/ui";
 
 import { matchDetailMockContent } from "./match-detail-mock-content";
@@ -57,13 +59,12 @@ export function TeamPreview() {
         >
           Rearmar
         </Button>
-        <Button
-          disabled
-          title="Edición no disponible en este mock"
-          variant="secondary"
+        <Link
+          className={styles.teamNavigationLink}
+          href="/play/match-demo/matchmaking"
         >
           Editar equipos
-        </Button>
+        </Link>
       </div>
     </section>
   );

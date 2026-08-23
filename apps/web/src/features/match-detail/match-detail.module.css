@@ -283,6 +283,21 @@
   flex: 1 1 auto;
 }
 
+.teamNavigationLink {
+  display: inline-flex;
+  min-block-size: var(--touch-target-min);
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--space-5);
+  border: var(--border-width-thin) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--background-elevated);
+  font: 700 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
 .rosterGroup {
   display: grid;
   gap: var(--space-3);
