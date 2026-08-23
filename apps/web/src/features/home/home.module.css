@@ -1,0 +1,323 @@
+.page {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-8);
+}
+
+.intro {
+  display: grid;
+  max-inline-size: var(--content-wide);
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+}
+
+.introCopy {
+  max-inline-size: var(--content-reading);
+}
+
+.nextMatch {
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-6);
+  overflow: hidden;
+  padding: var(--space-6);
+  border-color: var(--border-strong);
+}
+
+.nextMatch::after {
+  content: "";
+  position: absolute;
+  inset-block: var(--space-6);
+  inset-inline-end: var(--space-6);
+  inline-size: var(--space-9);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-inline-end: 0;
+  pointer-events: none;
+}
+
+.pitchStripe {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: var(--space-2);
+  background: var(--pitch-surface);
+}
+
+.matchHeading {
+  z-index: 1;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.matchTime {
+  padding-block-end: var(--space-2);
+  border-block-end: var(--border-width-strong) solid var(--accent-primary);
+}
+
+.matchMeta {
+  z-index: 1;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.matchAttendance {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+}
+
+.primaryLink {
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: var(--touch-target-min);
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-control);
+  background: var(--accent-primary);
+  color: var(--background-canvas);
+  font: 800 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.editorialGrid {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-8);
+}
+
+.ranking,
+.rising,
+.activity,
+.milestones {
+  min-inline-size: 0;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.sectionHeading > div,
+.rising {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.textLink {
+  display: inline-flex;
+  min-block-size: var(--touch-target-min);
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent-primary);
+  font: 700 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.rankingList,
+.timeline {
+  padding: 0;
+  margin: var(--space-5) 0 0;
+  list-style: none;
+}
+
+.rankingRow {
+  display: grid;
+  grid-template-columns: auto auto minmax(var(--space-4), 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-block-size: var(--touch-target-min);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.rankPosition {
+  color: var(--foreground-muted);
+  font: 700 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  font-variant-numeric: tabular-nums;
+}
+
+.rankLine {
+  border-block-start: var(--border-width-thin) dotted var(--border-subtle);
+}
+
+.rankOverall,
+.delta,
+.activityValue {
+  font-family: var(--font-display, var(--font-display-fallback));
+  font-variant-numeric: tabular-nums;
+  line-height: var(--type-leading-tight);
+}
+
+.rankOverall {
+  color: var(--accent-primary);
+  font-size: var(--type-heading-lg-size);
+  font-weight: 800;
+}
+
+.risingList {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-5);
+}
+
+.risingPlayer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-inline-start: var(--border-width-strong) solid var(--state-positive);
+  background: var(--background-surface);
+}
+
+.risingPlayer > div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.delta {
+  color: var(--state-positive);
+  font-size: var(--type-heading-lg-size);
+  white-space: nowrap;
+}
+
+.activity {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.activityStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.activityStat {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width-thin) solid var(--border-strong);
+}
+
+.activityValue {
+  font-size: clamp(
+    var(--type-heading-lg-size),
+    10vw,
+    var(--type-display-lg-size)
+  );
+  font-weight: 700;
+  letter-spacing: var(--type-tracking-display);
+}
+
+.milestones {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.timeline {
+  display: grid;
+}
+
+.timelineItem {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--space-4) 1fr;
+  gap: var(--space-4);
+  min-block-size: var(--space-8);
+}
+
+.timelineItem:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-block-end: 0;
+  inset-inline-start: calc(var(--space-2) - var(--border-width-thin));
+  border-inline-start: var(--border-width-thin) solid var(--border-strong);
+}
+
+.timelineMark {
+  z-index: 1;
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+  border: var(--border-width-strong) solid var(--accent-primary);
+  border-radius: var(--radius-round);
+  background: var(--background-canvas);
+}
+
+.timelineItem > div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding-block-end: var(--space-5);
+}
+
+@media (max-width: 24rem) {
+  .activityStats {
+    grid-template-columns: 1fr 1fr;
+    row-gap: var(--space-5);
+  }
+
+  .activityStat:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 48rem) {
+  .nextMatch {
+    grid-template-columns: minmax(0, 1.5fr) minmax(12rem, 1fr);
+    align-items: end;
+    padding: var(--space-7);
+  }
+
+  .matchMeta {
+    display: grid;
+    justify-items: end;
+  }
+
+  .primaryLink {
+    grid-column: 2;
+  }
+
+  .editorialGrid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
+    align-items: start;
+  }
+
+  .activityStat {
+    padding-inline-start: var(--space-5);
+  }
+}
+
+@media (min-width: 80rem) {
+  .page {
+    gap: var(--space-9);
+  }
+
+  .nextMatch {
+    grid-template-columns: minmax(0, 1.7fr) minmax(14rem, 0.7fr);
+  }
+
+  .activityStats {
+    max-inline-size: var(--content-wide);
+  }
+
+  .milestones {
+    grid-template-columns: minmax(12rem, 0.45fr) minmax(0, 1fr);
+  }
+
+  .timeline {
+    margin-block-start: 0;
+  }
+}
