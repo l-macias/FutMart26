@@ -1,0 +1,96 @@
+.football-overall {
+  display: inline-grid;
+  min-inline-size: calc(var(--space-9) + var(--space-5));
+  justify-items: center;
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  border-block: var(--border-width-strong) solid var(--border-accent);
+  background: var(--background-elevated);
+  color: var(--foreground-primary);
+}
+
+.football-overall__value {
+  font: 800 var(--type-score-size) / var(--type-leading-tight)
+    var(--font-display, var(--font-display-fallback));
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--type-tracking-display);
+}
+
+.football-overall__label {
+  color: var(--accent-primary);
+  font: 800 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+}
+
+.football-state {
+  --state-mark-color: var(--foreground-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--foreground-primary);
+  font: 700 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.football-state__signal {
+  inline-size: var(--space-2);
+  block-size: var(--space-2);
+  border: var(--border-width-thin) solid var(--state-mark-color);
+  border-radius: var(--radius-round);
+  background: color-mix(in srgb, var(--state-mark-color) 45%, transparent);
+}
+
+.football-state--positive {
+  --state-mark-color: var(--state-positive);
+}
+
+.football-state--warning {
+  --state-mark-color: var(--state-warning);
+}
+
+.football-state--negative {
+  --state-mark-color: var(--state-negative);
+}
+
+.football-tactical-divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: 100%;
+  color: var(--border-strong);
+}
+
+.football-tactical-divider__line {
+  block-size: var(--border-width-thin);
+  background: currentColor;
+}
+
+.football-tactical-divider__mark {
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  border: var(--border-width-thin) solid currentColor;
+  border-radius: var(--radius-round);
+  position: relative;
+}
+
+.football-tactical-divider__mark::before,
+.football-tactical-divider__mark::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+
+.football-tactical-divider__mark::before {
+  inset-block: calc(var(--space-1) * -1);
+  inset-inline-start: 50%;
+  inline-size: var(--border-width-thin);
+}
+
+.football-tactical-divider__mark::after {
+  inset-block-start: 50%;
+  inset-inline: calc(var(--space-1) * -1);
+  block-size: var(--border-width-thin);
+}

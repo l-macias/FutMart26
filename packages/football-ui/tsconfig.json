@@ -1,5 +1,9 @@
 {
   "extends": "@football/config/tsconfig/node.json",
-  "compilerOptions": { "rootDir": "src" },
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

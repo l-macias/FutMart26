@@ -1,0 +1,10 @@
+.screen {
+  display: grid;
+  max-inline-size: var(--content-placeholder);
+  gap: var(--space-5);
+  padding-block: var(--space-6);
+}
+
+.note {
+  padding: var(--space-5);
+}
