@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/components/placeholder-screen/placeholder-screen";
+import { PlayScreen } from "@/features/play/play-screen";
 
-export default function PlayPlaceholderPage() {
-  return <PlaceholderScreen index="02" title="Jugar" />;
+export default function PlayPage() {
+  return <PlayScreen />;
 }
