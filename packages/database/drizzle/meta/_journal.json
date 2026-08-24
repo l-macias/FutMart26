@@ -43,6 +43,20 @@
       "when": 1787579635023,
       "tag": "0005_gray_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787580818648,
+      "tag": "0006_striped_psynapse",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787581110614,
+      "tag": "0007_blushing_masque",
+      "breakpoints": true
     }
   ]
 }

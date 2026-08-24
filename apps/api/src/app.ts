@@ -16,6 +16,7 @@ import { GroupService } from "./modules/groups/group-service.js";
 import { PlayerService } from "./modules/identity/player-service.js";
 import { createMatchRoutes } from "./modules/matches/match-routes.js";
 import { MatchService } from "./modules/matches/match-service.js";
+import { MatchCompletionService } from "./modules/matches/match-completion-service.js";
 
 export function buildApp(
   config: ApiConfig,
@@ -96,7 +97,7 @@ export function buildApp(
     if (request.method === "OPTIONS") {
       reply.header(
         "access-control-allow-methods",
-        "GET,HEAD,POST,PATCH,DELETE,OPTIONS",
+        "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
       );
       reply.header("access-control-allow-headers", "Content-Type");
       return reply.status(204).send();
@@ -135,6 +136,7 @@ export function buildApp(
       dependencies.auth,
       new PlayerService(dependencies.database),
       new MatchService(dependencies.database),
+      new MatchCompletionService(dependencies.database),
     ),
   );
   return app;

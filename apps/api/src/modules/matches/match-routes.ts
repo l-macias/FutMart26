@@ -9,16 +9,21 @@ import {
   matchGuestParamsSchema,
   matchIdParamsSchema,
   updateMatchRequestSchema,
+  finalRosterRequestSchema,
+  updateStatsRequestSchema,
+  assignObserverRequestSchema,
 } from "@football/contracts";
 
 import { ApplicationError } from "../errors.js";
 import { PlayerService } from "../identity/player-service.js";
 import { MatchService } from "./match-service.js";
+import { MatchCompletionService } from "./match-completion-service.js";
 
 export function createMatchRoutes(
   auth: FootballAuth,
   players: PlayerService,
   matches: MatchService,
+  completion: MatchCompletionService,
 ): FastifyPluginAsync {
   return (app) => {
     async function actor(request: { headers: NodeJS.Dict<string | string[]> }) {
@@ -104,6 +109,58 @@ export function createMatchRoutes(
     app.get("/matches/:matchId/roster", async (request) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);
       return matches.roster((await actor(request)).id, matchId);
+    });
+    app.post("/matches/:matchId/finish", async (request, reply) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      await completion.finish((await actor(request)).id, matchId);
+      return reply.status(204).send();
+    });
+    app.put("/matches/:matchId/final-roster", async (request, reply) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = finalRosterRequestSchema.parse(request.body);
+      await completion.confirmRoster(
+        (await actor(request)).id,
+        matchId,
+        body.participants,
+      );
+      return reply.status(204).send();
+    });
+    app.get("/matches/:matchId/final-roster", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return completion.getFinalRoster((await actor(request)).id, matchId);
+    });
+    app.put("/matches/:matchId/stats", async (request, reply) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = updateStatsRequestSchema.parse(request.body);
+      await completion.updateStats(
+        (await actor(request)).id,
+        matchId,
+        body.participants,
+      );
+      return reply.status(204).send();
+    });
+    app.get("/matches/:matchId/stats", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return completion.getStats((await actor(request)).id, matchId);
+    });
+    app.put("/matches/:matchId/observer", async (request, reply) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = assignObserverRequestSchema.parse(request.body);
+      await completion.assignObserver(
+        (await actor(request)).id,
+        matchId,
+        body.playerId,
+      );
+      return reply.status(204).send();
+    });
+    app.delete("/matches/:matchId/observer", async (request, reply) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      await completion.removeObserver((await actor(request)).id, matchId);
+      return reply.status(204).send();
+    });
+    app.get("/matches/:matchId/voting-eligibility", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return completion.eligibility((await actor(request)).id, matchId);
     });
     return Promise.resolve();
   };

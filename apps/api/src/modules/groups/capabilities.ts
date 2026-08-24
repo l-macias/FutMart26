@@ -5,7 +5,11 @@ export type GroupCapability =
   | "GROUP_TRANSFER_OWNERSHIP"
   | "GROUP_ARCHIVE"
   | "MATCH_MANAGE"
-  | "MATCH_MANAGE_GUESTS";
+  | "MATCH_MANAGE_GUESTS"
+  | "MATCH_COMPLETE"
+  | "MATCH_CONFIRM_ROSTER"
+  | "MATCH_MANAGE_STATS"
+  | "MATCH_MANAGE_OBSERVER";
 
 const roleCapabilities = {
   OWNER: [
@@ -16,6 +20,10 @@ const roleCapabilities = {
     "GROUP_ARCHIVE",
     "MATCH_MANAGE",
     "MATCH_MANAGE_GUESTS",
+    "MATCH_COMPLETE",
+    "MATCH_CONFIRM_ROSTER",
+    "MATCH_MANAGE_STATS",
+    "MATCH_MANAGE_OBSERVER",
   ],
   MODERATOR: ["GROUP_READ"],
   MEMBER: ["GROUP_READ"],

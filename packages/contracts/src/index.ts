@@ -14,6 +14,10 @@ export const groupCapabilitySchema = z.enum([
   "GROUP_ARCHIVE",
   "MATCH_MANAGE",
   "MATCH_MANAGE_GUESTS",
+  "MATCH_COMPLETE",
+  "MATCH_CONFIRM_ROSTER",
+  "MATCH_MANAGE_STATS",
+  "MATCH_MANAGE_OBSERVER",
 ]);
 export const groupStatusSchema = z.enum(["ACTIVE", "ARCHIVED"]);
 export const membershipStatusSchema = z.enum(["ACTIVE", "LEFT", "REMOVED"]);
@@ -109,3 +113,22 @@ export const rosterSchema = z.object({
   confirmed: z.array(rosterParticipantSchema),
   waitlist: z.array(rosterParticipantSchema),
 });
+export const attendanceSchema = z.enum(["PLAYED", "NO_SHOW"]);
+export const finalRosterRequestSchema = z
+  .object({
+    participants: z.array(
+      z.object({ participantId: idSchema, attendance: attendanceSchema }),
+    ),
+  })
+  .strict();
+export const participantStatsSchema = z.object({
+  participantId: idSchema,
+  goals: z.number().int().nonnegative(),
+  assists: z.number().int().nonnegative(),
+});
+export const updateStatsRequestSchema = z
+  .object({ participants: z.array(participantStatsSchema) })
+  .strict();
+export const assignObserverRequestSchema = z
+  .object({ playerId: idSchema })
+  .strict();

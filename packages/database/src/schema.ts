@@ -224,6 +224,10 @@ export const matchParticipantStatus = pgEnum("match_participant_status", [
   "WAITLISTED",
   "CANCELLED",
 ]);
+export const matchAttendanceStatus = pgEnum("match_attendance_status", [
+  "PLAYED",
+  "NO_SHOW",
+]);
 
 // locationText is display-only in V1. Future Venue/geography IDs will be separate fields.
 export const matches = pgTable(
@@ -258,6 +262,17 @@ export const matches = pgTable(
       withTimezone: true,
     }),
     cancelledByPlayerId: uuid("cancelled_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    observerPlayerId: uuid("observer_player_id").references(() => players.id, {
+      onDelete: "restrict",
+    }),
+    rosterConfirmedAt: timestamp("roster_confirmed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    rosterConfirmedByPlayerId: uuid("roster_confirmed_by_player_id").references(
       () => players.id,
       { onDelete: "restrict" },
     ),
@@ -312,12 +327,24 @@ export const matchParticipants = pgTable(
       mode: "date",
       withTimezone: true,
     }),
+    attendance: matchAttendanceStatus("attendance"),
+    attendanceConfirmedAt: timestamp("attendance_confirmed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    attendanceConfirmedByPlayerId: uuid(
+      "attendance_confirmed_by_player_id",
+    ).references(() => players.id, { onDelete: "restrict" }),
     ...timestamps,
   },
   (table) => [
     check(
       "match_participants_identity_ck",
       sql`(${table.kind} = 'PLAYER' and ${table.playerId} is not null and ${table.guestDisplayName} is null and ${table.guestCreatedByPlayerId} is null) or (${table.kind} = 'GUEST' and ${table.playerId} is null and ${table.guestDisplayName} is not null and btrim(${table.guestDisplayName}) <> '' and ${table.guestCreatedByPlayerId} is not null)`,
+    ),
+    check(
+      "match_participants_attendance_evidence_ck",
+      sql`(${table.attendance} is null and ${table.attendanceConfirmedAt} is null and ${table.attendanceConfirmedByPlayerId} is null) or (${table.status} = 'CONFIRMED' and ${table.attendance} is not null and ${table.attendanceConfirmedAt} is not null and ${table.attendanceConfirmedByPlayerId} is not null)`,
     ),
     uniqueIndex("match_participants_admission_order_uq").on(
       table.matchId,
@@ -337,5 +364,32 @@ export const matchParticipants = pgTable(
       table.playerId,
       table.matchId,
     ),
+  ],
+);
+
+export const matchParticipantStats = pgTable(
+  "match_participant_stats",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    participantId: uuid("participant_id")
+      .notNull()
+      .references(() => matchParticipants.id, { onDelete: "restrict" }),
+    goals: integer("goals").default(0).notNull(),
+    assists: integer("assists").default(0).notNull(),
+    updatedByPlayerId: uuid("updated_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("match_participant_stats_participant_uq").on(
+      table.participantId,
+    ),
+    check("match_participant_stats_goals_ck", sql`${table.goals} >= 0`),
+    check("match_participant_stats_assists_ck", sql`${table.assists} >= 0`),
+    index("match_participant_stats_match_idx").on(table.matchId),
   ],
 );

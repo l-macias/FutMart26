@@ -7,12 +7,16 @@ import { and, eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 
 import { createDatabase } from "@football/database";
-import { createGuestRequestSchema } from "@football/contracts";
+import {
+  createGuestRequestSchema,
+  updateStatsRequestSchema,
+} from "@football/contracts";
 import {
   authUser,
   groupMemberships,
   groups,
   matchParticipants,
+  matchParticipantStats,
   matches,
 } from "@football/database/schema";
 
@@ -20,6 +24,7 @@ import { ApplicationError } from "../errors.js";
 import { GroupService } from "../groups/group-service.js";
 import { PlayerService } from "../identity/player-service.js";
 import { MatchService } from "./match-service.js";
+import { MatchCompletionService } from "./match-completion-service.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const safeTestDatabaseUrl =
@@ -60,6 +65,7 @@ void test(
     const players = new PlayerService(connection.db);
     const groupService = new GroupService(connection.db);
     const service = new MatchService(connection.db);
+    const completion = new MatchCompletionService(connection.db);
 
     async function seedPlayer(displayName: string) {
       const authUserId = randomUUID();
@@ -109,16 +115,16 @@ void test(
     }
 
     const tableNames = await connection.client.unsafe<{ tablename: string }[]>(
-      "select tablename from pg_tables where schemaname = 'public' and tablename in ('matches', 'match_participants') order by tablename",
+      "select tablename from pg_tables where schemaname = 'public' and tablename in ('matches', 'match_participants', 'match_participant_stats') order by tablename",
     );
     assert.deepEqual(
       tableNames.map((row) => row.tablename),
-      ["match_participants", "matches"],
+      ["match_participant_stats", "match_participants", "matches"],
     );
     const indexes = await connection.client.unsafe<
       { indexname: string; indexdef: string }[]
     >(
-      "select indexname, indexdef from pg_indexes where schemaname = 'public' and tablename in ('matches', 'match_participants')",
+      "select indexname, indexdef from pg_indexes where schemaname = 'public' and tablename in ('matches', 'match_participants', 'match_participant_stats')",
     );
     const index = (name: string) =>
       indexes.find((candidate) => candidate.indexname === name)?.indexdef ?? "";
@@ -130,6 +136,8 @@ void test(
       "match_participants_admission_order_uq",
       "match_participants_match_status_order_idx",
       "match_participants_player_match_idx",
+      "match_participant_stats_participant_uq",
+      "match_participant_stats_match_idx",
       "matches_group_scheduled_idx",
       "matches_group_status_idx",
     ])
@@ -137,7 +145,7 @@ void test(
     const constraints = await connection.client.unsafe<
       { conname: string; definition: string }[]
     >(
-      "select conname, pg_get_constraintdef(oid) as definition from pg_constraint where conrelid in ('matches'::regclass, 'match_participants'::regclass)",
+      "select conname, pg_get_constraintdef(oid) as definition from pg_constraint where conrelid in ('matches'::regclass, 'match_participants'::regclass, 'match_participant_stats'::regclass)",
     );
     assert.match(
       constraints.find(
@@ -145,6 +153,15 @@ void test(
       )?.definition ?? "",
       /CHECK.+PLAYER.+GUEST/,
     );
+    for (const name of [
+      "match_participants_attendance_evidence_ck",
+      "match_participant_stats_goals_ck",
+      "match_participant_stats_assists_ck",
+    ])
+      assert.ok(
+        constraints.some((constraint) => constraint.conname === name),
+        `Missing constraint ${name}`,
+      );
     for (const foreignKey of constraints.filter((constraint) =>
       constraint.definition.startsWith("FOREIGN KEY"),
     ))
@@ -163,6 +180,10 @@ void test(
     await addMember(group.id, moderator.id, "MODERATOR", [
       "MATCH_MANAGE",
       "MATCH_MANAGE_GUESTS",
+      "MATCH_COMPLETE",
+      "MATCH_CONFIRM_ROSTER",
+      "MATCH_MANAGE_STATS",
+      "MATCH_MANAGE_OBSERVER",
     ]);
     assert.equal(createGuestRequestSchema.safeParse({}).success, false);
     assert.equal(
@@ -172,6 +193,18 @@ void test(
     assert.deepEqual(
       createGuestRequestSchema.parse({ displayName: "  Diego  " }),
       { displayName: "Diego" },
+    );
+    assert.equal(
+      updateStatsRequestSchema.safeParse({
+        participants: [{ participantId: randomUUID(), goals: -1, assists: 0 }],
+      }).success,
+      false,
+    );
+    assert.equal(
+      updateStatsRequestSchema.safeParse({
+        participants: [{ participantId: randomUUID(), goals: 1.5, assists: 0 }],
+      }).success,
+      false,
     );
 
     const draft = await service.create(owner.id, group.id, {
@@ -450,6 +483,170 @@ void test(
       .where(eq(matches.id, locked.id));
     assert.equal(persistedLocked?.status, "STARTED");
     assert.ok(persistedLocked?.rosterLockedAt);
+
+    const draftForFinish = await service.create(owner.id, group.id, {
+      discipline: "F5",
+      scheduledAt: new Date("2027-03-01T20:00:00.000Z"),
+      durationMinutes: 60,
+      capacity: 2,
+      locationText: "Rosario",
+    });
+    await assert.rejects(
+      () => completion.finish(owner.id, draftForFinish.id),
+      hasCode("invalid_match_transition"),
+    );
+    const openForFinish = await createOpenMatch(owner.id, group.id, 2);
+    await assert.rejects(
+      () => completion.finish(owner.id, openForFinish.id),
+      hasCode("invalid_match_transition"),
+    );
+
+    const completed = await createOpenMatch(owner.id, group.id, 3);
+    const ownerParticipation = await service.join(owner.id, completed.id);
+    const playerParticipation = await service.join(playerA.id, completed.id);
+    const playedGuest = await service.addGuest(
+      owner.id,
+      completed.id,
+      "Final guest",
+    );
+    const waitlisted = await service.join(playerB.id, completed.id);
+    await assert.rejects(
+      () => completion.assignObserver(owner.id, completed.id, playedGuest.id),
+      hasCode("player_not_found"),
+    );
+    await assert.rejects(
+      () => completion.assignObserver(playerA.id, completed.id, external.id),
+      hasCode("forbidden"),
+    );
+    await completion.assignObserver(moderator.id, completed.id, external.id);
+    await service.start(owner.id, completed.id);
+    await Promise.all([
+      completion.finish(owner.id, completed.id),
+      completion.finish(moderator.id, completed.id),
+    ]);
+    const finalRoster = [
+      { participantId: ownerParticipation.id, attendance: "PLAYED" as const },
+      { participantId: playerParticipation.id, attendance: "NO_SHOW" as const },
+      { participantId: playedGuest.id, attendance: "PLAYED" as const },
+    ];
+    await assert.rejects(
+      () =>
+        completion.confirmRoster(
+          owner.id,
+          completed.id,
+          finalRoster.slice(0, 2),
+        ),
+      hasCode("invalid_final_roster"),
+    );
+    await assert.rejects(
+      () =>
+        completion.confirmRoster(owner.id, completed.id, [
+          ...finalRoster,
+          { participantId: waitlisted.id, attendance: "PLAYED" },
+        ]),
+      hasCode("invalid_final_roster"),
+    );
+    await assert.rejects(
+      () =>
+        completion.confirmRoster(owner.id, completed.id, [
+          finalRoster[0]!,
+          finalRoster[0]!,
+          finalRoster[2]!,
+        ]),
+      hasCode("invalid_final_roster"),
+    );
+    await Promise.all([
+      completion.confirmRoster(owner.id, completed.id, finalRoster),
+      completion.confirmRoster(owner.id, completed.id, [
+        finalRoster[0]!,
+        { participantId: playerParticipation.id, attendance: "PLAYED" },
+        finalRoster[2]!,
+      ]),
+    ]);
+    await completion.confirmRoster(owner.id, completed.id, finalRoster);
+
+    const observerRoster = await completion.getFinalRoster(
+      external.id,
+      completed.id,
+    );
+    assert.equal(observerRoster.participants.length, 3);
+
+    await completion.updateStats(external.id, completed.id, [
+      { participantId: ownerParticipation.id, goals: 2, assists: 1 },
+      { participantId: playedGuest.id, goals: 1, assists: 0 },
+    ]);
+    assert.equal(
+      (await completion.getStats(external.id, completed.id)).length,
+      2,
+    );
+    await assert.rejects(
+      () =>
+        completion.updateStats(owner.id, completed.id, [
+          { participantId: playerParticipation.id, goals: 1, assists: 0 },
+        ]),
+      hasCode("stats_not_allowed"),
+    );
+    await assert.rejects(
+      () => completion.updateStats(playerA.id, completed.id, []),
+      hasCode("forbidden"),
+    );
+    await assert.rejects(
+      () =>
+        connection.db.insert(matchParticipantStats).values({
+          id: randomUUID(),
+          matchId: completed.id,
+          participantId: playerParticipation.id,
+          goals: -1,
+          assists: 0,
+          updatedByPlayerId: owner.id,
+        }),
+      (error) =>
+        isDatabaseConstraint(
+          error,
+          "23514",
+          "match_participant_stats_goals_ck",
+        ),
+    );
+    const eligibility = await completion.eligibility(owner.id, completed.id);
+    assert.equal(eligibility.observer?.canVote, false);
+    const ownerEligibility = eligibility.participants.find(
+      (participant) => participant.participantId === ownerParticipation.id,
+    );
+    const noShowEligibility = eligibility.participants.find(
+      (participant) => participant.participantId === playerParticipation.id,
+    );
+    const guestEligibility = eligibility.participants.find(
+      (participant) => participant.participantId === playedGuest.id,
+    );
+    assert.deepEqual(
+      [ownerEligibility?.canVote, ownerEligibility?.canBeEvaluated],
+      [true, true],
+    );
+    assert.deepEqual(
+      [noShowEligibility?.canVote, noShowEligibility?.canBeEvaluated],
+      [false, false],
+    );
+    assert.deepEqual(
+      [guestEligibility?.canVote, guestEligibility?.canBeEvaluated],
+      [false, true],
+    );
+    await completion.assignObserver(owner.id, completed.id, owner.id);
+    const participantObserverEligibility = await completion.eligibility(
+      owner.id,
+      completed.id,
+    );
+    assert.equal(
+      participantObserverEligibility.participants.find(
+        (participant) => participant.participantId === ownerParticipation.id,
+      )?.canVote,
+      true,
+    );
+    await completion.removeObserver(owner.id, completed.id);
+    const [observerRemoved] = await connection.db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, completed.id));
+    assert.equal(observerRemoved?.observerPlayerId, null);
     const overCapacity = await connection.db
       .select({ count: sql<number>`count(*)::int` })
       .from(matchParticipants)

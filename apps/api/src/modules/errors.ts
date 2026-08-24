@@ -15,7 +15,10 @@ export type ApplicationErrorCode =
   | "invalid_match_transition"
   | "capacity_below_confirmed"
   | "invalid_capacity"
-  | "group_archived";
+  | "group_archived"
+  | "invalid_final_roster"
+  | "roster_not_confirmed"
+  | "stats_not_allowed";
 
 export class ApplicationError extends Error {
   constructor(
