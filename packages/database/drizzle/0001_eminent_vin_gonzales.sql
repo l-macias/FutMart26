@@ -1,0 +1,1 @@
+ALTER TABLE "group_memberships" ADD COLUMN "capabilities" text[] DEFAULT '{}'::text[] NOT NULL;
