@@ -1,7 +1,10 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  bigint,
+  check,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -200,6 +203,139 @@ export const groupRoleChanges = pgTable(
     index("group_role_changes_group_time_idx").on(
       table.groupId,
       table.changedAt,
+    ),
+  ],
+);
+
+export const matchDiscipline = pgEnum("match_discipline", ["F5"]);
+export const matchStatus = pgEnum("match_status", [
+  "DRAFT",
+  "OPEN",
+  "STARTED",
+  "FINISHED",
+  "CANCELLED",
+]);
+export const matchParticipantKind = pgEnum("match_participant_kind", [
+  "PLAYER",
+  "GUEST",
+]);
+export const matchParticipantStatus = pgEnum("match_participant_status", [
+  "CONFIRMED",
+  "WAITLISTED",
+  "CANCELLED",
+]);
+
+// locationText is display-only in V1. Future Venue/geography IDs will be separate fields.
+export const matches = pgTable(
+  "matches",
+  {
+    id: uuid("id").primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "restrict" }),
+    discipline: matchDiscipline("discipline").default("F5").notNull(),
+    status: matchStatus("status").default("DRAFT").notNull(),
+    scheduledAt: timestamp("scheduled_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    capacity: integer("capacity").notNull(),
+    locationText: text("location_text").notNull(),
+    createdByPlayerId: uuid("created_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    rosterLockedAt: timestamp("roster_locked_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    publishedAt: timestamp("published_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    cancelledAt: timestamp("cancelled_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    cancelledByPlayerId: uuid("cancelled_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    nextAdmissionOrder: bigint("next_admission_order", { mode: "bigint" })
+      .default(sql`1`)
+      .notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    check("matches_duration_positive_ck", sql`${table.durationMinutes} > 0`),
+    check("matches_capacity_positive_ck", sql`${table.capacity} > 0`),
+    index("matches_group_scheduled_idx").on(table.groupId, table.scheduledAt),
+    index("matches_group_status_idx").on(table.groupId, table.status),
+  ],
+);
+
+// One table creates one admission order for Players and Guests and therefore one waitlist.
+export const matchParticipants = pgTable(
+  "match_participants",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    kind: matchParticipantKind("kind").notNull(),
+    playerId: uuid("player_id").references(() => players.id, {
+      onDelete: "restrict",
+    }),
+    guestDisplayName: text("guest_display_name"),
+    guestCreatedByPlayerId: uuid("guest_created_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    status: matchParticipantStatus("status").notNull(),
+    admissionOrder: bigint("admission_order", { mode: "bigint" }).notNull(),
+    joinedAt: timestamp("joined_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    confirmedAt: timestamp("confirmed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    cancelledAt: timestamp("cancelled_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    cancelledByPlayerId: uuid("cancelled_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    promotedAt: timestamp("promoted_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "match_participants_identity_ck",
+      sql`(${table.kind} = 'PLAYER' and ${table.playerId} is not null and ${table.guestDisplayName} is null and ${table.guestCreatedByPlayerId} is null) or (${table.kind} = 'GUEST' and ${table.playerId} is null and ${table.guestDisplayName} is not null and btrim(${table.guestDisplayName}) <> '' and ${table.guestCreatedByPlayerId} is not null)`,
+    ),
+    uniqueIndex("match_participants_admission_order_uq").on(
+      table.matchId,
+      table.admissionOrder,
+    ),
+    uniqueIndex("match_participants_active_player_uq")
+      .on(table.matchId, table.playerId)
+      .where(
+        sql`${table.kind} = 'PLAYER' and ${table.status} in ('CONFIRMED', 'WAITLISTED')`,
+      ),
+    index("match_participants_match_status_order_idx").on(
+      table.matchId,
+      table.status,
+      table.admissionOrder,
+    ),
+    index("match_participants_player_match_idx").on(
+      table.playerId,
+      table.matchId,
     ),
   ],
 );

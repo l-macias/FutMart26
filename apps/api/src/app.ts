@@ -14,6 +14,8 @@ import { ApplicationError } from "./modules/errors.js";
 import { createGroupRoutes } from "./modules/groups/group-routes.js";
 import { GroupService } from "./modules/groups/group-service.js";
 import { PlayerService } from "./modules/identity/player-service.js";
+import { createMatchRoutes } from "./modules/matches/match-routes.js";
+import { MatchService } from "./modules/matches/match-service.js";
 
 export function buildApp(
   config: ApiConfig,
@@ -72,11 +74,13 @@ export function buildApp(
             ? "already_member"
             : constraint === "group_memberships_active_owner_uq"
               ? "ownership_invariant_violation"
-              : databaseConflict
-                ? "concurrency_conflict"
-                : statusCode === 400
-                  ? "bad_request"
-                  : "internal_server_error",
+              : constraint === "match_participants_active_player_uq"
+                ? "already_joined"
+                : databaseConflict
+                  ? "concurrency_conflict"
+                  : statusCode === 400
+                    ? "bad_request"
+                    : "internal_server_error",
       requestId: request.id,
     });
   });
@@ -92,7 +96,7 @@ export function buildApp(
     if (request.method === "OPTIONS") {
       reply.header(
         "access-control-allow-methods",
-        "GET,HEAD,POST,DELETE,OPTIONS",
+        "GET,HEAD,POST,PATCH,DELETE,OPTIONS",
       );
       reply.header("access-control-allow-headers", "Content-Type");
       return reply.status(204).send();
@@ -124,6 +128,13 @@ export function buildApp(
       dependencies.auth,
       new PlayerService(dependencies.database),
       new GroupService(dependencies.database),
+    ),
+  );
+  app.register(
+    createMatchRoutes(
+      dependencies.auth,
+      new PlayerService(dependencies.database),
+      new MatchService(dependencies.database),
     ),
   );
   return app;

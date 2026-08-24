@@ -12,6 +12,8 @@ export const groupCapabilitySchema = z.enum([
   "GROUP_MANAGE_MODERATORS",
   "GROUP_TRANSFER_OWNERSHIP",
   "GROUP_ARCHIVE",
+  "MATCH_MANAGE",
+  "MATCH_MANAGE_GUESTS",
 ]);
 export const groupStatusSchema = z.enum(["ACTIVE", "ARCHIVED"]);
 export const membershipStatusSchema = z.enum(["ACTIVE", "LEFT", "REMOVED"]);
@@ -44,3 +46,66 @@ export const groupMemberParamsSchema = z.object({
 export type PlayerResponse = z.infer<typeof playerSchema>;
 export type GroupResponse = z.infer<typeof groupSchema>;
 export type MembershipResponse = z.infer<typeof membershipSchema>;
+
+export const matchDisciplineSchema = z.literal("F5");
+export const matchStatusSchema = z.enum([
+  "DRAFT",
+  "OPEN",
+  "STARTED",
+  "FINISHED",
+  "CANCELLED",
+]);
+export const matchParticipantStatusSchema = z.enum([
+  "CONFIRMED",
+  "WAITLISTED",
+  "CANCELLED",
+]);
+export const matchParticipantKindSchema = z.enum(["PLAYER", "GUEST"]);
+const matchFieldsSchema = z.object({
+  scheduledAt: z.iso.datetime(),
+  durationMinutes: z.number().int().positive(),
+  capacity: z.number().int().positive(),
+  locationText: z.string().trim().min(1).max(200),
+});
+export const createMatchRequestSchema = matchFieldsSchema
+  .extend({ discipline: matchDisciplineSchema.optional().default("F5") })
+  .strict();
+export const updateMatchRequestSchema = matchFieldsSchema.partial().strict();
+export const matchIdParamsSchema = z.object({ matchId: idSchema });
+export const matchGuestParamsSchema = z.object({
+  matchId: idSchema,
+  guestId: idSchema,
+});
+export const createGuestRequestSchema = z
+  .object({ displayName: z.string().trim().min(1).max(100) })
+  .strict();
+export const matchSchema = z.object({
+  id: idSchema,
+  groupId: idSchema,
+  discipline: matchDisciplineSchema,
+  status: matchStatusSchema,
+  scheduledAt: z.iso.datetime(),
+  durationMinutes: z.number().int(),
+  capacity: z.number().int(),
+  locationText: z.string(),
+  rosterLockedAt: z.iso.datetime().nullable(),
+  confirmedCount: z.number().int().nonnegative(),
+  waitlistCount: z.number().int().nonnegative(),
+  availableSpots: z.number().int().nonnegative(),
+});
+export const rosterParticipantSchema = z.object({
+  id: idSchema,
+  kind: matchParticipantKindSchema,
+  status: matchParticipantStatusSchema,
+  displayName: z.string().nullable(),
+  playerId: idSchema.nullable(),
+  joinedAt: z.iso.datetime(),
+});
+export const rosterSchema = z.object({
+  capacity: z.number().int().positive(),
+  confirmedCount: z.number().int().nonnegative(),
+  waitlistCount: z.number().int().nonnegative(),
+  availableSpots: z.number().int().nonnegative(),
+  confirmed: z.array(rosterParticipantSchema),
+  waitlist: z.array(rosterParticipantSchema),
+});

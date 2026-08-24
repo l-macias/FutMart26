@@ -22,6 +22,27 @@
       "when": 1787540799134,
       "tag": "0002_shallow_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787578563221,
+      "tag": "0003_productive_abomination",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787578816710,
+      "tag": "0004_freezing_the_initiative",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787579635023,
+      "tag": "0005_gray_warbird",
+      "breakpoints": true
     }
   ]
 }

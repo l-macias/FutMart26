@@ -3,7 +3,9 @@ export type GroupCapability =
   | "GROUP_MANAGE_MEMBERS"
   | "GROUP_MANAGE_MODERATORS"
   | "GROUP_TRANSFER_OWNERSHIP"
-  | "GROUP_ARCHIVE";
+  | "GROUP_ARCHIVE"
+  | "MATCH_MANAGE"
+  | "MATCH_MANAGE_GUESTS";
 
 const roleCapabilities = {
   OWNER: [
@@ -12,6 +14,8 @@ const roleCapabilities = {
     "GROUP_MANAGE_MODERATORS",
     "GROUP_TRANSFER_OWNERSHIP",
     "GROUP_ARCHIVE",
+    "MATCH_MANAGE",
+    "MATCH_MANAGE_GUESTS",
   ],
   MODERATOR: ["GROUP_READ"],
   MEMBER: ["GROUP_READ"],

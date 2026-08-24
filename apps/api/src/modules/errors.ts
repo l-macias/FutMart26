@@ -7,7 +7,15 @@ export type ApplicationErrorCode =
   | "already_member"
   | "invalid_role_transition"
   | "ownership_invariant_violation"
-  | "concurrency_conflict";
+  | "concurrency_conflict"
+  | "match_not_found"
+  | "match_not_open"
+  | "not_participating"
+  | "roster_locked"
+  | "invalid_match_transition"
+  | "capacity_below_confirmed"
+  | "invalid_capacity"
+  | "group_archived";
 
 export class ApplicationError extends Error {
   constructor(
