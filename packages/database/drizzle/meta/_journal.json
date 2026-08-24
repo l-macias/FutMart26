@@ -71,6 +71,13 @@
       "when": 1787589011430,
       "tag": "0009_known_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787592245430,
+      "tag": "0010_windy_manta",
+      "breakpoints": true
     }
   ]
 }

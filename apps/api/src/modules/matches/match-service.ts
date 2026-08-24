@@ -7,6 +7,8 @@ import {
   groupMemberships,
   groups,
   matchParticipants,
+  matchSportingResults,
+  matchTeamAssignments,
   matches,
   players,
 } from "@football/database/schema";
@@ -97,6 +99,33 @@ export class MatchService {
         true,
       );
       if (match.status !== "DRAFT") this.invalidTransition();
+      const blockers = await tx.execute(sql`
+        select older.id
+        from ${matches} older
+        where older.group_id = ${match.groupId}
+          and older.status = 'FINISHED'
+          and older.roster_confirmed_at is not null
+          and (older.scheduled_at, older.id) < (${match.scheduledAt.toISOString()}::timestamptz, ${match.id}::uuid)
+          and exists (
+            select 1 from ${matchParticipants} participant
+            where participant.match_id = older.id
+              and participant.status = 'CONFIRMED'
+              and participant.attendance = 'PLAYED'
+          )
+          and not exists (
+            select 1 from ${matchSportingResults} result
+            where result.match_id = older.id
+              and result.status in ('CONFIRMED', 'NOT_PLAYED')
+          )
+        order by older.scheduled_at, older.id
+        limit 1
+      `);
+      if (blockers.length > 0)
+        throw new ApplicationError(
+          "prior_match_sporting_closure_required",
+          "An older played Match requires sporting closure before publication",
+          409,
+        );
       const now = new Date();
       await tx
         .update(matches)
@@ -175,7 +204,30 @@ export class MatchService {
         "MATCH_MANAGE",
         true,
       );
+      if (match.status === "STARTED") return;
       if (match.status !== "OPEN") this.invalidTransition();
+      const [counts] = await tx
+        .select({
+          confirmed: sql<number>`count(distinct ${matchParticipants.id})::int`,
+          assigned: sql<number>`count(distinct ${matchTeamAssignments.participantId})::int`,
+        })
+        .from(matchParticipants)
+        .leftJoin(
+          matchTeamAssignments,
+          eq(matchTeamAssignments.participantId, matchParticipants.id),
+        )
+        .where(
+          and(
+            eq(matchParticipants.matchId, matchId),
+            eq(matchParticipants.status, "CONFIRMED"),
+          ),
+        );
+      if (counts!.confirmed !== counts!.assigned)
+        throw new ApplicationError(
+          "incomplete_team_assignments",
+          "Every confirmed participant must have one team assignment before START",
+          409,
+        );
       const now = new Date();
       await tx
         .update(matches)
@@ -425,6 +477,9 @@ export class MatchService {
     actorPlayerId: string,
   ) {
     const now = new Date();
+    await tx
+      .delete(matchTeamAssignments)
+      .where(eq(matchTeamAssignments.participantId, id));
     await tx
       .update(matchParticipants)
       .set({

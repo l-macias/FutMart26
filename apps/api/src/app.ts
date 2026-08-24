@@ -17,6 +17,8 @@ import { PlayerService } from "./modules/identity/player-service.js";
 import { createMatchRoutes } from "./modules/matches/match-routes.js";
 import { MatchService } from "./modules/matches/match-service.js";
 import { MatchCompletionService } from "./modules/matches/match-completion-service.js";
+import { MatchResultService } from "./modules/matches/match-result-service.js";
+import { MatchTeamService } from "./modules/matches/match-team-service.js";
 import { createVotingRoutes } from "./modules/voting/voting-routes.js";
 import { VotingService } from "./modules/voting/voting-service.js";
 
@@ -142,6 +144,8 @@ export function buildApp(
       new PlayerService(dependencies.database),
       new MatchService(dependencies.database),
       new MatchCompletionService(dependencies.database),
+      new MatchTeamService(dependencies.database),
+      new MatchResultService(dependencies.database),
     ),
   );
   app.register(

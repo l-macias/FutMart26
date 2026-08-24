@@ -25,6 +25,7 @@ import { GroupService } from "../groups/group-service.js";
 import { PlayerService } from "../identity/player-service.js";
 import { MatchService } from "./match-service.js";
 import { MatchCompletionService } from "./match-completion-service.js";
+import { MatchTeamService } from "./match-team-service.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const safeTestDatabaseUrl =
@@ -66,6 +67,7 @@ void test(
     const groupService = new GroupService(connection.db);
     const service = new MatchService(connection.db);
     const completion = new MatchCompletionService(connection.db);
+    const teams = new MatchTeamService(connection.db);
 
     async function seedPlayer(displayName: string) {
       const authUserId = randomUUID();
@@ -184,6 +186,7 @@ void test(
       "MATCH_CONFIRM_ROSTER",
       "MATCH_MANAGE_STATS",
       "MATCH_MANAGE_OBSERVER",
+      "MATCH_MANAGE_TEAMS",
     ]);
     assert.equal(createGuestRequestSchema.safeParse({}).success, false);
     assert.equal(
@@ -452,7 +455,10 @@ void test(
     assert.equal(coherentRace.waitlist[0]?.playerId, playerB.id);
 
     const locked = await createOpenMatch(owner.id, group.id, 10);
-    await service.join(playerA.id, locked.id);
+    const lockedPlayer = await service.join(playerA.id, locked.id);
+    await teams.replace(owner.id, locked.id, [
+      { participantId: lockedPlayer.id, side: "TEAM_A" },
+    ]);
     await service.start(owner.id, locked.id);
     await assert.rejects(
       () => service.join(playerB.id, locked.id),
@@ -519,6 +525,11 @@ void test(
       hasCode("forbidden"),
     );
     await completion.assignObserver(moderator.id, completed.id, external.id);
+    await teams.replace(owner.id, completed.id, [
+      { participantId: ownerParticipation.id, side: "TEAM_A" },
+      { participantId: playerParticipation.id, side: "TEAM_B" },
+      { participantId: playedGuest.id, side: "TEAM_A" },
+    ]);
     await service.start(owner.id, completed.id);
     await Promise.all([
       completion.finish(owner.id, completed.id),

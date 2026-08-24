@@ -19,6 +19,7 @@ export const groupCapabilitySchema = z.enum([
   "MATCH_MANAGE_STATS",
   "MATCH_MANAGE_OBSERVER",
   "MATCH_MANAGE_VOTING",
+  "MATCH_MANAGE_TEAMS",
 ]);
 export const groupStatusSchema = z.enum(["ACTIVE", "ARCHIVED"]);
 export const membershipStatusSchema = z.enum(["ACTIVE", "LEFT", "REMOVED"]);
@@ -133,6 +134,31 @@ export const updateStatsRequestSchema = z
 export const assignObserverRequestSchema = z
   .object({ playerId: idSchema })
   .strict();
+
+export const matchTeamSideSchema = z.enum(["TEAM_A", "TEAM_B"]);
+export const replaceMatchTeamsRequestSchema = z
+  .object({
+    assignments: z
+      .array(
+        z
+          .object({
+            participantId: idSchema,
+            side: matchTeamSideSchema,
+          })
+          .strict(),
+      )
+      .max(20),
+  })
+  .strict();
+export const resultScoreSchema = z
+  .object({
+    teamAGoals: z.number().int().nonnegative(),
+    teamBGoals: z.number().int().nonnegative(),
+  })
+  .strict();
+export const resultDraftRequestSchema = resultScoreSchema.extend({
+  participants: z.array(participantStatsSchema).max(20),
+});
 
 export const votingAttributeSchema = z.enum([
   "PASE",

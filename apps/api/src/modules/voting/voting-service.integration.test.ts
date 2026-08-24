@@ -20,6 +20,8 @@ import { GroupService } from "../groups/group-service.js";
 import { PlayerService } from "../identity/player-service.js";
 import { MatchCompletionService } from "../matches/match-completion-service.js";
 import { MatchService } from "../matches/match-service.js";
+import { MatchResultService } from "../matches/match-result-service.js";
+import { MatchTeamService } from "../matches/match-team-service.js";
 import { VotingService } from "./voting-service.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -75,6 +77,8 @@ void test(
     const groups = new GroupService(connection.db);
     const matches = new MatchService(connection.db);
     const completion = new MatchCompletionService(connection.db);
+    const teams = new MatchTeamService(connection.db);
+    const sportingResults = new MatchResultService(connection.db);
     let now = new Date("2027-08-01T22:00:00.000Z");
     const voting = new VotingService(connection.db, () => now);
 
@@ -122,6 +126,15 @@ void test(
         match.id,
         "Guest Three",
       );
+      const all = [ownerPart, aPart, bPart, guest, guestTwo, guestThree];
+      await teams.replace(
+        owner.id,
+        match.id,
+        all.map((participant, index) => ({
+          participantId: participant.id,
+          side: index % 2 === 0 ? ("TEAM_A" as const) : ("TEAM_B" as const),
+        })),
+      );
       await matches.start(owner.id, match.id);
       await completion.finish(owner.id, match.id);
       if (options.confirm !== false)
@@ -133,6 +146,14 @@ void test(
           { participantId: guestTwo.id, attendance: "PLAYED" },
           { participantId: guestThree.id, attendance: "PLAYED" },
         ]);
+      if (options.confirm !== false) {
+        await sportingResults.saveDraft(owner.id, match.id, {
+          teamAGoals: 0,
+          teamBGoals: 0,
+          participants: [],
+        });
+        await sportingResults.confirm(owner.id, match.id);
+      }
       return { match, ownerPart, aPart, bPart, guest, guestTwo, guestThree };
     }
     const code = (expected: string) => (error: unknown) =>

@@ -7,6 +7,7 @@ import {
   groupMemberships,
   matchParticipantStats,
   matchParticipants,
+  matchSportingResults,
   matches,
   players,
   votingSessions,
@@ -105,6 +106,27 @@ export class MatchCompletionService {
           })
           .where(eq(matchParticipants.id, participant.participantId));
       }
+      const [sportingResult] = await tx
+        .select()
+        .from(matchSportingResults)
+        .where(eq(matchSportingResults.matchId, matchId))
+        .limit(1);
+      if (sportingResult?.status === "NOT_PLAYED") {
+        await tx
+          .delete(matchSportingResults)
+          .where(eq(matchSportingResults.id, sportingResult.id));
+      } else if (sportingResult?.status === "CONFIRMED") {
+        await tx
+          .update(matchSportingResults)
+          .set({
+            status: "DRAFT",
+            confirmedAt: null,
+            confirmedByPlayerId: null,
+            updatedByPlayerId: actorPlayerId,
+            updatedAt: now,
+          })
+          .where(eq(matchSportingResults.id, sportingResult.id));
+      }
       await tx
         .update(matches)
         .set({
@@ -133,6 +155,17 @@ export class MatchCompletionService {
         throw new ApplicationError(
           "roster_not_confirmed",
           "Final roster is not confirmed",
+          409,
+        );
+      const [voting] = await tx
+        .select({ id: votingSessions.id })
+        .from(votingSessions)
+        .where(eq(votingSessions.matchId, matchId))
+        .limit(1);
+      if (voting)
+        throw new ApplicationError(
+          "sporting_result_locked",
+          "Statistics are frozen after Voting exists",
           409,
         );
       if (
@@ -181,6 +214,16 @@ export class MatchCompletionService {
             },
           });
       }
+      await tx
+        .update(matchSportingResults)
+        .set({
+          status: "DRAFT",
+          confirmedAt: null,
+          confirmedByPlayerId: null,
+          updatedByPlayerId: actorPlayerId,
+          updatedAt: new Date(),
+        })
+        .where(eq(matchSportingResults.matchId, matchId));
     });
   }
 

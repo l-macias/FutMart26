@@ -3,6 +3,7 @@ import {
   boolean,
   bigint,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -230,6 +231,16 @@ export const matchAttendanceStatus = pgEnum("match_attendance_status", [
   "PLAYED",
   "NO_SHOW",
 ]);
+export const matchTeamSide = pgEnum("match_team_side", ["TEAM_A", "TEAM_B"]);
+export const matchTeamAssignmentSource = pgEnum(
+  "match_team_assignment_source",
+  ["MANUAL", "INTELLIGENT"],
+);
+export const sportingResultStatus = pgEnum("sporting_result_status", [
+  "DRAFT",
+  "CONFIRMED",
+  "NOT_PLAYED",
+]);
 
 // locationText is display-only in V1. Future Venue/geography IDs will be separate fields.
 export const matches = pgTable(
@@ -352,6 +363,7 @@ export const matchParticipants = pgTable(
       table.matchId,
       table.admissionOrder,
     ),
+    uniqueIndex("match_participants_id_match_uq").on(table.id, table.matchId),
     uniqueIndex("match_participants_active_player_uq")
       .on(table.matchId, table.playerId)
       .where(
@@ -365,6 +377,76 @@ export const matchParticipants = pgTable(
     index("match_participants_player_match_idx").on(
       table.playerId,
       table.matchId,
+    ),
+  ],
+);
+
+// TEAM_A and TEAM_B are Match-scoped sides, not persistent Group teams.
+export const matchTeamAssignments = pgTable(
+  "match_team_assignments",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    participantId: uuid("participant_id").notNull(),
+    side: matchTeamSide("side").notNull(),
+    source: matchTeamAssignmentSource("source").notNull(),
+    algorithmVersion: text("algorithm_version"),
+    updatedByPlayerId: uuid("updated_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      name: "match_team_assignments_participant_match_fk",
+      columns: [table.participantId, table.matchId],
+      foreignColumns: [matchParticipants.id, matchParticipants.matchId],
+    }).onDelete("restrict"),
+    uniqueIndex("match_team_assignments_participant_uq").on(
+      table.participantId,
+    ),
+    index("match_team_assignments_match_side_idx").on(
+      table.matchId,
+      table.side,
+    ),
+  ],
+);
+
+export const matchSportingResults = pgTable(
+  "match_sporting_results",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    status: sportingResultStatus("status").default("DRAFT").notNull(),
+    teamAGoals: integer("team_a_goals"),
+    teamBGoals: integer("team_b_goals"),
+    updatedByPlayerId: uuid("updated_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    confirmedAt: timestamp("confirmed_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    confirmedByPlayerId: uuid("confirmed_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("match_sporting_results_match_uq").on(table.matchId),
+    index("match_sporting_results_status_idx").on(table.status),
+    check(
+      "match_sporting_results_state_ck",
+      sql`(${table.status} = 'DRAFT' and ${table.teamAGoals} is not null and ${table.teamBGoals} is not null and ${table.confirmedAt} is null and ${table.confirmedByPlayerId} is null) or (${table.status} = 'CONFIRMED' and ${table.teamAGoals} is not null and ${table.teamBGoals} is not null and ${table.confirmedAt} is not null and ${table.confirmedByPlayerId} is not null) or (${table.status} = 'NOT_PLAYED' and ${table.teamAGoals} is null and ${table.teamBGoals} is null and ${table.confirmedAt} is not null and ${table.confirmedByPlayerId} is not null)`,
+    ),
+    check(
+      "match_sporting_results_scores_ck",
+      sql`(${table.teamAGoals} is null or ${table.teamAGoals} >= 0) and (${table.teamBGoals} is null or ${table.teamBGoals} >= 0)`,
     ),
   ],
 );

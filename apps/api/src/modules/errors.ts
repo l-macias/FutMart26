@@ -28,7 +28,15 @@ export type ApplicationErrorCode =
   | "progression_not_ready"
   | "invalid_progression_evidence"
   | "progression_out_of_order"
-  | "progression_config_not_found";
+  | "progression_config_not_found"
+  | "invalid_team_assignment"
+  | "teams_locked"
+  | "incomplete_team_assignments"
+  | "invalid_sporting_result"
+  | "sporting_result_not_ready"
+  | "sporting_result_locked"
+  | "sporting_result_not_confirmed"
+  | "prior_match_sporting_closure_required";
 
 export class ApplicationError extends Error {
   constructor(

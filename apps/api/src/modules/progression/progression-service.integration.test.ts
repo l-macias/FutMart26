@@ -20,6 +20,8 @@ import { GroupService } from "../groups/group-service.js";
 import { PlayerService } from "../identity/player-service.js";
 import { MatchCompletionService } from "../matches/match-completion-service.js";
 import { MatchService } from "../matches/match-service.js";
+import { MatchResultService } from "../matches/match-result-service.js";
+import { MatchTeamService } from "../matches/match-team-service.js";
 import { VotingService } from "../voting/voting-service.js";
 import {
   PROGRESSION_V1_1_CONFIG,
@@ -61,6 +63,8 @@ void test(
     const groups = new GroupService(connection.db);
     const matchService = new MatchService(connection.db);
     const completion = new MatchCompletionService(connection.db);
+    const teams = new MatchTeamService(connection.db);
+    const results = new MatchResultService(connection.db);
     let now = new Date("2028-01-01T12:00:00.000Z");
     const voting = new VotingService(connection.db, () => now);
     const progression = new ProgressionService(connection.db, () => now);
@@ -144,6 +148,15 @@ void test(
       const guest = options.guest
         ? await matchService.addGuest(ownerId, match.id, "Progression Guest")
         : null;
+      const allParticipants = [...participants, ...(guest ? [guest] : [])];
+      await teams.replace(
+        ownerId,
+        match.id,
+        allParticipants.map((participant, index) => ({
+          participantId: participant.id,
+          side: index % 2 === 0 ? ("TEAM_A" as const) : ("TEAM_B" as const),
+        })),
+      );
       await matchService.start(ownerId, match.id);
       await completion.finish(ownerId, match.id);
       await completion.confirmRoster(ownerId, match.id, [
@@ -158,6 +171,12 @@ void test(
           ? [{ participantId: guest.id, attendance: "PLAYED" as const }]
           : []),
       ]);
+      await results.saveDraft(ownerId, match.id, {
+        teamAGoals: 0,
+        teamBGoals: 0,
+        participants: [],
+      });
+      await results.confirm(ownerId, match.id);
       return { match, participants, guest };
     }
 

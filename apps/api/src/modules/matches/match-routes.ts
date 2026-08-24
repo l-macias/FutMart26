@@ -12,18 +12,24 @@ import {
   finalRosterRequestSchema,
   updateStatsRequestSchema,
   assignObserverRequestSchema,
+  replaceMatchTeamsRequestSchema,
+  resultDraftRequestSchema,
 } from "@football/contracts";
 
 import { ApplicationError } from "../errors.js";
 import { PlayerService } from "../identity/player-service.js";
 import { MatchService } from "./match-service.js";
 import { MatchCompletionService } from "./match-completion-service.js";
+import { MatchResultService } from "./match-result-service.js";
+import { MatchTeamService } from "./match-team-service.js";
 
 export function createMatchRoutes(
   auth: FootballAuth,
   players: PlayerService,
   matches: MatchService,
   completion: MatchCompletionService,
+  teams: MatchTeamService,
+  results: MatchResultService,
 ): FastifyPluginAsync {
   return (app) => {
     async function actor(request: { headers: NodeJS.Dict<string | string[]> }) {
@@ -110,6 +116,23 @@ export function createMatchRoutes(
       const { matchId } = matchIdParamsSchema.parse(request.params);
       return matches.roster((await actor(request)).id, matchId);
     });
+    app.get("/matches/:matchId/teams", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return teams.get((await actor(request)).id, matchId);
+    });
+    app.put("/matches/:matchId/teams", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = replaceMatchTeamsRequestSchema.parse(request.body);
+      return teams.replace(
+        (await actor(request)).id,
+        matchId,
+        body.assignments,
+      );
+    });
+    app.post("/matches/:matchId/teams/generate", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return teams.generate((await actor(request)).id, matchId);
+    });
     app.post("/matches/:matchId/finish", async (request, reply) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);
       await completion.finish((await actor(request)).id, matchId);
@@ -142,6 +165,19 @@ export function createMatchRoutes(
     app.get("/matches/:matchId/stats", async (request) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);
       return completion.getStats((await actor(request)).id, matchId);
+    });
+    app.get("/matches/:matchId/result", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return results.get((await actor(request)).id, matchId);
+    });
+    app.put("/matches/:matchId/result", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = resultDraftRequestSchema.parse(request.body);
+      return results.saveDraft((await actor(request)).id, matchId, body);
+    });
+    app.post("/matches/:matchId/result/confirm", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      return results.confirm((await actor(request)).id, matchId);
     });
     app.put("/matches/:matchId/observer", async (request, reply) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);

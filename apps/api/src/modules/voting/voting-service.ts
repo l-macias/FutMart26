@@ -7,6 +7,7 @@ import {
   evaluationEvidence,
   groupMemberships,
   matchParticipants,
+  matchSportingResults,
   matches,
   playerEvaluations,
   players,
@@ -52,6 +53,17 @@ export class VotingService {
         throw new ApplicationError(
           "roster_not_confirmed",
           "Final roster is not confirmed",
+          409,
+        );
+      const [sportingResult] = await tx
+        .select({ status: matchSportingResults.status })
+        .from(matchSportingResults)
+        .where(eq(matchSportingResults.matchId, matchId))
+        .limit(1);
+      if (!sportingResult || sportingResult.status !== "CONFIRMED")
+        throw new ApplicationError(
+          "sporting_result_not_confirmed",
+          "Sporting result must be confirmed before Voting opens",
           409,
         );
       const now = this.clock();

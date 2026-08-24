@@ -23,6 +23,19 @@ void test("group capabilities keep ownership authority server-side", () => {
     hasGroupCapability("MODERATOR", [], "GROUP_TRANSFER_OWNERSHIP"),
     false,
   );
+  assert.equal(hasGroupCapability("OWNER", [], "MATCH_MANAGE_TEAMS"), true);
+  assert.equal(
+    hasGroupCapability(
+      "MODERATOR",
+      ["MATCH_MANAGE_TEAMS"],
+      "MATCH_MANAGE_TEAMS",
+    ),
+    true,
+  );
+  assert.equal(
+    hasGroupCapability("MODERATOR", [], "MATCH_MANAGE_TEAMS"),
+    false,
+  );
   assert.equal(
     hasGroupCapability(
       "MEMBER",
