@@ -17,6 +17,8 @@ import { PlayerService } from "./modules/identity/player-service.js";
 import { createMatchRoutes } from "./modules/matches/match-routes.js";
 import { MatchService } from "./modules/matches/match-service.js";
 import { MatchCompletionService } from "./modules/matches/match-completion-service.js";
+import { createVotingRoutes } from "./modules/voting/voting-routes.js";
+import { VotingService } from "./modules/voting/voting-service.js";
 
 export function buildApp(
   config: ApiConfig,
@@ -83,6 +85,9 @@ export function buildApp(
                     ? "bad_request"
                     : "internal_server_error",
       requestId: request.id,
+      ...(error instanceof ApplicationError && error.details
+        ? { details: error.details }
+        : {}),
     });
   });
 
@@ -137,6 +142,13 @@ export function buildApp(
       new PlayerService(dependencies.database),
       new MatchService(dependencies.database),
       new MatchCompletionService(dependencies.database),
+    ),
+  );
+  app.register(
+    createVotingRoutes(
+      dependencies.auth,
+      new PlayerService(dependencies.database),
+      new VotingService(dependencies.database),
     ),
   );
   return app;

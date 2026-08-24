@@ -393,3 +393,151 @@ export const matchParticipantStats = pgTable(
     index("match_participant_stats_match_idx").on(table.matchId),
   ],
 );
+
+export const votingSessionStatus = pgEnum("voting_session_status", [
+  "OPEN",
+  "CLOSED",
+]);
+export const votingCloseReason = pgEnum("voting_close_reason", [
+  "ALL_ELIGIBLE_VOTED",
+  "DEADLINE",
+]);
+export const ballotMode = pgEnum("ballot_mode", ["QUICK", "FULL"]);
+export const ballotStatus = pgEnum("ballot_status", ["VALID", "VOIDED"]);
+export const quickSignal = pgEnum("quick_signal", ["POSITIVE", "IMPROVEMENT"]);
+export const evidenceType = pgEnum("evaluation_evidence_type", [
+  "STRENGTH",
+  "IMPROVEMENT",
+]);
+export const evidenceAttribute = pgEnum("evaluation_evidence_attribute", [
+  "PASE",
+  "REGATE",
+  "REMATE",
+  "DEFENSA",
+  "VELOCIDAD",
+  "FISICO",
+]);
+
+export const votingSessions = pgTable(
+  "voting_sessions",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    status: votingSessionStatus("status").default("OPEN").notNull(),
+    openedAt: timestamp("opened_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    closesAt: timestamp("closes_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    closedAt: timestamp("closed_at", { mode: "date", withTimezone: true }),
+    closeReason: votingCloseReason("close_reason"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("voting_sessions_match_uq").on(table.matchId),
+    index("voting_sessions_status_closes_idx").on(table.status, table.closesAt),
+    check(
+      "voting_sessions_close_evidence_ck",
+      sql`(${table.status} = 'OPEN' and ${table.closedAt} is null and ${table.closeReason} is null) or (${table.status} = 'CLOSED' and ${table.closedAt} is not null and ${table.closeReason} is not null)`,
+    ),
+    check(
+      "voting_sessions_window_ck",
+      sql`${table.closesAt} > ${table.openedAt}`,
+    ),
+  ],
+);
+
+export const votingBallots = pgTable(
+  "voting_ballots",
+  {
+    id: uuid("id").primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => votingSessions.id, { onDelete: "restrict" }),
+    voterPlayerId: uuid("voter_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    mode: ballotMode("mode").notNull(),
+    status: ballotStatus("status").default("VALID").notNull(),
+    submittedAt: timestamp("submitted_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    voidedAt: timestamp("voided_at", { mode: "date", withTimezone: true }),
+    voidedByPlayerId: uuid("voided_by_player_id").references(() => players.id, {
+      onDelete: "restrict",
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("voting_ballots_session_voter_uq").on(
+      table.sessionId,
+      table.voterPlayerId,
+    ),
+    index("voting_ballots_session_status_idx").on(
+      table.sessionId,
+      table.status,
+    ),
+    check(
+      "voting_ballots_void_evidence_ck",
+      sql`(${table.status} = 'VALID' and ${table.voidedAt} is null and ${table.voidedByPlayerId} is null) or (${table.status} = 'VOIDED' and ${table.voidedAt} is not null and ${table.voidedByPlayerId} is not null)`,
+    ),
+  ],
+);
+
+export const playerEvaluations = pgTable(
+  "player_evaluations",
+  {
+    id: uuid("id").primaryKey(),
+    ballotId: uuid("ballot_id")
+      .notNull()
+      .references(() => votingBallots.id, { onDelete: "restrict" }),
+    targetParticipantId: uuid("target_participant_id")
+      .notNull()
+      .references(() => matchParticipants.id, { onDelete: "restrict" }),
+    rating: integer("rating").notNull(),
+    quickSignal: quickSignal("quick_signal"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("player_evaluations_ballot_target_uq").on(
+      table.ballotId,
+      table.targetParticipantId,
+    ),
+    index("player_evaluations_target_idx").on(table.targetParticipantId),
+    check(
+      "player_evaluations_rating_ck",
+      sql`${table.rating} between 1 and 10`,
+    ),
+    check(
+      "player_evaluations_quick_rating_ck",
+      sql`${table.quickSignal} is null or (${table.quickSignal} = 'POSITIVE' and ${table.rating} between 7 and 10) or (${table.quickSignal} = 'IMPROVEMENT' and ${table.rating} between 1 and 5)`,
+    ),
+  ],
+);
+
+export const evaluationEvidence = pgTable(
+  "evaluation_evidence",
+  {
+    id: uuid("id").primaryKey(),
+    evaluationId: uuid("evaluation_id")
+      .notNull()
+      .references(() => playerEvaluations.id, { onDelete: "restrict" }),
+    type: evidenceType("type").notNull(),
+    attribute: evidenceAttribute("attribute").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("evaluation_evidence_evaluation_type_attribute_uq").on(
+      table.evaluationId,
+      table.type,
+      table.attribute,
+    ),
+    index("evaluation_evidence_evaluation_idx").on(table.evaluationId),
+  ],
+);

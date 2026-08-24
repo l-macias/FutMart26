@@ -9,6 +9,7 @@ import {
   matchParticipants,
   matches,
   players,
+  votingSessions,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -16,13 +17,13 @@ import {
   type GroupCapability,
   hasGroupCapability,
 } from "../groups/capabilities.js";
+import { VOTING_V1_CONFIG } from "../voting/voting-config.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type DatabaseExecutor = Database | Transaction;
 type Attendance = "PLAYED" | "NO_SHOW";
 type FinalRosterInput = { participantId: string; attendance: Attendance }[];
 type StatsInput = { participantId: string; goals: number; assists: number }[];
-const VOTING_GRACE_MINUTES = 15;
 
 export class MatchCompletionService {
   constructor(private readonly database: Database) {}
@@ -59,6 +60,17 @@ export class MatchCompletionService {
         "MATCH_CONFIRM_ROSTER",
       );
       if (match.status !== "FINISHED") this.invalidTransition();
+      const [voting] = await tx
+        .select({ id: votingSessions.id })
+        .from(votingSessions)
+        .where(eq(votingSessions.matchId, matchId))
+        .limit(1);
+      if (voting)
+        throw new ApplicationError(
+          "invalid_final_roster",
+          "Final roster is frozen after Voting opens",
+          409,
+        );
       const confirmed = await tx
         .select({ id: matchParticipants.id })
         .from(matchParticipants)
@@ -242,7 +254,7 @@ export class MatchCompletionService {
     );
     return {
       votingEligibleAfter: new Date(
-        scheduledEnd.getTime() + VOTING_GRACE_MINUTES * 60_000,
+        scheduledEnd.getTime() + VOTING_V1_CONFIG.gracePeriodMinutes * 60_000,
       ).toISOString(),
       observer: match.observerPlayerId
         ? { playerId: match.observerPlayerId, canVote: false }

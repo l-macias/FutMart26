@@ -18,13 +18,20 @@ export type ApplicationErrorCode =
   | "group_archived"
   | "invalid_final_roster"
   | "roster_not_confirmed"
-  | "stats_not_allowed";
+  | "stats_not_allowed"
+  | "voting_not_found"
+  | "voting_not_eligible_yet"
+  | "voting_not_open"
+  | "voter_not_eligible"
+  | "invalid_ballot"
+  | "ballot_already_submitted";
 
 export class ApplicationError extends Error {
   constructor(
     readonly code: ApplicationErrorCode,
     message: string,
     readonly statusCode: number,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApplicationError";

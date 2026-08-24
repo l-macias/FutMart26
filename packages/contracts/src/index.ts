@@ -18,6 +18,7 @@ export const groupCapabilitySchema = z.enum([
   "MATCH_CONFIRM_ROSTER",
   "MATCH_MANAGE_STATS",
   "MATCH_MANAGE_OBSERVER",
+  "MATCH_MANAGE_VOTING",
 ]);
 export const groupStatusSchema = z.enum(["ACTIVE", "ARCHIVED"]);
 export const membershipStatusSchema = z.enum(["ACTIVE", "LEFT", "REMOVED"]);
@@ -132,3 +133,41 @@ export const updateStatsRequestSchema = z
 export const assignObserverRequestSchema = z
   .object({ playerId: idSchema })
   .strict();
+
+export const votingAttributeSchema = z.enum([
+  "PASE",
+  "REGATE",
+  "REMATE",
+  "DEFENSA",
+  "VELOCIDAD",
+  "FISICO",
+]);
+const fullEvaluationSchema = z
+  .object({
+    targetParticipantId: idSchema,
+    rating: z.number().int().min(1).max(10),
+    strengths: z.array(votingAttributeSchema).max(3),
+    improvements: z.array(votingAttributeSchema).max(3),
+  })
+  .strict();
+const quickEvaluationSchema = z
+  .object({
+    targetParticipantId: idSchema,
+    rating: z.number().int().min(1).max(10),
+    quickSignal: z.enum(["POSITIVE", "IMPROVEMENT"]),
+  })
+  .strict();
+export const submitBallotRequestSchema = z.discriminatedUnion("mode", [
+  z
+    .object({
+      mode: z.literal("QUICK"),
+      evaluations: z.array(quickEvaluationSchema).min(1).max(6),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal("FULL"),
+      evaluations: z.array(fullEvaluationSchema).min(1).max(200),
+    })
+    .strict(),
+]);

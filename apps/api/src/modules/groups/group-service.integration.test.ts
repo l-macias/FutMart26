@@ -63,13 +63,17 @@ void test(
         "auth_session",
         "auth_user",
         "auth_verification",
+        "evaluation_evidence",
         "group_memberships",
         "group_role_changes",
         "groups",
         "match_participant_stats",
         "match_participants",
         "matches",
+        "player_evaluations",
         "players",
+        "voting_ballots",
+        "voting_sessions",
       ],
     );
     const catalogIndexes = await connection.client.unsafe<
@@ -97,7 +101,7 @@ void test(
     const primaryKeys = await connection.client.unsafe<{ count: string }[]>(
       "select count(*)::text as count from pg_constraint where contype = 'p' and connamespace = 'public'::regnamespace",
     );
-    assert.equal(primaryKeys[0]?.count, "11");
+    assert.equal(primaryKeys[0]?.count, "15");
     const foreignKeys = await connection.client.unsafe<
       { conname: string; definition: string }[]
     >(

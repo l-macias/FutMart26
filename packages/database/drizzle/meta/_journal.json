@@ -57,6 +57,13 @@
       "when": 1787581110614,
       "tag": "0007_blushing_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787582836078,
+      "tag": "0008_foamy_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }

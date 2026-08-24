@@ -9,7 +9,8 @@ export type GroupCapability =
   | "MATCH_COMPLETE"
   | "MATCH_CONFIRM_ROSTER"
   | "MATCH_MANAGE_STATS"
-  | "MATCH_MANAGE_OBSERVER";
+  | "MATCH_MANAGE_OBSERVER"
+  | "MATCH_MANAGE_VOTING";
 
 const roleCapabilities = {
   OWNER: [
@@ -24,6 +25,7 @@ const roleCapabilities = {
     "MATCH_CONFIRM_ROSTER",
     "MATCH_MANAGE_STATS",
     "MATCH_MANAGE_OBSERVER",
+    "MATCH_MANAGE_VOTING",
   ],
   MODERATOR: ["GROUP_READ"],
   MEMBER: ["GROUP_READ"],
