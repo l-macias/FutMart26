@@ -1,0 +1,525 @@
+.page,
+.pageHeader,
+.identity,
+.identityHeading,
+.identityHeading > div,
+.profileContent,
+.panelSection,
+.signalGrid,
+.signalGrid > div,
+.groupMemberships,
+.groupBreakdown,
+.markGroup,
+.markGroup > div:first-child {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.page {
+  gap: var(--space-6);
+}
+
+.pageHeader,
+.identityHeading > div,
+.groupMemberships,
+.markGroup > div:first-child {
+  gap: var(--space-2);
+}
+
+.profileLayout {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-7);
+}
+
+.identity {
+  justify-items: center;
+  gap: var(--space-5);
+}
+
+.identityHeading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  inline-size: 100%;
+  align-items: end;
+  gap: var(--space-4);
+}
+
+.identityMetrics {
+  display: flex;
+  gap: var(--space-4);
+  padding: 0;
+  margin: 0;
+}
+
+.identityMetrics > div {
+  display: grid;
+  gap: var(--space-1);
+  text-align: end;
+}
+
+.identityMetrics dt,
+.metricList dt,
+.openStats dt {
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.identityMetrics dd,
+.metricList dd,
+.openStats dd {
+  margin: 0;
+  color: var(--foreground-primary);
+  font: 800 var(--type-heading-md-size) / 1
+    var(--font-display, var(--font-display-fallback));
+}
+
+.playerCard {
+  --card-master-rows: 16% 44% 12% 22% 6%;
+
+  position: relative;
+  display: grid;
+  inline-size: clamp(13.75rem, 72vw, 17.5rem);
+  aspect-ratio: 2 / 3;
+  margin: 0;
+  overflow: hidden;
+  border: var(--border-width-strong) solid var(--border-accent);
+  border-radius: var(--radius-panel);
+  background: var(--background-elevated);
+  container-type: inline-size;
+  isolation: isolate;
+  animation: card-enter var(--motion-transition-duration)
+    var(--motion-ease-emphasized) both;
+}
+
+.skinLayer,
+.artworkLayer,
+.dataLayer {
+  grid-area: 1 / 1;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.skinLayer {
+  position: relative;
+  z-index: 1;
+  border: var(--space-2) solid var(--background-surface);
+  pointer-events: none;
+}
+
+.skinLayer::before,
+.skinLayer::after,
+.skinLayer > span {
+  position: absolute;
+  content: "";
+}
+
+.skinLayer::before {
+  inset: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-accent);
+}
+
+.skinLayer::after {
+  inset-inline: 10%;
+  inset-block-start: 14%;
+  block-size: var(--border-width-thin);
+  background: var(--border-strong);
+}
+
+.skinLayer > span:first-child {
+  inset-inline-start: 6%;
+  inset-block: 22% 10%;
+  inline-size: var(--border-width-strong);
+  background: var(--accent-muted);
+}
+
+.skinLayer > span:last-child {
+  inset-inline-end: 6%;
+  inset-block: 10% 22%;
+  inline-size: var(--border-width-thin);
+  background: var(--border-strong);
+}
+
+.artworkLayer {
+  z-index: 2;
+  display: grid;
+  grid-template-rows: var(--card-master-rows);
+  place-items: center;
+  overflow: hidden;
+}
+
+.artworkLayer > * {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.artworkLayer > :last-child {
+  align-self: end;
+  margin-block-end: var(--space-3);
+}
+
+.playerSilhouette {
+  align-self: end;
+  inline-size: 48%;
+  block-size: 88%;
+  border: var(--border-width-thin) solid var(--border-strong);
+  border-block-end: 0;
+  border-radius: var(--radius-round) var(--radius-round) 0 0;
+  background: var(--background-surface);
+}
+
+.dataLayer {
+  z-index: 3;
+  display: grid;
+  grid-template-rows: var(--card-master-rows);
+  padding: 6%;
+}
+
+.cardTop {
+  display: flex;
+  min-inline-size: 0;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTop > span {
+  display: grid;
+}
+
+.cardOverall {
+  color: var(--accent-primary);
+  font-size: clamp(2.75rem, 16cqi, 4.75rem);
+  font-weight: 800;
+}
+
+.cardDiscipline {
+  padding-block-start: var(--space-2);
+  color: var(--foreground-primary);
+  font-weight: 800;
+}
+
+.cardName {
+  align-self: end;
+  overflow: hidden;
+  font-size: clamp(2rem, 12cqi, 3.5rem);
+  font-weight: 800;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: center;
+  padding: 0;
+  margin: 0;
+  border-block: var(--border-width-thin) solid var(--border-strong);
+}
+
+.cardStats > div {
+  display: grid;
+  grid-template-columns: auto auto;
+  min-inline-size: 0;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.cardStats dt,
+.cardStats dd {
+  margin: 0;
+  font-family: var(--font-display, var(--font-display-fallback));
+  line-height: var(--type-leading-tight);
+}
+
+.cardStats dt {
+  color: var(--foreground-muted);
+  font-size: clamp(0.625rem, 3.4cqi, var(--type-label-size));
+  font-weight: 700;
+}
+
+.cardStats dd {
+  color: var(--foreground-primary);
+  font-size: clamp(var(--type-label-size), 4.5cqi, var(--type-heading-md-size));
+  font-weight: 800;
+}
+
+.cardTier {
+  align-self: end;
+  justify-self: center;
+  color: var(--accent-primary);
+  font-size: clamp(0.625rem, 3.5cqi, var(--type-label-size));
+}
+
+.profileContent {
+  align-content: start;
+  gap: var(--space-5);
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-inline-size: 0;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.tabs button {
+  min-inline-size: 0;
+  min-block-size: var(--touch-target-min);
+  padding: var(--space-2);
+  border: 0;
+  border-block-end: var(--border-width-strong) solid transparent;
+  background: transparent;
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-navigation);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-micro-duration) var(--motion-ease-standard),
+    color var(--motion-micro-duration) var(--motion-ease-standard);
+}
+
+.tabs button[aria-selected="true"] {
+  border-color: var(--accent-primary);
+  color: var(--foreground-primary);
+}
+
+.tabPanel {
+  min-inline-size: 0;
+  animation: panel-enter var(--motion-feedback-duration)
+    var(--motion-ease-standard) both;
+}
+
+.panelSection {
+  gap: var(--space-5);
+}
+
+.metricList,
+.summaryList {
+  display: grid;
+  padding: 0;
+  margin: 0;
+}
+
+.metricList > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.signalGrid {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.signalGrid > div {
+  gap: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--border-strong);
+}
+
+.positive {
+  color: var(--state-positive);
+}
+
+.negative {
+  color: var(--state-negative);
+}
+
+.groupMemberships {
+  gap: var(--space-2);
+  padding-block-start: var(--space-2);
+}
+
+.openStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin: 0;
+}
+
+.openStats > div {
+  display: grid;
+  gap: var(--space-2);
+  padding-inline-end: var(--space-3);
+  border-inline-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.openStats dd {
+  font-size: var(--type-display-lg-size);
+}
+
+.groupBreakdown {
+  gap: var(--space-3);
+}
+
+.groupBreakdown ul,
+.achievementList,
+.awardList,
+.timeline {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.groupBreakdown li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.timeline {
+  display: grid;
+}
+
+.timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--touch-target-min) minmax(0, 1fr);
+  gap: var(--space-4);
+  padding-block-end: var(--space-5);
+}
+
+.timeline li:not(:last-child)::before {
+  position: absolute;
+  inset-block: var(--touch-target-min) 0;
+  inset-inline-start: calc(var(--touch-target-min) / 2);
+  inline-size: var(--border-width-thin);
+  background: var(--border-strong);
+  content: "";
+}
+
+.timelineNode {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  inline-size: var(--touch-target-min);
+  block-size: var(--touch-target-min);
+  place-items: center;
+  border: var(--border-width-thin) solid var(--border-accent);
+  border-radius: var(--radius-round);
+  background: var(--background-canvas);
+  color: var(--accent-primary);
+  font: 700 var(--type-metadata-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+}
+
+.timeline li > div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+}
+
+.markGroup {
+  gap: var(--space-4);
+}
+
+.achievementList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.achievementList li {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+}
+
+.achievementMark {
+  inline-size: var(--space-5);
+  block-size: var(--space-5);
+  border: var(--border-width-strong) solid var(--accent-primary);
+  transform: rotate(45deg);
+}
+
+.achievementList .locked {
+  color: var(--foreground-muted);
+  opacity: 0.58;
+}
+
+.awardList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.awardList li {
+  display: grid;
+  grid-template-columns: var(--space-5) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.awardList li > span:first-child {
+  block-size: var(--border-width-strong);
+  background: var(--state-positive);
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-3));
+  }
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (min-width: 64rem) {
+  .profileLayout {
+    grid-template-columns: minmax(18.75rem, 0.8fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+
+  .identity {
+    position: sticky;
+    inset-block-start: calc(var(--touch-target-min) + var(--space-7));
+  }
+
+  .identityHeading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .identityMetrics {
+    inline-size: 100%;
+    justify-content: space-between;
+  }
+
+  .identityMetrics > div {
+    text-align: start;
+  }
+
+  .playerCard {
+    inline-size: clamp(18.75rem, 28vw, 23.75rem);
+  }
+
+  .profileContent {
+    min-block-size: 38rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playerCard,
+  .tabPanel {
+    animation: none;
+  }
+}
