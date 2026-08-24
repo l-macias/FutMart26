@@ -24,7 +24,11 @@ export type ApplicationErrorCode =
   | "voting_not_open"
   | "voter_not_eligible"
   | "invalid_ballot"
-  | "ballot_already_submitted";
+  | "ballot_already_submitted"
+  | "progression_not_ready"
+  | "invalid_progression_evidence"
+  | "progression_out_of_order"
+  | "progression_config_not_found";
 
 export class ApplicationError extends Error {
   constructor(

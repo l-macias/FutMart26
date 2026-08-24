@@ -5,6 +5,8 @@ import {
   check,
   index,
   integer,
+  jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -539,5 +541,214 @@ export const evaluationEvidence = pgTable(
       table.attribute,
     ),
     index("evaluation_evidence_evaluation_idx").on(table.evaluationId),
+  ],
+);
+
+export const progressionRatingProfile = pgEnum("progression_rating_profile", [
+  "LIBRE",
+  "DEFENSIVO",
+  "MEDIO",
+  "OFENSIVO",
+]);
+export const progressionStreakDirection = pgEnum(
+  "progression_streak_direction",
+  ["POSITIVE", "NEGATIVE", "NONE"],
+);
+export const progressionProcessingOutcome = pgEnum(
+  "progression_processing_outcome",
+  ["APPLIED", "NEUTRAL", "NO_EVIDENCE"],
+);
+
+const progressionAttributes = {
+  velocidad: numeric("velocidad", { precision: 24, scale: 12 }).notNull(),
+  pase: numeric("pase", { precision: 24, scale: 12 }).notNull(),
+  regate: numeric("regate", { precision: 24, scale: 12 }).notNull(),
+  remate: numeric("remate", { precision: 24, scale: 12 }).notNull(),
+  defensa: numeric("defensa", { precision: 24, scale: 12 }).notNull(),
+  fisico: numeric("fisico", { precision: 24, scale: 12 }).notNull(),
+};
+
+export const progressionConfigVersions = pgTable(
+  "progression_config_versions",
+  {
+    id: uuid("id").primaryKey(),
+    version: text("version").notNull(),
+    discipline: matchDiscipline("discipline").notNull(),
+    document: jsonb("document").$type<Record<string, unknown>>().notNull(),
+    activatedAt: timestamp("activated_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("progression_config_versions_discipline_version_uq").on(
+      table.discipline,
+      table.version,
+    ),
+    index("progression_config_versions_active_idx").on(
+      table.discipline,
+      table.activatedAt,
+    ),
+  ],
+);
+
+export const playerPerformances = pgTable(
+  "player_performances",
+  {
+    id: uuid("id").primaryKey(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    discipline: matchDiscipline("discipline").notNull(),
+    ratingProfile: progressionRatingProfile("rating_profile")
+      .default("LIBRE")
+      .notNull(),
+    ...progressionAttributes,
+    internalOvr: numeric("internal_ovr", {
+      precision: 24,
+      scale: 12,
+    }).notNull(),
+    streakDirection: progressionStreakDirection("streak_direction")
+      .default("NONE")
+      .notNull(),
+    streakCount: integer("streak_count").default(0).notNull(),
+    processedMatchCount: integer("processed_match_count").default(0).notNull(),
+    lastProcessedMatchId: uuid("last_processed_match_id").references(
+      () => matches.id,
+      { onDelete: "restrict" },
+    ),
+    lastProcessedScheduledAt: timestamp("last_processed_scheduled_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("player_performances_player_discipline_uq").on(
+      table.playerId,
+      table.discipline,
+    ),
+    check(
+      "player_performances_attributes_range_ck",
+      sql`${table.velocidad} between 1 and 99 and ${table.pase} between 1 and 99 and ${table.regate} between 1 and 99 and ${table.remate} between 1 and 99 and ${table.defensa} between 1 and 99 and ${table.fisico} between 1 and 99`,
+    ),
+    check(
+      "player_performances_streak_ck",
+      sql`(${table.streakDirection} = 'NONE' and ${table.streakCount} = 0) or (${table.streakDirection} <> 'NONE' and ${table.streakCount} > 0)`,
+    ),
+    check(
+      "player_performances_count_ck",
+      sql`${table.processedMatchCount} >= 0`,
+    ),
+  ],
+);
+
+export const progressionSnapshots = pgTable(
+  "progression_snapshots",
+  {
+    id: uuid("id").primaryKey(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    discipline: matchDiscipline("discipline").notNull(),
+    beforeAttributes: jsonb("before_attributes")
+      .$type<Record<string, string>>()
+      .notNull(),
+    afterAttributes: jsonb("after_attributes")
+      .$type<Record<string, string>>()
+      .notNull(),
+    attributeDeltas: jsonb("attribute_deltas")
+      .$type<Record<string, string>>()
+      .notNull(),
+    beforeOvr: numeric("before_ovr", { precision: 24, scale: 12 }).notNull(),
+    afterOvr: numeric("after_ovr", { precision: 24, scale: 12 }).notNull(),
+    ovrDelta: numeric("ovr_delta", { precision: 24, scale: 12 }).notNull(),
+    evaluationsReceived: integer("evaluations_received").notNull(),
+    eligibleEvaluatorsForTarget: integer(
+      "eligible_evaluators_for_target",
+    ).notNull(),
+    aggregatedRating: numeric("aggregated_rating", {
+      precision: 24,
+      scale: 12,
+    }),
+    participationRatio: numeric("participation_ratio", {
+      precision: 24,
+      scale: 12,
+    }).notNull(),
+    confidenceMultiplier: numeric("confidence_multiplier", {
+      precision: 24,
+      scale: 12,
+    }).notNull(),
+    rawPerformanceSignal: numeric("raw_performance_signal", {
+      precision: 24,
+      scale: 12,
+    }),
+    effectivePerformanceSignal: numeric("effective_performance_signal", {
+      precision: 24,
+      scale: 12,
+    }),
+    streakBefore: jsonb("streak_before")
+      .$type<{ direction: string; count: number }>()
+      .notNull(),
+    streakAfter: jsonb("streak_after")
+      .$type<{ direction: string; count: number }>()
+      .notNull(),
+    streakMultiplier: numeric("streak_multiplier", {
+      precision: 24,
+      scale: 12,
+    }).notNull(),
+    progressionBudget: numeric("progression_budget", {
+      precision: 24,
+      scale: 12,
+    }).notNull(),
+    baseDistribution: jsonb("base_distribution")
+      .$type<Record<string, string>>()
+      .notNull(),
+    tagCoverage: numeric("tag_coverage", {
+      precision: 24,
+      scale: 12,
+    }).notNull(),
+    tagDistribution: jsonb("tag_distribution")
+      .$type<Record<string, string>>()
+      .notNull(),
+    finalDistribution: jsonb("final_distribution")
+      .$type<Record<string, string>>()
+      .notNull(),
+    configVersionId: uuid("config_version_id")
+      .notNull()
+      .references(() => progressionConfigVersions.id, {
+        onDelete: "restrict",
+      }),
+    processingOutcome:
+      progressionProcessingOutcome("processing_outcome").notNull(),
+    processedAt: timestamp("processed_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("progression_snapshots_player_match_discipline_uq").on(
+      table.playerId,
+      table.matchId,
+      table.discipline,
+    ),
+    index("progression_snapshots_player_processed_idx").on(
+      table.playerId,
+      table.processedAt,
+    ),
+    index("progression_snapshots_match_idx").on(table.matchId),
+    check(
+      "progression_snapshots_counts_ck",
+      sql`${table.evaluationsReceived} >= 0 and ${table.eligibleEvaluatorsForTarget} >= ${table.evaluationsReceived}`,
+    ),
   ],
 );

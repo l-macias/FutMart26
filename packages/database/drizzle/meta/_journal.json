@@ -64,6 +64,13 @@
       "when": 1787582836078,
       "tag": "0008_foamy_wendell_vaughn",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787589011430,
+      "tag": "0009_known_power_man",
+      "breakpoints": true
     }
   ]
 }
