@@ -10,11 +10,11 @@ function roster(
   count: number,
   keepers: number[] = [],
   strengths: number[] = [],
-) {
+): MatchmakingParticipant[] {
   return Array.from({ length: count }, (_, index) => ({
     participantId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
     internalOvr: String(strengths[index] ?? 60),
-    ratingProfile: "LIBRE" as const,
+    preferredRoles: ["LIBRE"],
     willingToPlayGoalkeeper: keepers.includes(index),
   }));
 }

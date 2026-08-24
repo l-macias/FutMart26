@@ -20,9 +20,18 @@ export const groupCapabilitySchema = z.enum([
   "MATCH_MANAGE_OBSERVER",
   "MATCH_MANAGE_VOTING",
   "MATCH_MANAGE_TEAMS",
+  "GROUP_MANAGE_INVITATIONS",
+  "GROUP_MANAGE_GUEST_POLICY",
+  "GROUP_MANAGE_GUESTS",
+  "MATCH_GUEST_OVERRIDE",
 ]);
 export const groupStatusSchema = z.enum(["ACTIVE", "ARCHIVED"]);
-export const membershipStatusSchema = z.enum(["ACTIVE", "LEFT", "REMOVED"]);
+export const membershipStatusSchema = z.enum([
+  "ACTIVE",
+  "LEFT",
+  "REMOVED",
+  "BLOCKED",
+]);
 export const groupSchema = z.object({
   id: idSchema,
   name: z.string(),
@@ -49,6 +58,92 @@ export const groupMemberParamsSchema = z.object({
   groupId: idSchema,
   playerId: idSchema,
 });
+export const invitationTypeSchema = z.enum(["SINGLE_USE", "TIME_LIMITED"]);
+export const createInvitationRequestSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("SINGLE_USE") }).strict(),
+  z
+    .object({
+      type: z.literal("TIME_LIMITED"),
+      expiresAt: z.iso.datetime(),
+      maxUses: z.number().int().positive().nullable().optional(),
+    })
+    .strict(),
+]);
+export const invitationTokenParamsSchema = z.object({
+  token: z.string().min(32).max(200),
+});
+export const invitationParamsSchema = z.object({
+  groupId: idSchema,
+  invitationId: idSchema,
+});
+
+export const footballRoleSchema = z.enum([
+  "LIBRE",
+  "DEFENSIVO",
+  "MEDIO",
+  "OFENSIVO",
+  "PORTERO",
+]);
+export const footballStrengthSchema = z.enum([
+  "VELOCIDAD",
+  "PASE",
+  "REGATE",
+  "REMATE",
+  "DEFENSA",
+  "FISICO",
+]);
+export const footballPreferencesRequestSchema = z
+  .object({
+    preferredRoles: z.array(footballRoleSchema).max(2),
+    willingToPlayGoalkeeper: z.boolean(),
+    strengths: z.array(footballStrengthSchema).max(3),
+  })
+  .superRefine((value, context) => {
+    if (new Set(value.preferredRoles).size !== value.preferredRoles.length)
+      context.addIssue({
+        code: "custom",
+        message: "Duplicate preferred roles",
+      });
+    if (new Set(value.strengths).size !== value.strengths.length)
+      context.addIssue({ code: "custom", message: "Duplicate strengths" });
+    if (
+      value.preferredRoles.includes("PORTERO") &&
+      !value.willingToPlayGoalkeeper
+    )
+      context.addIssue({
+        code: "custom",
+        message: "PORTERO requires goalkeeper willingness",
+      });
+  });
+
+export const groupGuestStatusSchema = z.enum(["ACTIVE", "ARCHIVED", "DELETED"]);
+export const createGroupGuestRequestSchema = z
+  .object({ displayName: z.string().trim().min(1).max(100) })
+  .strict();
+export const updateGroupGuestRequestSchema = createGroupGuestRequestSchema;
+export const groupGuestParamsSchema = z.object({
+  groupId: idSchema,
+  guestId: idSchema,
+});
+export const groupGuestListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(10_000).default(0),
+});
+export const guestPolicyRequestSchema = z
+  .object({
+    guestsEnabled: z.boolean().optional(),
+    defaultGuestAllowancePerMember: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export const guestAllowanceRequestSchema = z
+  .object({ guestAllowanceOverride: z.number().int().nonnegative().nullable() })
+  .strict();
+export const moderatorCapabilitiesRequestSchema = z
+  .object({ capabilities: z.array(groupCapabilitySchema).max(20) })
+  .superRefine((value, context) => {
+    if (new Set(value.capabilities).size !== value.capabilities.length)
+      context.addIssue({ code: "custom", message: "Duplicate capabilities" });
+  });
 export type PlayerResponse = z.infer<typeof playerSchema>;
 export type GroupResponse = z.infer<typeof groupSchema>;
 export type MembershipResponse = z.infer<typeof membershipSchema>;
@@ -83,7 +178,7 @@ export const matchGuestParamsSchema = z.object({
   guestId: idSchema,
 });
 export const createGuestRequestSchema = z
-  .object({ displayName: z.string().trim().min(1).max(100) })
+  .object({ groupGuestId: idSchema })
   .strict();
 export const matchSchema = z.object({
   id: idSchema,

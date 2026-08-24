@@ -9,6 +9,7 @@ import {
   matchParticipants,
   matches,
   matchTeamAssignments,
+  playerFootballPreferences,
   playerPerformances,
   players,
 } from "@football/database/schema";
@@ -56,7 +57,6 @@ export class MatchTeamService {
         .select({
           playerId: playerPerformances.playerId,
           internalOvr: playerPerformances.internalOvr,
-          ratingProfile: playerPerformances.ratingProfile,
         })
         .from(playerPerformances)
         .where(
@@ -71,20 +71,44 @@ export class MatchTeamService {
           ),
         );
       const byPlayer = new Map(performances.map((row) => [row.playerId, row]));
+      const preferences = await tx
+        .select({
+          playerId: playerFootballPreferences.playerId,
+          preferredRoles: playerFootballPreferences.preferredRoles,
+          willingToPlayGoalkeeper:
+            playerFootballPreferences.willingToPlayGoalkeeper,
+        })
+        .from(playerFootballPreferences)
+        .where(
+          and(
+            eq(playerFootballPreferences.discipline, "F5"),
+            inArray(
+              playerFootballPreferences.playerId,
+              participants.flatMap((participant) =>
+                participant.playerId ? [participant.playerId] : [],
+              ),
+            ),
+          ),
+        );
+      const preferencesByPlayer = new Map(
+        preferences.map((row) => [row.playerId, row]),
+      );
       const proposal = proposeMatchTeams(
         participants.map((participant) => {
           const performance = participant.playerId
             ? byPlayer.get(participant.playerId)
+            : undefined;
+          const preference = participant.playerId
+            ? preferencesByPlayer.get(participant.playerId)
             : undefined;
           return {
             participantId: participant.id,
             internalOvr:
               performance?.internalOvr ??
               MATCHMAKING_V1_CONFIG.defaultInternalOvr,
-            ratingProfile: performance?.ratingProfile ?? "LIBRE",
-            // No persisted goalkeeper preference exists yet. The pure engine accepts it,
-            // but production deliberately reports missing coverage rather than inventing it.
-            willingToPlayGoalkeeper: false,
+            preferredRoles: preference?.preferredRoles ?? [],
+            willingToPlayGoalkeeper:
+              preference?.willingToPlayGoalkeeper ?? false,
           };
         }),
       );

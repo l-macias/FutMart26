@@ -13,6 +13,10 @@ import { registerHealthRoute } from "./http/health.js";
 import { ApplicationError } from "./modules/errors.js";
 import { createGroupRoutes } from "./modules/groups/group-routes.js";
 import { GroupService } from "./modules/groups/group-service.js";
+import { createGroupAccessRoutes } from "./modules/groups/group-access-routes.js";
+import { GroupGuestService } from "./modules/groups/group-guest-service.js";
+import { InvitationService } from "./modules/groups/invitation-service.js";
+import { FootballPreferencesService } from "./modules/identity/football-preferences-service.js";
 import { PlayerService } from "./modules/identity/player-service.js";
 import { createMatchRoutes } from "./modules/matches/match-routes.js";
 import { MatchService } from "./modules/matches/match-service.js";
@@ -136,6 +140,16 @@ export function buildApp(
       dependencies.auth,
       new PlayerService(dependencies.database),
       new GroupService(dependencies.database),
+    ),
+  );
+  app.register(
+    createGroupAccessRoutes(
+      dependencies.auth,
+      new PlayerService(dependencies.database),
+      new GroupService(dependencies.database),
+      new InvitationService(dependencies.database),
+      new GroupGuestService(dependencies.database),
+      new FootballPreferencesService(dependencies.database),
     ),
   );
   app.register(

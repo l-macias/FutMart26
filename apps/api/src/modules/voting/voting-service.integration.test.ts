@@ -23,6 +23,7 @@ import { MatchService } from "../matches/match-service.js";
 import { MatchResultService } from "../matches/match-result-service.js";
 import { MatchTeamService } from "../matches/match-team-service.js";
 import { VotingService } from "./voting-service.js";
+import { seedGroupGuest } from "../../test-support/group-guest.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const safeUrl =
@@ -119,12 +120,20 @@ void test(
       const ownerPart = await matches.join(owner.id, match.id);
       const aPart = await matches.join(playerA.id, match.id);
       const bPart = await matches.join(playerB.id, match.id);
-      const guest = await matches.addGuest(owner.id, match.id, "Guest Voting");
-      const guestTwo = await matches.addGuest(owner.id, match.id, "Guest Two");
+      const guest = await matches.addGuest(
+        owner.id,
+        match.id,
+        await seedGroupGuest(connection.db, match.id, owner.id, "Guest Voting"),
+      );
+      const guestTwo = await matches.addGuest(
+        owner.id,
+        match.id,
+        await seedGroupGuest(connection.db, match.id, owner.id, "Guest Two"),
+      );
       const guestThree = await matches.addGuest(
         owner.id,
         match.id,
-        "Guest Three",
+        await seedGroupGuest(connection.db, match.id, owner.id, "Guest Three"),
       );
       const all = [ownerPart, aPart, bPart, guest, guestTwo, guestThree];
       await teams.replace(

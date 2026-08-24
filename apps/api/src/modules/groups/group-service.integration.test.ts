@@ -64,6 +64,9 @@ void test(
         "auth_user",
         "auth_verification",
         "evaluation_evidence",
+        "group_guests",
+        "group_invitation_usages",
+        "group_invitations",
         "group_memberships",
         "group_role_changes",
         "groups",
@@ -73,6 +76,7 @@ void test(
         "match_team_assignments",
         "matches",
         "player_evaluations",
+        "player_football_preferences",
         "player_performances",
         "players",
         "progression_config_versions",
@@ -106,7 +110,7 @@ void test(
     const primaryKeys = await connection.client.unsafe<{ count: string }[]>(
       "select count(*)::text as count from pg_constraint where contype = 'p' and connamespace = 'public'::regnamespace",
     );
-    assert.equal(primaryKeys[0]?.count, "20");
+    assert.equal(primaryKeys[0]?.count, "24");
     const foreignKeys = await connection.client.unsafe<
       { conname: string; definition: string }[]
     >(
@@ -147,6 +151,7 @@ void test(
       { enum_name: "membership_status", enum_value: "ACTIVE" },
       { enum_name: "membership_status", enum_value: "LEFT" },
       { enum_name: "membership_status", enum_value: "REMOVED" },
+      { enum_name: "membership_status", enum_value: "BLOCKED" },
     ]);
 
     async function seedPlayer(name: string) {

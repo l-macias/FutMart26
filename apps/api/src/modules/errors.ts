@@ -36,7 +36,16 @@ export type ApplicationErrorCode =
   | "sporting_result_not_ready"
   | "sporting_result_locked"
   | "sporting_result_not_confirmed"
-  | "prior_match_sporting_closure_required";
+  | "prior_match_sporting_closure_required"
+  | "invitation_not_available"
+  | "invalid_invitation"
+  | "member_blocked"
+  | "guest_not_found"
+  | "guest_name_conflict"
+  | "guest_policy_disabled"
+  | "guest_allowance_exceeded"
+  | "guest_not_reusable"
+  | "invalid_football_preferences";
 
 export class ApplicationError extends Error {
   constructor(

@@ -26,6 +26,7 @@ import { PlayerService } from "../identity/player-service.js";
 import { MatchService } from "./match-service.js";
 import { MatchCompletionService } from "./match-completion-service.js";
 import { MatchTeamService } from "./match-team-service.js";
+import { seedGroupGuest } from "../../test-support/group-guest.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const safeTestDatabaseUrl =
@@ -189,14 +190,10 @@ void test(
       "MATCH_MANAGE_TEAMS",
     ]);
     assert.equal(createGuestRequestSchema.safeParse({}).success, false);
-    assert.equal(
-      createGuestRequestSchema.safeParse({ displayName: "   " }).success,
-      false,
-    );
-    assert.deepEqual(
-      createGuestRequestSchema.parse({ displayName: "  Diego  " }),
-      { displayName: "Diego" },
-    );
+    const groupGuestId = randomUUID();
+    assert.deepEqual(createGuestRequestSchema.parse({ groupGuestId }), {
+      groupGuestId,
+    });
     assert.equal(
       updateStatsRequestSchema.safeParse({
         participants: [{ participantId: randomUUID(), goals: -1, assists: 0 }],
@@ -229,7 +226,12 @@ void test(
     const moderatorGuest = await service.addGuest(
       moderator.id,
       moderatorDraft.id,
-      "Guest by moderator",
+      await seedGroupGuest(
+        connection.db,
+        moderatorDraft.id,
+        owner.id,
+        "Guest by moderator",
+      ),
     );
     assert.equal(moderatorGuest.status, "CONFIRMED");
     await assert.rejects(
@@ -354,7 +356,11 @@ void test(
     const orderMatch = await createOpenMatch(owner.id, group.id, 1);
     await service.join(owner.id, orderMatch.id);
     const cancelledFirstAttempt = await service.join(playerA.id, orderMatch.id);
-    const guestAhead = await service.addGuest(owner.id, orderMatch.id, "Diego");
+    const guestAhead = await service.addGuest(
+      owner.id,
+      orderMatch.id,
+      await seedGroupGuest(connection.db, orderMatch.id, owner.id, "Diego"),
+    );
     await service.join(playerB.id, orderMatch.id);
     await service.leave(playerA.id, orderMatch.id);
     const rejoined = await service.join(playerA.id, orderMatch.id);
@@ -378,7 +384,11 @@ void test(
 
     const guestPromotion = await createOpenMatch(owner.id, group.id, 1);
     await service.join(owner.id, guestPromotion.id);
-    const guest = await service.addGuest(owner.id, guestPromotion.id, "Pablo");
+    const guest = await service.addGuest(
+      owner.id,
+      guestPromotion.id,
+      await seedGroupGuest(connection.db, guestPromotion.id, owner.id, "Pablo"),
+    );
     await service.join(playerA.id, guestPromotion.id);
     await service.leave(owner.id, guestPromotion.id);
     let guestRoster = await roster(guestPromotion.id, playerA.id);
@@ -412,7 +422,16 @@ void test(
 
     const guestPlayerRace = await createOpenMatch(owner.id, group.id, 1);
     const admissionRace = await Promise.all([
-      service.addGuest(owner.id, guestPlayerRace.id, "Race guest"),
+      service.addGuest(
+        owner.id,
+        guestPlayerRace.id,
+        await seedGroupGuest(
+          connection.db,
+          guestPlayerRace.id,
+          owner.id,
+          "Race guest",
+        ),
+      ),
       service.join(playerA.id, guestPlayerRace.id),
     ]);
     assert.equal(
@@ -465,13 +484,32 @@ void test(
       hasCode("roster_locked"),
     );
     await assert.rejects(
-      () => service.addGuest(owner.id, locked.id, "Late guest"),
+      async () =>
+        service.addGuest(
+          owner.id,
+          locked.id,
+          await seedGroupGuest(
+            connection.db,
+            locked.id,
+            owner.id,
+            "Late guest",
+          ),
+        ),
       hasCode("roster_locked"),
     );
 
     const cancelled = await createOpenMatch(owner.id, group.id, 2);
     await service.join(playerA.id, cancelled.id);
-    await service.addGuest(owner.id, cancelled.id, "Preserved guest");
+    await service.addGuest(
+      owner.id,
+      cancelled.id,
+      await seedGroupGuest(
+        connection.db,
+        cancelled.id,
+        owner.id,
+        "Preserved guest",
+      ),
+    );
     await service.cancel(owner.id, cancelled.id);
     const preserved = await connection.db
       .select()
@@ -513,7 +551,12 @@ void test(
     const playedGuest = await service.addGuest(
       owner.id,
       completed.id,
-      "Final guest",
+      await seedGroupGuest(
+        connection.db,
+        completed.id,
+        owner.id,
+        "Final guest",
+      ),
     );
     const waitlisted = await service.join(playerB.id, completed.id);
     await assert.rejects(

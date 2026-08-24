@@ -105,11 +105,36 @@ export const membershipStatus = pgEnum("membership_status", [
   "ACTIVE",
   "LEFT",
   "REMOVED",
+  "BLOCKED",
 ]);
 export const membershipRole = pgEnum("membership_role", [
   "OWNER",
   "MODERATOR",
   "MEMBER",
+]);
+export const invitationType = pgEnum("invitation_type", [
+  "SINGLE_USE",
+  "TIME_LIMITED",
+]);
+export const footballRole = pgEnum("football_role", [
+  "LIBRE",
+  "DEFENSIVO",
+  "MEDIO",
+  "OFENSIVO",
+  "PORTERO",
+]);
+export const footballStrength = pgEnum("football_strength", [
+  "VELOCIDAD",
+  "PASE",
+  "REGATE",
+  "REMATE",
+  "DEFENSA",
+  "FISICO",
+]);
+export const groupGuestStatus = pgEnum("group_guest_status", [
+  "ACTIVE",
+  "ARCHIVED",
+  "DELETED",
 ]);
 
 export const players = pgTable("players", {
@@ -131,9 +156,21 @@ export const groups = pgTable(
     createdByPlayerId: uuid("created_by_player_id")
       .notNull()
       .references(() => players.id, { onDelete: "restrict" }),
+    guestsEnabled: boolean("guests_enabled").default(true).notNull(),
+    defaultGuestAllowancePerMember: integer(
+      "default_guest_allowance_per_member",
+    )
+      .default(1)
+      .notNull(),
     ...timestamps,
   },
-  (table) => [index("groups_created_by_idx").on(table.createdByPlayerId)],
+  (table) => [
+    check(
+      "groups_default_guest_allowance_nonnegative_ck",
+      sql`${table.defaultGuestAllowancePerMember} >= 0`,
+    ),
+    index("groups_created_by_idx").on(table.createdByPlayerId),
+  ],
 );
 
 export const groupMemberships = pgTable(
@@ -162,9 +199,14 @@ export const groupMemberships = pgTable(
       .defaultNow()
       .notNull(),
     endedAt: timestamp("ended_at", { mode: "date", withTimezone: true }),
+    guestAllowanceOverride: integer("guest_allowance_override"),
     ...timestamps,
   },
   (table) => [
+    check(
+      "group_memberships_guest_allowance_nonnegative_ck",
+      sql`${table.guestAllowanceOverride} is null or ${table.guestAllowanceOverride} >= 0`,
+    ),
     uniqueIndex("group_memberships_active_player_uq")
       .on(table.groupId, table.playerId)
       .where(sql`${table.status} = 'ACTIVE'`),
@@ -179,6 +221,156 @@ export const groupMemberships = pgTable(
       table.groupId,
       table.status,
       table.joinedAt,
+    ),
+  ],
+);
+
+export const groupInvitations = pgTable(
+  "group_invitations",
+  {
+    id: uuid("id").primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "restrict" }),
+    type: invitationType("type").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    createdByPlayerId: uuid("created_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    createdByRole: membershipRole("created_by_role").notNull(),
+    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }),
+    maxUses: integer("max_uses"),
+    useCount: integer("use_count").default(0).notNull(),
+    revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
+    revokedByPlayerId: uuid("revoked_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("group_invitations_token_hash_uq").on(table.tokenHash),
+    check("group_invitations_use_count_ck", sql`${table.useCount} >= 0`),
+    check(
+      "group_invitations_max_uses_ck",
+      sql`${table.maxUses} is null or (${table.maxUses} > 0 and ${table.useCount} <= ${table.maxUses})`,
+    ),
+    check(
+      "group_invitations_type_ck",
+      sql`(${table.type} = 'SINGLE_USE' and ${table.expiresAt} is null and ${table.maxUses} = 1) or (${table.type} = 'TIME_LIMITED' and ${table.expiresAt} is not null)`,
+    ),
+    index("group_invitations_group_created_idx").on(
+      table.groupId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const groupInvitationUsages = pgTable(
+  "group_invitation_usages",
+  {
+    id: uuid("id").primaryKey(),
+    invitationId: uuid("invitation_id")
+      .notNull()
+      .references(() => groupInvitations.id, { onDelete: "restrict" }),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => groupMemberships.id, { onDelete: "restrict" }),
+    usedAt: timestamp("used_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("group_invitation_usages_invitation_player_uq").on(
+      table.invitationId,
+      table.playerId,
+    ),
+    index("group_invitation_usages_invitation_time_idx").on(
+      table.invitationId,
+      table.usedAt,
+    ),
+  ],
+);
+
+export const playerFootballPreferences = pgTable(
+  "player_football_preferences",
+  {
+    id: uuid("id").primaryKey(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    discipline: text("discipline").default("F5").notNull(),
+    preferredRoles: footballRole("preferred_roles").array().notNull(),
+    willingToPlayGoalkeeper: boolean("willing_to_play_goalkeeper")
+      .default(false)
+      .notNull(),
+    strengths: footballStrength("strengths").array().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("player_football_preferences_player_discipline_uq").on(
+      table.playerId,
+      table.discipline,
+    ),
+    check(
+      "player_football_preferences_discipline_ck",
+      sql`${table.discipline} = 'F5'`,
+    ),
+    check(
+      "player_football_preferences_roles_ck",
+      sql`cardinality(${table.preferredRoles}) <= 2`,
+    ),
+    check(
+      "player_football_preferences_strengths_ck",
+      sql`cardinality(${table.strengths}) <= 3`,
+    ),
+    check(
+      "player_football_preferences_keeper_ck",
+      sql`not ('PORTERO' = any(${table.preferredRoles})) or ${table.willingToPlayGoalkeeper}`,
+    ),
+  ],
+);
+
+export const groupGuests = pgTable(
+  "group_guests",
+  {
+    id: uuid("id").primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "restrict" }),
+    displayName: text("display_name").notNull(),
+    normalizedDisplayName: text("normalized_display_name").notNull(),
+    status: groupGuestStatus("status").default("ACTIVE").notNull(),
+    createdByPlayerId: uuid("created_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    archivedAt: timestamp("archived_at", { mode: "date", withTimezone: true }),
+    archivedByPlayerId: uuid("archived_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    deletedAt: timestamp("deleted_at", { mode: "date", withTimezone: true }),
+    deletedByPlayerId: uuid("deleted_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "group_guests_names_nonempty_ck",
+      sql`btrim(${table.displayName}) <> '' and btrim(${table.normalizedDisplayName}) <> ''`,
+    ),
+    uniqueIndex("group_guests_reusable_name_uq")
+      .on(table.groupId, table.normalizedDisplayName)
+      .where(sql`${table.status} in ('ACTIVE', 'ARCHIVED')`),
+    index("group_guests_group_status_name_idx").on(
+      table.groupId,
+      table.status,
+      table.normalizedDisplayName,
     ),
   ],
 );
@@ -314,6 +506,9 @@ export const matchParticipants = pgTable(
     playerId: uuid("player_id").references(() => players.id, {
       onDelete: "restrict",
     }),
+    groupGuestId: uuid("group_guest_id").references(() => groupGuests.id, {
+      onDelete: "restrict",
+    }),
     guestDisplayName: text("guest_display_name"),
     guestCreatedByPlayerId: uuid("guest_created_by_player_id").references(
       () => players.id,
@@ -353,7 +548,7 @@ export const matchParticipants = pgTable(
   (table) => [
     check(
       "match_participants_identity_ck",
-      sql`(${table.kind} = 'PLAYER' and ${table.playerId} is not null and ${table.guestDisplayName} is null and ${table.guestCreatedByPlayerId} is null) or (${table.kind} = 'GUEST' and ${table.playerId} is null and ${table.guestDisplayName} is not null and btrim(${table.guestDisplayName}) <> '' and ${table.guestCreatedByPlayerId} is not null)`,
+      sql`(${table.kind} = 'PLAYER' and ${table.playerId} is not null and ${table.groupGuestId} is null and ${table.guestDisplayName} is null and ${table.guestCreatedByPlayerId} is null) or (${table.kind} = 'GUEST' and ${table.playerId} is null and ${table.groupGuestId} is not null and ${table.guestDisplayName} is not null and btrim(${table.guestDisplayName}) <> '' and ${table.guestCreatedByPlayerId} is not null)`,
     ),
     check(
       "match_participants_attendance_evidence_ck",
@@ -376,6 +571,10 @@ export const matchParticipants = pgTable(
     ),
     index("match_participants_player_match_idx").on(
       table.playerId,
+      table.matchId,
+    ),
+    index("match_participants_group_guest_match_idx").on(
+      table.groupGuestId,
       table.matchId,
     ),
   ],

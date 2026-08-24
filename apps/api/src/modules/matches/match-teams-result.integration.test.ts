@@ -22,6 +22,7 @@ import { MatchCompletionService } from "./match-completion-service.js";
 import { MatchResultService } from "./match-result-service.js";
 import { MatchService } from "./match-service.js";
 import { MatchTeamService } from "./match-team-service.js";
+import { seedGroupGuest } from "../../test-support/group-guest.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const safeUrl =
@@ -102,7 +103,11 @@ void test(
       ...members.slice(0, 8).map((item) => item.id),
     ])
       participants.push(await matches.join(playerId, match.id));
-    const guest = await matches.addGuest(owner.id, match.id, "Guest scorer");
+    const guest = await matches.addGuest(
+      owner.id,
+      match.id,
+      await seedGroupGuest(connection.db, match.id, owner.id, "Guest scorer"),
+    );
     const waitlisted = await matches.join(members[9]!.id, match.id);
     assert.equal(waitlisted.status, "WAITLISTED");
     await assert.rejects(

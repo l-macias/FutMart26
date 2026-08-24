@@ -10,7 +10,7 @@ export const MATCHMAKING_V1_CONFIG = {
 export type MatchmakingParticipant = {
   participantId: string;
   internalOvr: string;
-  ratingProfile: "LIBRE" | "DEFENSIVO" | "MEDIO" | "OFENSIVO";
+  preferredRoles: ("LIBRE" | "DEFENSIVO" | "MEDIO" | "OFENSIVO" | "PORTERO")[];
   willingToPlayGoalkeeper: boolean;
 };
 
@@ -121,18 +121,18 @@ function average(team: MatchmakingParticipant[]) {
 }
 
 function rolePenalty(a: MatchmakingParticipant[], b: MatchmakingParticipant[]) {
-  const profiles: MatchmakingParticipant["ratingProfile"][] = [
-    "DEFENSIVO",
-    "MEDIO",
-    "OFENSIVO",
-    "LIBRE",
-  ];
+  const profiles: Exclude<
+    MatchmakingParticipant["preferredRoles"][number],
+    "PORTERO"
+  >[] = ["DEFENSIVO", "MEDIO", "OFENSIVO", "LIBRE"];
   return profiles.reduce(
     (penalty, profile) =>
       penalty +
       Math.abs(
-        a.filter((item) => item.ratingProfile === profile).length -
-          b.filter((item) => item.ratingProfile === profile).length,
+        a.filter((item) => (item.preferredRoles[0] ?? "LIBRE") === profile)
+          .length -
+          b.filter((item) => (item.preferredRoles[0] ?? "LIBRE") === profile)
+            .length,
       ),
     0,
   );

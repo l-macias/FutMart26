@@ -232,6 +232,43 @@ export class GroupService {
     });
   }
 
+  async setModeratorCapabilities(
+    actorPlayerId: string,
+    groupId: string,
+    targetPlayerId: string,
+    capabilities: GroupCapability[],
+  ) {
+    return this.database.transaction(async (tx) => {
+      await this.lockActiveGroup(tx, groupId);
+      const actor = await this.requireActiveMembership(
+        tx,
+        actorPlayerId,
+        groupId,
+      );
+      if (actor.role !== "OWNER")
+        throw new ApplicationError(
+          "forbidden",
+          "Only the owner can grant capabilities",
+          403,
+        );
+      const target = await this.requireActiveMembership(
+        tx,
+        targetPlayerId,
+        groupId,
+      );
+      if (target.role !== "MODERATOR")
+        throw new ApplicationError(
+          "invalid_role_transition",
+          "Capabilities can only be granted to moderators",
+          409,
+        );
+      await tx
+        .update(groupMemberships)
+        .set({ capabilities, updatedAt: new Date() })
+        .where(eq(groupMemberships.id, target.id));
+    });
+  }
+
   async leave(actorPlayerId: string, groupId: string) {
     return this.database.transaction(async (tx) => {
       await this.lockActiveGroup(tx, groupId);
@@ -309,6 +346,81 @@ export class GroupService {
           409,
         );
       await this.endMembership(tx, target.id, "REMOVED");
+    });
+  }
+
+  async block(actorPlayerId: string, groupId: string, targetPlayerId: string) {
+    return this.database.transaction(async (tx) => {
+      await this.lockActiveGroup(tx, groupId);
+      const actor = await this.requireActiveMembership(
+        tx,
+        actorPlayerId,
+        groupId,
+      );
+      if (actor.role !== "OWNER")
+        throw new ApplicationError(
+          "forbidden",
+          "Only the owner can block members",
+          403,
+        );
+      const target = await this.requireActiveMembership(
+        tx,
+        targetPlayerId,
+        groupId,
+      );
+      if (target.role === "OWNER")
+        throw new ApplicationError(
+          "ownership_invariant_violation",
+          "Owner cannot be blocked",
+          409,
+        );
+      await tx
+        .update(groupMemberships)
+        .set({ status: "BLOCKED", endedAt: new Date(), updatedAt: new Date() })
+        .where(eq(groupMemberships.id, target.id));
+    });
+  }
+
+  async unblock(
+    actorPlayerId: string,
+    groupId: string,
+    targetPlayerId: string,
+  ) {
+    return this.database.transaction(async (tx) => {
+      await this.lockActiveGroup(tx, groupId);
+      const actor = await this.requireActiveMembership(
+        tx,
+        actorPlayerId,
+        groupId,
+      );
+      if (actor.role !== "OWNER")
+        throw new ApplicationError(
+          "forbidden",
+          "Only the owner can unblock members",
+          403,
+        );
+      const [blocked] = await tx
+        .select()
+        .from(groupMemberships)
+        .where(
+          and(
+            eq(groupMemberships.groupId, groupId),
+            eq(groupMemberships.playerId, targetPlayerId),
+            eq(groupMemberships.status, "BLOCKED"),
+          ),
+        )
+        .orderBy(sql`${groupMemberships.updatedAt} desc`)
+        .limit(1);
+      if (!blocked)
+        throw new ApplicationError(
+          "membership_not_found",
+          "Blocked membership not found",
+          404,
+        );
+      await tx
+        .update(groupMemberships)
+        .set({ status: "REMOVED", updatedAt: new Date() })
+        .where(eq(groupMemberships.id, blocked.id));
     });
   }
 

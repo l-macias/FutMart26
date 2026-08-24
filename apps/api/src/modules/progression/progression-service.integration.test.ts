@@ -23,6 +23,7 @@ import { MatchService } from "../matches/match-service.js";
 import { MatchResultService } from "../matches/match-result-service.js";
 import { MatchTeamService } from "../matches/match-team-service.js";
 import { VotingService } from "../voting/voting-service.js";
+import { seedGroupGuest } from "../../test-support/group-guest.js";
 import {
   PROGRESSION_V1_1_CONFIG,
   PROGRESSION_V1_1_VERSION,
@@ -146,7 +147,16 @@ void test(
       for (const playerId of playerIds)
         participants.push(await matchService.join(playerId, match.id));
       const guest = options.guest
-        ? await matchService.addGuest(ownerId, match.id, "Progression Guest")
+        ? await matchService.addGuest(
+            ownerId,
+            match.id,
+            await seedGroupGuest(
+              connection.db,
+              match.id,
+              ownerId,
+              "Progression Guest",
+            ),
+          )
         : null;
       const allParticipants = [...participants, ...(guest ? [guest] : [])];
       await teams.replace(

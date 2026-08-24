@@ -103,7 +103,7 @@ export function createMatchRoutes(
       const guest = await matches.addGuest(
         (await actor(request)).id,
         matchId,
-        body.displayName,
+        body.groupGuestId,
       );
       return reply.status(201).send({ id: guest.id, status: guest.status });
     });

@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@football/database";
 import {
   groupMemberships,
+  groupGuests,
   groups,
   matchParticipants,
   matchSportingResults,
@@ -302,20 +303,92 @@ export class MatchService {
     });
   }
 
-  async addGuest(actorPlayerId: string, matchId: string, displayName: string) {
+  async addGuest(actorPlayerId: string, matchId: string, groupGuestId: string) {
     return this.database.transaction(async (tx) => {
       const match = await this.lockMatch(tx, matchId);
-      await this.requireGroupCapability(
-        tx,
-        actorPlayerId,
-        match.groupId,
-        "MATCH_MANAGE_GUESTS",
-        true,
-      );
       this.requireOpen(match);
+      const [membership] = await tx
+        .select({
+          id: groupMemberships.id,
+          role: groupMemberships.role,
+          capabilities: groupMemberships.capabilities,
+          guestAllowanceOverride: groupMemberships.guestAllowanceOverride,
+          guestsEnabled: groups.guestsEnabled,
+          defaultAllowance: groups.defaultGuestAllowancePerMember,
+          groupStatus: groups.status,
+        })
+        .from(groupMemberships)
+        .innerJoin(groups, eq(groups.id, groupMemberships.groupId))
+        .where(
+          and(
+            eq(groupMemberships.groupId, match.groupId),
+            eq(groupMemberships.playerId, actorPlayerId),
+            eq(groupMemberships.status, "ACTIVE"),
+          ),
+        )
+        .limit(1);
+      if (!membership)
+        throw new ApplicationError("forbidden", "Forbidden", 403);
+      if (membership.groupStatus !== "ACTIVE")
+        throw new ApplicationError("group_archived", "Group is archived", 409);
+      if (!membership.guestsEnabled)
+        throw new ApplicationError(
+          "guest_policy_disabled",
+          "Guests are disabled for this Group",
+          409,
+        );
+      await tx.execute(
+        sql`select id from ${groupMemberships} where id = ${membership.id} for update`,
+      );
+      const [guest] = await tx
+        .select()
+        .from(groupGuests)
+        .where(
+          and(
+            eq(groupGuests.id, groupGuestId),
+            eq(groupGuests.groupId, match.groupId),
+            eq(groupGuests.status, "ACTIVE"),
+          ),
+        )
+        .limit(1);
+      if (!guest)
+        throw new ApplicationError(
+          "guest_not_reusable",
+          "Guest is not reusable",
+          409,
+        );
+      const hasOverride =
+        membership.role === "OWNER" ||
+        hasGroupCapability(
+          membership.role,
+          membership.capabilities,
+          "MATCH_GUEST_OVERRIDE",
+        );
+      if (!hasOverride) {
+        const allowance =
+          membership.guestAllowanceOverride ?? membership.defaultAllowance;
+        const [active] = await tx
+          .select({ value: sql<number>`count(*)::int` })
+          .from(matchParticipants)
+          .where(
+            and(
+              eq(matchParticipants.matchId, matchId),
+              eq(matchParticipants.kind, "GUEST"),
+              eq(matchParticipants.guestCreatedByPlayerId, actorPlayerId),
+              inArray(matchParticipants.status, ["CONFIRMED", "WAITLISTED"]),
+            ),
+          );
+        if ((active?.value ?? 0) >= allowance)
+          throw new ApplicationError(
+            "guest_allowance_exceeded",
+            "Guest allowance exceeded",
+            409,
+          );
+      }
       return this.admit(tx, match, {
         kind: "GUEST",
-        guestDisplayName: displayName,
+        groupGuestId: guest.id,
+        guestDisplayName: guest.displayName,
         guestCreatedByPlayerId: actorPlayerId,
       });
     });
@@ -324,13 +397,6 @@ export class MatchService {
   async cancelGuest(actorPlayerId: string, matchId: string, guestId: string) {
     return this.database.transaction(async (tx) => {
       const match = await this.lockMatch(tx, matchId);
-      await this.requireGroupCapability(
-        tx,
-        actorPlayerId,
-        match.groupId,
-        "MATCH_MANAGE_GUESTS",
-        true,
-      );
       this.requireOpen(match);
       const [guest] = await tx
         .select()
@@ -350,6 +416,15 @@ export class MatchService {
           "Guest is not participating",
           404,
         );
+      if (guest.guestCreatedByPlayerId !== actorPlayerId) {
+        await this.requireGroupCapability(
+          tx,
+          actorPlayerId,
+          match.groupId,
+          "MATCH_MANAGE_GUESTS",
+          true,
+        );
+      }
       await this.cancelParticipation(tx, guest.id, actorPlayerId);
       if (guest.status === "CONFIRMED")
         await this.promoteAvailable(tx, matchId, match.capacity);
@@ -410,6 +485,7 @@ export class MatchService {
       | { kind: "PLAYER"; playerId: string }
       | {
           kind: "GUEST";
+          groupGuestId: string;
           guestDisplayName: string;
           guestCreatedByPlayerId: string;
         },

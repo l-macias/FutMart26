@@ -78,6 +78,13 @@
       "when": 1787592245430,
       "tag": "0010_windy_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787595893872,
+      "tag": "0011_adorable_absorbing_man",
+      "breakpoints": true
     }
   ]
 }
