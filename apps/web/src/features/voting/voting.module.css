@@ -61,7 +61,13 @@
   gap: var(--space-3);
 }
 
-.modeSelection button {
+.modeOptions {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-3);
+}
+
+.modeOptions button {
   display: grid;
   min-inline-size: 0;
   min-block-size: calc(var(--touch-target-min) + var(--space-6));
@@ -353,6 +359,18 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+@media (max-width: 47.99rem) {
+  .evaluationActions {
+    position: sticky;
+    z-index: var(--z-navigation);
+    inset-block-end: calc(
+      var(--touch-target-min) + var(--space-6) + env(safe-area-inset-bottom)
+    );
+    padding-block: var(--space-2);
+    background: var(--background-canvas);
+  }
+}
+
 .quickRating {
   padding-block: var(--space-4);
   border-block: var(--border-width-thin) solid var(--border-strong);
@@ -435,8 +453,12 @@
     gap: var(--space-8);
   }
 
-  .modeSelection {
+  .modeOptions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modeSelection {
+    max-inline-size: var(--content-reading);
   }
 
   .quickVoting {

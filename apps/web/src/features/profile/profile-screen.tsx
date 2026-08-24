@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type KeyboardEvent, useRef, useState } from "react";
 
 import { TacticalDivider } from "@football/football-ui";
 import { Text } from "@football/ui";
@@ -24,6 +24,27 @@ const tabs = [
 
 export function ProfileScreen() {
   const [activeSection, setActiveSection] = useState<ProfileSection>("summary");
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  function handleTabKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) {
+    let nextIndex: number | undefined;
+
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + tabs.length) % tabs.length;
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = tabs.length - 1;
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex]!;
+    setActiveSection(nextTab.id);
+    tabRefs.current[nextIndex]?.focus();
+  }
 
   return (
     <div className={styles.page}>
@@ -68,13 +89,17 @@ export function ProfileScreen() {
             className={styles.tabs}
             role="tablist"
           >
-            {tabs.map((tab) => (
+            {tabs.map((tab, index) => (
               <button
                 aria-controls={`profile-panel-${tab.id}`}
                 aria-selected={activeSection === tab.id}
                 id={`profile-tab-${tab.id}`}
                 key={tab.id}
                 onClick={() => setActiveSection(tab.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                ref={(element) => {
+                  tabRefs.current[index] = element;
+                }}
                 role="tab"
                 tabIndex={activeSection === tab.id ? 0 : -1}
                 type="button"

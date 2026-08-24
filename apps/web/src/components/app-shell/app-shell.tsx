@@ -40,9 +40,13 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           <IconButton disabled label="Notificaciones, próximamente">
             <NotificationIcon />
           </IconButton>
-          <IconButton disabled label="Perfil, próximamente">
+          <Link
+            aria-label="Abrir perfil"
+            className="ui-icon-button"
+            href="/profile"
+          >
             <ProfileIcon />
-          </IconButton>
+          </Link>
         </div>
       </header>
 

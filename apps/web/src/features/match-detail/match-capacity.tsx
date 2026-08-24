@@ -10,7 +10,7 @@ export function MatchCapacity() {
           Estado del cupo
         </Text>
         <Text as="span" tone="muted" variant="metadata">
-          12 anotados
+          10 anotados · 8 en cupo
         </Text>
       </div>
 
@@ -28,7 +28,7 @@ export function MatchCapacity() {
 
       <div className={styles.capacityLegend}>
         <Text as="span" variant="label">
-          8 confirmados
+          8 confirmados · 1 Guest
         </Text>
         <Text as="span" tone="muted" variant="label">
           2 lugares

@@ -13,7 +13,7 @@ export function VotingModeSelection({
       <Text as="h2" id="mode-selection-title" variant="heading-lg">
         ¿Cómo querés votar?
       </Text>
-      <div>
+      <div className={styles.modeOptions}>
         <button onClick={() => onSelect("quick")} type="button">
           <Text as="span" variant="heading-lg">
             Rápido

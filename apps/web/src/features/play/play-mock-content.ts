@@ -8,7 +8,7 @@ export const playMockContent = {
     },
     results: {
       eyebrow: "Resultados listos",
-      title: "Fútbol oficina",
+      title: "Los del martes",
       detail: "Tu progreso del último partido ya está disponible.",
     },
     promotion: {

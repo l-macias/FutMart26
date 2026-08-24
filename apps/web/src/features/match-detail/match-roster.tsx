@@ -29,9 +29,16 @@ export function MatchRoster() {
               <span className={styles.playerOrder}>
                 {String(index + 1).padStart(2, "0")}
               </span>
-              <Text as="span" variant="heading-md">
-                {player.name}
-              </Text>
+              <span className={styles.rosterIdentity}>
+                {"guest" in player && player.guest ? (
+                  <Text as="span" tone="accent" variant="metadata">
+                    Guest
+                  </Text>
+                ) : null}
+                <Text as="span" variant="heading-md">
+                  {player.name}
+                </Text>
+              </span>
               <Text as="span" tone="muted" variant="metadata">
                 {player.role}
               </Text>
@@ -60,22 +67,9 @@ export function MatchRoster() {
           </ol>
         </div>
 
-        <article className={styles.guest}>
-          <Text as="span" tone="accent" variant="metadata">
-            Guest
-          </Text>
-          <div>
-            <span aria-hidden="true" className={styles.guestToken}>
-              {matchDetailMockContent.guest.initials}
-            </span>
-            <Text as="h3" variant="heading-md">
-              {matchDetailMockContent.guest.name}
-            </Text>
-          </div>
-          <Text tone="muted" variant="metadata">
-            Invitado cargado para este partido
-          </Text>
-        </article>
+        <Text tone="muted" variant="metadata">
+          Guest Diego ocupa una de las 8 plazas confirmadas.
+        </Text>
       </div>
     </section>
   );

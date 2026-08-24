@@ -2,19 +2,23 @@
 export const matchDetailMockContent = {
   confirmed: [
     { name: "Lucas", initials: "LU", role: "Ofensivo" },
-    { name: "Martín", initials: "MA", role: "Mixto" },
     { name: "Nico", initials: "NI", role: "Defensivo" },
     { name: "Juan", initials: "JU", role: "Arquero" },
     { name: "Sofi", initials: "SO", role: "Mixto" },
     { name: "Tomi", initials: "TO", role: "Ofensivo" },
     { name: "Fede", initials: "FE", role: "Defensivo" },
     { name: "Lean", initials: "LE", role: "Libre" },
+    {
+      name: "Diego",
+      initials: "DI",
+      role: "Arquero · Puede atajar",
+      guest: true,
+    },
   ],
   waitlist: [
     { order: "#1", name: "Pablo" },
     { order: "#2", name: "Mati" },
   ],
-  guest: { name: "Diego", initials: "DI" },
   teams: [
     {
       name: "Equipo A",

@@ -31,7 +31,7 @@ export function NextMatchPreview() {
           <MatchStateMark tone="positive">Confirmado</MatchStateMark>
         </div>
       </div>
-      <Link className={styles.primaryLink} href="/play">
+      <Link className={styles.primaryLink} href="/play/match-demo">
         Ver partido <span aria-hidden="true">→</span>
       </Link>
     </Surface>

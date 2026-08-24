@@ -311,6 +311,21 @@
   font-size: var(--type-heading-md-size);
 }
 
+@media (max-width: 47.99rem) {
+  .moveTarget {
+    position: fixed;
+    z-index: var(--z-header);
+    inset-inline: var(--space-4);
+    inline-size: auto;
+    inset-block-end: calc(
+      var(--touch-target-min) + var(--touch-target-min) +
+        var(--touch-target-min) + var(--space-8) + env(safe-area-inset-bottom)
+    );
+    background: var(--background-elevated);
+    box-shadow: var(--elevation-raised);
+  }
+}
+
 .actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
