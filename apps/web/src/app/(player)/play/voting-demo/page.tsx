@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/components/placeholder-screen/placeholder-screen";
+import { VotingScreen } from "@/features/voting/voting-screen";
 
 export default function VotingDemoPage() {
-  return <PlaceholderScreen index="02.B" title="Votación" />;
+  return <VotingScreen />;
 }

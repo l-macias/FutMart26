@@ -1,0 +1,373 @@
+.page,
+.intro,
+.stage,
+.centerStage,
+.attributeStage,
+.revealContext,
+.signals,
+.signals > div,
+.summary,
+.cardStage,
+.cardData,
+.cardData > span {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.page {
+  min-block-size: min(44rem, calc(100dvh - var(--space-9)));
+  align-content: start;
+  gap: var(--space-5);
+}
+
+.scenarioSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  inline-size: min(100%, var(--content-reading));
+  gap: var(--space-2);
+}
+
+.scenarioSwitch button {
+  min-block-size: var(--touch-target-min);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--foreground-muted);
+  font: 700 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.scenarioSwitch button[aria-pressed="true"] {
+  border-color: var(--accent-primary);
+  color: var(--foreground-primary);
+}
+
+.intro {
+  min-block-size: min(32rem, 60dvh);
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-4);
+  padding-block: var(--space-6);
+}
+
+.revealContext {
+  gap: var(--space-1);
+}
+
+.stage {
+  min-block-size: min(27rem, 52dvh);
+  align-content: center;
+  animation: stage-in var(--motion-transition-duration)
+    var(--motion-ease-emphasized) both;
+}
+
+.centerStage {
+  inline-size: min(100%, var(--content-reading));
+  justify-items: center;
+  gap: var(--space-3);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.matchRating,
+.milestoneValue,
+.overallAfter,
+.cardOverall,
+.attributeValues > :last-child,
+.summaryList dd {
+  font-weight: 800;
+}
+
+.strongValue {
+  font-weight: 800;
+}
+
+.matchRating {
+  font-size: var(--type-display-xl-size);
+}
+
+.positive,
+.deltaPositive {
+  color: var(--state-positive);
+}
+
+.negative,
+.deltaNegative {
+  color: var(--state-negative);
+}
+
+.deltaNeutral {
+  color: var(--foreground-muted);
+}
+
+.overallChange {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto minmax(0, auto);
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.progressArrow {
+  color: var(--accent-primary);
+  font-size: var(--type-heading-lg-size);
+}
+
+.overallAfter {
+  color: var(--foreground-primary);
+  animation: value-reveal var(--motion-feedback-duration)
+    var(--motion-ease-emphasized) both;
+  animation-delay: var(--motion-micro-duration);
+}
+
+.attributeStage {
+  gap: var(--space-4);
+}
+
+.attributeList {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.attributeList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--space-6);
+  min-inline-size: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.attributeValues {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.signals {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.signals > div {
+  gap: var(--space-1);
+  padding-inline-start: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--border-strong);
+}
+
+.milestone {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-7) var(--space-5);
+  border-color: var(--accent-primary);
+  animation: milestone-in var(--motion-celebration-duration)
+    var(--motion-ease-emphasized) both;
+}
+
+.celebrationLine {
+  position: absolute;
+  inset-inline: var(--space-5);
+  inset-block-start: var(--space-4);
+  block-size: var(--border-width-strong);
+  background: var(--accent-primary);
+  transform-origin: left;
+  animation: line-reveal var(--motion-celebration-duration)
+    var(--motion-ease-emphasized) both;
+}
+
+.tierChange {
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  text-transform: uppercase;
+}
+
+.tierChange > span:nth-child(2) {
+  color: var(--accent-primary);
+}
+
+.cardStage {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.cardStage > div {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.cardPreview {
+  position: relative;
+  display: grid;
+  inline-size: min(14rem, 68vw);
+  aspect-ratio: 5 / 7;
+  grid-template-rows: minmax(0, 1fr) auto;
+  margin: 0 auto;
+  overflow: hidden;
+  border: var(--border-width-strong) solid var(--accent-primary);
+  border-radius: var(--radius-panel);
+  background: var(--background-elevated);
+  animation: card-reveal var(--motion-celebration-duration)
+    var(--motion-ease-emphasized) both;
+}
+
+.cardArtwork {
+  position: relative;
+  display: grid;
+  place-content: center;
+  overflow: hidden;
+  border-block-end: var(--border-width-thin) solid var(--border-accent);
+  text-align: center;
+}
+
+.cardArtwork > span {
+  position: absolute;
+  inset: 18% 28% 0;
+  border: var(--border-width-thin) solid var(--border-strong);
+  border-block-end: 0;
+  border-radius: var(--radius-round) var(--radius-round) 0 0;
+}
+
+.cardData {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.cardData > span {
+  gap: var(--space-1);
+}
+
+.cardOverall {
+  color: var(--accent-primary);
+}
+
+.cardName {
+  min-inline-size: 0;
+  font-weight: 800;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.revealActions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 1fr);
+  inline-size: min(100%, var(--content-reading));
+  gap: var(--space-3);
+  margin-inline: auto;
+}
+
+.summary {
+  inline-size: min(100%, var(--content-reading));
+  gap: var(--space-5);
+  padding: var(--space-6);
+  margin-inline: auto;
+}
+
+.summaryList {
+  display: grid;
+  padding: 0;
+  margin: 0;
+}
+
+.summaryList > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.summaryList dt {
+  color: var(--foreground-muted);
+  font: 700 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.summaryList dd {
+  margin: 0;
+  font: 800 var(--type-heading-md-size) / 1
+    var(--font-display, var(--font-display-fallback));
+}
+
+.summaryActions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@keyframes stage-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-3));
+  }
+}
+
+@keyframes value-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes milestone-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes line-reveal {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-4)) rotate(-1deg);
+  }
+}
+
+@media (min-width: 48rem) {
+  .page {
+    align-content: center;
+  }
+
+  .cardStage {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.7fr);
+    inline-size: min(100%, var(--content-wide));
+    margin-inline: auto;
+  }
+
+  .summaryActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summaryActions > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .overallAfter,
+  .milestone,
+  .celebrationLine,
+  .cardPreview {
+    animation: none;
+  }
+}

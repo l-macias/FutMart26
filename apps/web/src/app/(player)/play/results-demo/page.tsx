@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/components/placeholder-screen/placeholder-screen";
+import { ProgressionRevealScreen } from "@/features/progression-reveal/progression-reveal-screen";
 
 export default function ResultsDemoPage() {
-  return <PlaceholderScreen index="02.C" title="Resultados" />;
+  return <ProgressionRevealScreen />;
 }
