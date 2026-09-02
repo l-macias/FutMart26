@@ -1,49 +1,60 @@
 "use client";
 
-import { type KeyboardEvent, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 
 import { TacticalDivider } from "@football/football-ui";
 import { Text } from "@football/ui";
 
+import { api } from "@/lib/api/resources";
+import { queryKeys } from "@/lib/api/query-keys";
+import { ProfilePlayerCard } from "./profile-player-card";
 import { CareerMarks } from "./career-marks";
-import { PlayerCardMock } from "./player-card-mock";
-import { PlayerStats } from "./player-stats";
-import { profileMock } from "./profile-mock-content";
 import { ProfileSummary } from "./profile-summary";
-import { ProgressionTimeline } from "./progression-timeline";
 import styles from "./profile.module.css";
 
-type ProfileSection = "summary" | "stats" | "progression" | "marks";
-
-const tabs = [
-  { id: "summary", label: "Resumen" },
-  { id: "stats", label: "Stats" },
-  { id: "progression", label: "Progresión" },
-  { id: "marks", label: "Logros" },
-] as const satisfies readonly { id: ProfileSection; label: string }[];
-
 export function ProfileScreen() {
-  const [activeSection, setActiveSection] = useState<ProfileSection>("summary");
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const player = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const performance = useQuery({
+    queryKey: queryKeys.performance,
+    queryFn: api.performance,
+  });
+  const preferences = useQuery({
+    queryKey: queryKeys.footballPreferences,
+    queryFn: api.preferences,
+  });
+  const groups = useQuery({ queryKey: queryKeys.groups, queryFn: api.groups });
+  const rewards = useQuery({
+    queryKey: queryKeys.rewards,
+    queryFn: api.rewards,
+  });
 
-  function handleTabKeyDown(
-    event: KeyboardEvent<HTMLButtonElement>,
-    index: number,
+  if (
+    player.isPending ||
+    performance.isPending ||
+    preferences.isPending ||
+    groups.isPending ||
+    rewards.isPending
   ) {
-    let nextIndex: number | undefined;
+    return (
+      <div className={styles.page}>
+        <p role="status">Preparando tu perfil F5…</p>
+      </div>
+    );
+  }
 
-    if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
-    if (event.key === "ArrowLeft") {
-      nextIndex = (index - 1 + tabs.length) % tabs.length;
-    }
-    if (event.key === "Home") nextIndex = 0;
-    if (event.key === "End") nextIndex = tabs.length - 1;
-    if (nextIndex === undefined) return;
-
-    event.preventDefault();
-    const nextTab = tabs[nextIndex]!;
-    setActiveSection(nextTab.id);
-    tabRefs.current[nextIndex]?.focus();
+  if (
+    player.isError ||
+    performance.isError ||
+    preferences.isError ||
+    groups.isError ||
+    rewards.isError
+  ) {
+    return (
+      <div className={styles.page}>
+        <p role="alert">No pudimos cargar tu perfil F5.</p>
+      </div>
+    );
   }
 
   return (
@@ -62,63 +73,100 @@ export function ProfileScreen() {
           <div className={styles.identityHeading}>
             <div>
               <Text as="h2" variant="display-lg">
-                {profileMock.name}
+                {player.data.displayName}
               </Text>
               <Text as="span" tone="accent" variant="label">
-                {profileMock.discipline}
+                F5
               </Text>
             </div>
             <dl className={styles.identityMetrics}>
               <div>
                 <dt>OVR actual</dt>
-                <dd>{profileMock.overall}</dd>
+                <dd>{Math.round(performance.data.overall)}</dd>
               </div>
               <div>
-                <dt>Personal best</dt>
-                <dd>{profileMock.personalBest}</dd>
+                <dt>Partidos</dt>
+                <dd>{performance.data.processedMatchCount}</dd>
               </div>
             </dl>
           </div>
-          <PlayerCardMock />
+          <ProfilePlayerCard
+            image={player.data.image}
+            name={player.data.displayName}
+            performance={performance.data}
+          />
         </aside>
 
         <main className={styles.profileContent}>
           <TacticalDivider />
-          <div
-            aria-label="Secciones del perfil"
-            className={styles.tabs}
-            role="tablist"
-          >
-            {tabs.map((tab, index) => (
-              <button
-                aria-controls={`profile-panel-${tab.id}`}
-                aria-selected={activeSection === tab.id}
-                id={`profile-tab-${tab.id}`}
-                key={tab.id}
-                onClick={() => setActiveSection(tab.id)}
-                onKeyDown={(event) => handleTabKeyDown(event, index)}
-                ref={(element) => {
-                  tabRefs.current[index] = element;
-                }}
-                role="tab"
-                tabIndex={activeSection === tab.id ? 0 : -1}
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <div
-            aria-labelledby={`profile-tab-${activeSection}`}
-            className={styles.tabPanel}
-            id={`profile-panel-${activeSection}`}
-            role="tabpanel"
-          >
-            {activeSection === "summary" ? <ProfileSummary /> : null}
-            {activeSection === "stats" ? <PlayerStats /> : null}
-            {activeSection === "progression" ? <ProgressionTimeline /> : null}
-            {activeSection === "marks" ? <CareerMarks /> : null}
-          </div>
+          <ProfileSummary
+            groups={groups.data}
+            performance={performance.data}
+            preferences={preferences.data}
+          />
+          <TacticalDivider />
+          <CareerMarks rewards={rewards.data} />
+          <TacticalDivider />
+          <section className={styles.panelSection}>
+            <Text as="h2" variant="heading-lg">
+              Tu carrera
+            </Text>
+            <Text tone="muted">
+              Recorré tu evolución partido a partido desde snapshots reales.
+            </Text>
+            <Link
+              className="ui-button ui-button--secondary"
+              href="/profile/progression"
+            >
+              Historial de progreso
+            </Link>
+          </section>
+          <TacticalDivider />
+          <section className={styles.panelSection}>
+            <Text as="h2" variant="heading-lg">
+              Tu identidad
+            </Text>
+            <Text tone="muted">
+              Ajustá cómo te mostrás y cómo preferís jugar. Tu cuenta se
+              administra por separado.
+            </Text>
+            <Link
+              className="ui-button ui-button--secondary"
+              href="/profile/edit"
+            >
+              Editar perfil
+            </Link>
+            <Link
+              className="ui-button ui-button--secondary"
+              href="/profile/preferences"
+            >
+              Preferencias de juego
+            </Link>
+            <Link
+              className="ui-button ui-button--secondary"
+              href="/profile/account"
+            >
+              Cuenta y seguridad
+            </Link>
+          </section>
+          <TacticalDivider />
+          <section className={styles.panelSection}>
+            <Text as="h2" variant="heading-lg">
+              Tu red
+            </Text>
+            <Link
+              className="ui-button ui-button--secondary"
+              href="/connections"
+            >
+              Ver conexiones
+            </Link>
+            <Link
+              className="ui-button ui-button--secondary"
+              href="/invitations"
+            >
+              Ver invitaciones
+            </Link>
+          </section>
         </main>
       </div>
     </div>

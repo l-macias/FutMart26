@@ -1,0 +1,1 @@
+ALTER TYPE "public"."directed_invitation_status" ADD VALUE 'EXPIRED';

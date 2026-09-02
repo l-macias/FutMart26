@@ -1,0 +1,355 @@
+.page {
+  display: grid;
+  gap: var(--space-7);
+  max-inline-size: var(--content-wide);
+  margin-inline: auto;
+}
+.hero,
+.detailHero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding-block-end: var(--space-5);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+.hero > div,
+.detailHero > div {
+  display: grid;
+  gap: var(--space-2);
+}
+.createForm,
+.inviteForm {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
+  background: var(--background-surface);
+}
+.createForm label,
+.inviteForm > label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--foreground-muted);
+  font-size: var(--type-label-size);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.createForm input,
+.inviteForm input,
+.inviteForm select {
+  min-block-size: var(--touch-target-min);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding-inline: var(--space-3);
+  background: var(--background-elevated);
+  color: var(--foreground-primary);
+}
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  max-inline-size: var(--content-reading);
+  padding-block: var(--space-8);
+}
+.groupList,
+.memberList,
+.invitationList {
+  display: grid;
+}
+.groupRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-block-size: 5.5rem;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+.groupRow > span:nth-child(2) {
+  display: grid;
+  gap: var(--space-1);
+}
+.groupRow strong,
+.member strong {
+  font-family: var(--font-display);
+  font-size: var(--type-heading-md-size);
+  text-transform: uppercase;
+}
+.groupRow small,
+.member small,
+.secret small,
+.invitationList small {
+  color: var(--foreground-muted);
+  text-transform: uppercase;
+}
+.index {
+  color: var(--accent-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-heading-md-size);
+}
+.back {
+  inline-size: fit-content;
+  color: var(--foreground-muted);
+  font-size: var(--type-label-size);
+  font-weight: 800;
+  letter-spacing: var(--type-tracking-label);
+}
+.crest {
+  display: grid;
+  inline-size: 4.5rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: var(--border-width-strong) solid var(--pitch-surface);
+  color: var(--state-positive);
+  font: 800 var(--type-heading-lg-size)/1 var(--font-display);
+}
+.detailGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+  gap: var(--space-7);
+  align-items: start;
+}
+
+.rankingCallout {
+  justify-self: start;
+}
+
+.clubSummary,
+.activitySection {
+  display: grid;
+  gap: var(--space-4);
+  padding-block: var(--space-5);
+  border-block: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.statsStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.statsStrip > div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
+  background: var(--background-surface);
+}
+
+.statsStrip strong {
+  font: 900 var(--type-heading-lg-size) / 1
+    var(--font-display, var(--font-display-fallback));
+}
+
+.statsStrip span,
+.activityRow time {
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1.2
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.topThree,
+.activityList {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.rankPreview {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: 3.5rem;
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.rankPreview > strong {
+  color: var(--accent-primary);
+}
+
+.activityRow {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--border-strong);
+  background: var(--background-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.activityRow small {
+  color: var(--foreground-muted);
+}
+
+@media (min-width: 48rem) {
+  .statsStrip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .clubSummary {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.55fr);
+  }
+
+  .clubSummary > .sectionHeading,
+  .clubSummary > .statsStrip {
+    grid-column: 1;
+  }
+
+  .clubSummary > .topThree {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+.matchesSection {
+  display: grid;
+  gap: var(--space-4);
+}
+.sectionHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.sectionHeading > div {
+  display: grid;
+  gap: var(--space-1);
+}
+.matchList {
+  display: grid;
+}
+.matchRow {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-block-size: 4.5rem;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+.matchRow > span {
+  color: var(--accent-primary);
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.matchRow > strong {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+.matchRow > small {
+  color: var(--foreground-muted);
+  text-align: end;
+}
+.member {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: 3.75rem;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+.member > span {
+  color: var(--foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+.invites,
+.secondary {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  background: var(--background-surface);
+}
+.inviteForm {
+  padding: 0;
+  border: 0;
+}
+.inviteForm fieldset {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.inviteForm legend {
+  margin-block-end: var(--space-2);
+  color: var(--foreground-muted);
+  font-size: var(--type-label-size);
+  text-transform: uppercase;
+}
+.inviteForm fieldset label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.secret {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--border-accent);
+  background: var(--background-elevated);
+}
+.secret code {
+  overflow: hidden;
+  color: var(--foreground-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invitationList article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
+}
+.invitationList article > span {
+  display: grid;
+  gap: var(--space-1);
+}
+.error {
+  margin: 0;
+  color: var(--state-negative);
+}
+.status {
+  color: var(--foreground-muted);
+}
+@media (max-width: 48rem) {
+  .hero,
+  .detailHero {
+    align-items: start;
+  }
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+  .page {
+    padding-block-end: var(--space-6);
+  }
+}
+@media (max-width: 25rem) {
+  .hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .member {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .member small {
+    grid-column: 2;
+  }
+  .sectionHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .matchRow {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+    padding-block: var(--space-3);
+  }
+  .matchRow > small {
+    text-align: start;
+  }
+}

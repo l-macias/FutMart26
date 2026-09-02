@@ -1,0 +1,77 @@
+.page,
+.header,
+.section,
+.list,
+.list li,
+.list li > div {
+  display: grid;
+  min-inline-size: 0;
+}
+.page {
+  gap: var(--space-7);
+  padding-block-end: var(--space-7);
+}
+.header {
+  gap: var(--space-2);
+  padding-block: var(--space-4);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+.section {
+  gap: var(--space-3);
+}
+.list {
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.list li {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
+  background: var(--background-surface);
+}
+.list li > div {
+  gap: var(--space-1);
+}
+.list span {
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1.25
+    var(--font-interface, var(--font-interface-fallback));
+  text-transform: uppercase;
+}
+.actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: var(--space-2) !important;
+}
+.state {
+  padding: var(--space-6);
+}
+.inviteControl {
+  display: grid;
+  gap: var(--space-2);
+}
+.selector {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  background: var(--background-elevated);
+}
+.selector > button {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  color: inherit;
+  background: var(--background-surface);
+  text-align: start;
+}
+@media (min-width: 40rem) {
+  .list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}

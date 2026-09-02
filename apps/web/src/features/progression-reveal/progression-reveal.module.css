@@ -82,6 +82,31 @@
   font-weight: 800;
 }
 
+.contextScore {
+  color: var(--foreground-primary);
+  font-size: var(--type-display-xl-size);
+}
+
+.evidenceSummary {
+  display: grid;
+  gap: var(--space-1);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.cardReveal {
+  display: grid;
+  min-inline-size: 0;
+  justify-items: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.cardReveal > div:first-child {
+  display: grid;
+  gap: var(--space-2);
+}
+
 .strongValue {
   font-weight: 800;
 }
@@ -306,6 +331,25 @@
 .summaryActions {
   display: grid;
   gap: var(--space-3);
+}
+
+.rewards {
+  display: grid;
+  inline-size: min(100%, 34rem);
+  gap: var(--space-3);
+}
+
+.rewards > div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--border-accent);
+  border-radius: var(--radius-panel);
+  background: var(--background-surface-raised);
+}
+
+.rewardAward {
+  color: var(--state-positive);
 }
 
 @keyframes stage-in {

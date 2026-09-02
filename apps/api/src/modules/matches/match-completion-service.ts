@@ -10,7 +10,6 @@ import {
   matchSportingResults,
   matches,
   players,
-  votingSessions,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -18,7 +17,7 @@ import {
   type GroupCapability,
   hasGroupCapability,
 } from "../groups/capabilities.js";
-import { VOTING_V1_CONFIG } from "../voting/voting-config.js";
+import { votingEligibleAfter, votingOpensAt } from "../voting/voting-window.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type DatabaseExecutor = Database | Transaction;
@@ -27,7 +26,10 @@ type FinalRosterInput = { participantId: string; attendance: Attendance }[];
 type StatsInput = { participantId: string; goals: number; assists: number }[];
 
 export class MatchCompletionService {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async finish(actorPlayerId: string, matchId: string) {
     return this.database.transaction(async (tx) => {
@@ -61,15 +63,10 @@ export class MatchCompletionService {
         "MATCH_CONFIRM_ROSTER",
       );
       if (match.status !== "FINISHED") this.invalidTransition();
-      const [voting] = await tx
-        .select({ id: votingSessions.id })
-        .from(votingSessions)
-        .where(eq(votingSessions.matchId, matchId))
-        .limit(1);
-      if (voting)
+      if (await this.isVotingLocked(tx, match))
         throw new ApplicationError(
           "invalid_final_roster",
-          "Final roster is frozen after Voting opens",
+          "Final roster is frozen after Voting becomes eligible",
           409,
         );
       const confirmed = await tx
@@ -141,8 +138,10 @@ export class MatchCompletionService {
   async getFinalRoster(actorPlayerId: string, matchId: string) {
     const match = await this.readableMatchOrObserver(actorPlayerId, matchId);
     const rows = await this.rosterRows(matchId);
+    const closure = await this.closureState(actorPlayerId, match);
     return {
       confirmedAt: match.rosterConfirmedAt?.toISOString() ?? null,
+      ...closure,
       participants: rows.map((row) => this.rosterView(row)),
     };
   }
@@ -157,15 +156,10 @@ export class MatchCompletionService {
           "Final roster is not confirmed",
           409,
         );
-      const [voting] = await tx
-        .select({ id: votingSessions.id })
-        .from(votingSessions)
-        .where(eq(votingSessions.matchId, matchId))
-        .limit(1);
-      if (voting)
+      if (await this.isVotingLocked(tx, match))
         throw new ApplicationError(
           "sporting_result_locked",
-          "Statistics are frozen after Voting exists",
+          "Statistics are frozen after Voting becomes eligible",
           409,
         );
       if (
@@ -292,13 +286,29 @@ export class MatchCompletionService {
         409,
       );
     const rows = await this.rosterRows(matchId);
-    const scheduledEnd = new Date(
-      match.scheduledAt.getTime() + match.durationMinutes * 60_000,
-    );
+    const [result] = await this.database
+      .select({
+        status: matchSportingResults.status,
+        confirmedAt: matchSportingResults.confirmedAt,
+      })
+      .from(matchSportingResults)
+      .where(eq(matchSportingResults.matchId, matchId))
+      .limit(1);
+    const startsAt =
+      result?.status === "CONFIRMED" && result.confirmedAt
+        ? votingOpensAt(
+            match.scheduledAt,
+            match.durationMinutes,
+            result.confirmedAt,
+          )
+        : null;
     return {
-      votingEligibleAfter: new Date(
-        scheduledEnd.getTime() + VOTING_V1_CONFIG.gracePeriodMinutes * 60_000,
+      votingEligibleAfter: votingEligibleAfter(
+        match.scheduledAt,
+        match.durationMinutes,
       ).toISOString(),
+      votingStartsAt: startsAt?.toISOString() ?? null,
+      votingStarted: startsAt ? this.clock() >= startsAt : false,
       observer: match.observerPlayerId
         ? { playerId: match.observerPlayerId, canVote: false }
         : null,
@@ -339,6 +349,93 @@ export class MatchCompletionService {
       playerId: row.playerId,
       displayName: row.kind === "PLAYER" ? row.playerName : row.guestName,
       attendance: row.attendance,
+    };
+  }
+
+  private async isVotingLocked(
+    db: DatabaseExecutor,
+    match: typeof matches.$inferSelect,
+  ) {
+    const [result] = await db
+      .select({
+        status: matchSportingResults.status,
+        confirmedAt: matchSportingResults.confirmedAt,
+      })
+      .from(matchSportingResults)
+      .where(eq(matchSportingResults.matchId, match.id))
+      .limit(1);
+    if (result?.status !== "CONFIRMED" || !result.confirmedAt) return false;
+    return (
+      this.clock() >=
+      votingOpensAt(
+        match.scheduledAt,
+        match.durationMinutes,
+        result.confirmedAt,
+      )
+    );
+  }
+
+  private async closureState(
+    actorPlayerId: string,
+    match: typeof matches.$inferSelect,
+  ) {
+    const [result] = await this.database
+      .select({
+        status: matchSportingResults.status,
+        confirmedAt: matchSportingResults.confirmedAt,
+      })
+      .from(matchSportingResults)
+      .where(eq(matchSportingResults.matchId, match.id))
+      .limit(1);
+    const startsAt =
+      result?.status === "CONFIRMED" && result.confirmedAt
+        ? votingOpensAt(
+            match.scheduledAt,
+            match.durationMinutes,
+            result.confirmedAt,
+          )
+        : null;
+    const votingStarted = startsAt ? this.clock() >= startsAt : false;
+    const [membership] = await this.database
+      .select({
+        role: groupMemberships.role,
+        capabilities: groupMemberships.capabilities,
+      })
+      .from(groupMemberships)
+      .where(
+        and(
+          eq(groupMemberships.groupId, match.groupId),
+          eq(groupMemberships.playerId, actorPlayerId),
+          eq(groupMemberships.status, "ACTIVE"),
+        ),
+      )
+      .limit(1);
+    const canConfirmRoster = Boolean(
+      membership &&
+      hasGroupCapability(
+        membership.role,
+        membership.capabilities,
+        "MATCH_CONFIRM_ROSTER",
+      ),
+    );
+    const canManageStats =
+      match.observerPlayerId === actorPlayerId ||
+      Boolean(
+        membership &&
+        hasGroupCapability(
+          membership.role,
+          membership.capabilities,
+          "MATCH_MANAGE_STATS",
+        ),
+      );
+    return {
+      closureEditable:
+        match.status === "FINISHED" &&
+        canConfirmRoster &&
+        canManageStats &&
+        !votingStarted,
+      votingStartsAt: startsAt?.toISOString() ?? null,
+      votingStarted,
     };
   }
 

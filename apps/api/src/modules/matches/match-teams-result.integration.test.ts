@@ -12,6 +12,7 @@ import {
   groupMemberships,
   matchSportingResults,
   matchTeamAssignments,
+  playerFootballPreferences,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -55,10 +56,10 @@ void test(
     const playerService = new PlayerService(connection.db);
     const groups = new GroupService(connection.db);
     const matches = new MatchService(connection.db);
-    const completion = new MatchCompletionService(connection.db);
+    let now = new Date("2028-03-01T21:10:00.000Z");
+    const completion = new MatchCompletionService(connection.db, () => now);
     const teams = new MatchTeamService(connection.db);
-    const results = new MatchResultService(connection.db);
-    const now = new Date("2028-03-01T23:00:00.000Z");
+    const results = new MatchResultService(connection.db, () => now);
     const voting = new VotingService(connection.db, () => now);
 
     async function player(name: string) {
@@ -97,6 +98,14 @@ void test(
     }
 
     const match = await openMatch(new Date("2028-03-01T20:00:00.000Z"), 10);
+    await connection.db.insert(playerFootballPreferences).values({
+      id: randomUUID(),
+      playerId: owner.id,
+      discipline: "F5",
+      preferredRoles: ["PORTERO", "MEDIO"],
+      willingToPlayGoalkeeper: true,
+      strengths: ["PASE"],
+    });
     const participants = [];
     for (const playerId of [
       owner.id,
@@ -152,11 +161,26 @@ void test(
     assert.equal(proposal.TEAM_A.participants.length, 5);
     assert.equal(proposal.TEAM_B.participants.length, 5);
     assert.equal(proposal.source, "INTELLIGENT");
-    assert.equal(proposal.diagnostics[0], "NO_KEEPER_COVERAGE");
+    assert.equal(proposal.diagnostics[0], "INCOMPLETE_KEEPER_COVERAGE");
     assert.equal(
       proposal.TEAM_A.participants.length + proposal.TEAM_B.participants.length,
       10,
     );
+    const proposedPlayers = [
+      ...proposal.TEAM_A.participants,
+      ...proposal.TEAM_B.participants,
+    ];
+    const ownerReadModel = proposedPlayers.find(
+      (participant) => participant.playerId === owner.id,
+    )!;
+    const guestReadModel = proposedPlayers.find(
+      (participant) => participant.participantId === guest.id,
+    )!;
+    assert.deepEqual(ownerReadModel.preferredRoles, ["PORTERO", "MEDIO"]);
+    assert.equal(ownerReadModel.willingToPlayGoalkeeper, true);
+    assert.equal(Number(ownerReadModel.internalOvr), 60);
+    assert.equal(guestReadModel.kind, "GUEST");
+    assert.equal(guestReadModel.internalOvr, null);
     await assert.rejects(
       () =>
         connection.db.insert(matchTeamAssignments).values({
@@ -201,6 +225,30 @@ void test(
           (item) => item.participantId === guest.id,
         ),
     );
+
+    const staleMatch = await openMatch(new Date("2028-03-02T20:00:00.000Z"), 2);
+    const staleConfirmed = [
+      await matches.join(owner.id, staleMatch.id),
+      await matches.join(members[0]!.id, staleMatch.id),
+    ];
+    const promoted = await matches.join(members[1]!.id, staleMatch.id);
+    assert.equal(promoted.status, "WAITLISTED");
+    await teams.generate(owner.id, staleMatch.id);
+    await matches.cancelParticipant(
+      owner.id,
+      staleMatch.id,
+      staleConfirmed[1]!.id,
+    );
+    const staleTeams = await teams.get(owner.id, staleMatch.id);
+    assert.equal(staleTeams.rosterChanged, true);
+    assert.equal(staleTeams.readyToStart, false);
+    await assert.rejects(
+      () => matches.start(owner.id, staleMatch.id),
+      code("incomplete_team_assignments"),
+    );
+    const regenerated = await teams.generate(owner.id, staleMatch.id);
+    assert.equal(regenerated.rosterChanged, false);
+    assert.equal(regenerated.readyToStart, true);
 
     const editVsStart = await Promise.allSettled([
       matches.start(owner.id, match.id),
@@ -336,6 +384,55 @@ void test(
       participants: [],
     });
     await results.confirm(owner.id, match.id);
+    const beforeGraceBoundary = new MatchCompletionService(
+      connection.db,
+      () => new Date("2028-03-01T21:14:00.000Z"),
+    );
+    const editableClosure = await beforeGraceBoundary.getFinalRoster(
+      owner.id,
+      match.id,
+    );
+    assert.equal(editableClosure.closureEditable, true);
+    assert.equal(editableClosure.votingStarted, false);
+    assert.equal(editableClosure.votingStartsAt, "2028-03-01T21:15:00.000Z");
+    assert.equal(
+      (await beforeGraceBoundary.getFinalRoster(outsider.id, match.id))
+        .closureEditable,
+      false,
+    );
+    const afterGraceBoundary = new MatchCompletionService(
+      connection.db,
+      () => new Date("2028-03-01T21:16:00.000Z"),
+    );
+    assert.equal(
+      (await afterGraceBoundary.getFinalRoster(owner.id, match.id))
+        .closureEditable,
+      false,
+    );
+
+    await connection.db
+      .update(matchSportingResults)
+      .set({ confirmedAt: new Date("2028-03-01T22:30:00.000Z") })
+      .where(eq(matchSportingResults.matchId, match.id));
+    const confirmedAtBoundary = await new MatchCompletionService(
+      connection.db,
+      () => new Date("2028-03-01T22:29:00.000Z"),
+    ).getFinalRoster(owner.id, match.id);
+    assert.equal(
+      confirmedAtBoundary.votingStartsAt,
+      "2028-03-01T22:30:00.000Z",
+    );
+    assert.equal(confirmedAtBoundary.closureEditable, true);
+    assert.equal(
+      (
+        await new MatchCompletionService(
+          connection.db,
+          () => new Date("2028-03-01T22:31:00.000Z"),
+        ).getFinalRoster(owner.id, match.id)
+      ).closureEditable,
+      false,
+    );
+    now = new Date("2028-03-01T23:00:00.000Z");
     const session = await voting.open(owner.id, match.id);
     assert.equal(session.status, "OPEN");
     await assert.rejects(

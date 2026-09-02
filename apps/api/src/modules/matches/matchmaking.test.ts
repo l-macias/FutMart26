@@ -62,6 +62,27 @@ void test("keeper diagnostics and stable tie breaking are explicit", () => {
   ]);
 });
 
+for (const [count, expectedA, expectedB] of [
+  [12, 6, 6],
+  [11, 6, 5],
+  [10, 5, 5],
+  [9, 5, 4],
+] as const) {
+  void test(`F5 proposes deterministic ${expectedA}v${expectedB} teams from ${count} confirmed participants`, () => {
+    const participants = roster(count, [0, 1]);
+    const proposal = proposeMatchTeams(participants);
+    assert.deepEqual(proposeMatchTeams(participants), proposal);
+    assert.equal(
+      proposal.assignments.filter((item) => item.side === "TEAM_A").length,
+      expectedA,
+    );
+    assert.equal(
+      proposal.assignments.filter((item) => item.side === "TEAM_B").length,
+      expectedB,
+    );
+  });
+}
+
 function keepers(participants: MatchmakingParticipant[]) {
   return new Set(
     participants

@@ -12,11 +12,11 @@ Objective goals and assists are aggregate counters owned by the Match participan
 
 Voting eligibility is derived from participant kind and confirmed attendance. It is not persisted: a played Player can vote and be evaluated, a played Guest can only be evaluated, and a no-show can do neither.
 
-Result persistence is deferred until backend team assignment exists. Storing home/away scores without durable teams would create evidence that cannot be attributed to the participants that produced it.
+Sporting result persistence uses the locked Match-scoped team assignments. A confirmed result records the authoritative Team A/Team B score and validates it against aggregate goals and assists from participants whose final attendance is `PLAYED`; `NOT_PLAYED` remains distinct from a valid `0-0` draw.
 
 ## Concurrency and correction boundary
 
-Finish, final-roster confirmation and correction, statistics writes, and observer changes serialize on the parent Match with `SELECT ... FOR UPDATE`. Final-roster corrections are allowed before the future Voting-open boundary. The Voting slice must close or explicitly redefine that correction window; this ADR does not introduce ballots or voting state.
+Finish, final-roster confirmation and correction, statistics writes, result writes, and observer changes serialize on the parent Match with `SELECT ... FOR UPDATE`. Ordinary roster, statistics, and sporting-result corrections are allowed only before the effective Voting start. That boundary is authoritative even when no `voting_sessions` row has been materialized yet.
 
 ## Consequences
 
@@ -24,4 +24,4 @@ Finish, final-roster confirmation and correction, statistics writes, and observe
 - waitlisted and cancelled attempts cannot enter the final roster;
 - Player and Guest statistics use the same participant identity;
 - observer assignment does not grant Group-wide capabilities;
-- result storage remains semantically blocked until teams are persisted.
+- historical team assignments remain the source for attributing result and statistics by side.

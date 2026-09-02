@@ -181,13 +181,39 @@ export class GroupGuestService {
       .select({
         guestsEnabled: groups.guestsEnabled,
         defaultGuestAllowancePerMember: groups.defaultGuestAllowancePerMember,
+        guestAllowanceOverride: groupMemberships.guestAllowanceOverride,
+        role: groupMemberships.role,
+        capabilities: groupMemberships.capabilities,
       })
       .from(groups)
+      .innerJoin(
+        groupMemberships,
+        and(
+          eq(groupMemberships.groupId, groups.id),
+          eq(groupMemberships.playerId, actorPlayerId),
+          eq(groupMemberships.status, "ACTIVE"),
+        ),
+      )
       .where(eq(groups.id, groupId))
       .limit(1);
     if (!group)
       throw new ApplicationError("group_not_found", "Group not found", 404);
-    return group;
+    const canOverride =
+      group.role === "OWNER" ||
+      hasGroupCapability(
+        group.role,
+        group.capabilities,
+        "MATCH_GUEST_OVERRIDE",
+      );
+    return {
+      guestsEnabled: group.guestsEnabled,
+      defaultGuestAllowancePerMember: group.defaultGuestAllowancePerMember,
+      effectiveAllowance: canOverride
+        ? null
+        : (group.guestAllowanceOverride ??
+          group.defaultGuestAllowancePerMember),
+      canOverride,
+    };
   }
 
   async updatePolicy(

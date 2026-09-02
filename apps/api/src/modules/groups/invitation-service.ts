@@ -1,13 +1,15 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 
 import type { Database } from "@football/database";
 import {
   groupInvitations,
+  groupConnectionInvitations,
   groupInvitationUsages,
   groupMemberships,
   groups,
   players,
+  playerConnections,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -57,12 +59,19 @@ export class InvitationService {
   async list(actorPlayerId: string, groupId: string) {
     await this.requireManager(actorPlayerId, groupId);
     const rows = await this.database
-      .select()
+      .select({
+        invitation: groupInvitations,
+        createdByDisplayName: players.displayName,
+      })
       .from(groupInvitations)
+      .innerJoin(players, eq(players.id, groupInvitations.createdByPlayerId))
       .where(eq(groupInvitations.groupId, groupId))
       .orderBy(desc(groupInvitations.createdAt))
       .limit(100);
-    return rows.map((row) => this.present(row, new Date()));
+    return rows.map((row) => ({
+      ...this.present(row.invitation, new Date()),
+      createdByDisplayName: row.createdByDisplayName,
+    }));
   }
 
   async preview(token: string) {
@@ -99,49 +108,276 @@ export class InvitationService {
         .limit(1);
       if (!group || group.status !== "ACTIVE") this.unavailable();
 
-      const history = await tx
-        .select()
-        .from(groupMemberships)
-        .where(
-          and(
-            eq(groupMemberships.groupId, invitation.groupId),
-            eq(groupMemberships.playerId, actorPlayerId),
-          ),
-        )
-        .orderBy(desc(groupMemberships.createdAt), desc(groupMemberships.id))
-        .limit(1);
-      const latest = history[0];
-      if (latest?.status === "BLOCKED")
-        throw new ApplicationError(
-          "member_blocked",
-          "You cannot join this group",
-          403,
-        );
-      if (latest?.status === "ACTIVE")
+      const admission = await this.admitMember(
+        tx,
+        invitation.groupId,
+        actorPlayerId,
+      );
+      if (admission.outcome === "ALREADY_MEMBER")
         return {
           outcome: "ALREADY_MEMBER" as const,
           groupId: invitation.groupId,
         };
-
-      const membershipId = randomUUID();
-      await tx.insert(groupMemberships).values({
-        id: membershipId,
-        groupId: invitation.groupId,
-        playerId: actorPlayerId,
-        role: "MEMBER",
-        capabilities: [],
-      });
       await tx.insert(groupInvitationUsages).values({
         id: randomUUID(),
         invitationId: invitation.id,
         playerId: actorPlayerId,
-        membershipId,
+        membershipId: admission.membershipId,
       });
       await tx
         .update(groupInvitations)
         .set({ useCount: invitation.useCount + 1, updatedAt: new Date() })
         .where(eq(groupInvitations.id, invitation.id));
       return { outcome: "JOINED" as const, groupId: invitation.groupId };
+    });
+  }
+
+  async createDirected(
+    actorPlayerId: string,
+    groupId: string,
+    invitedPlayerId: string,
+  ) {
+    if (actorPlayerId === invitedPlayerId)
+      throw new ApplicationError(
+        "invalid_invitation",
+        "Cannot invite yourself",
+        422,
+      );
+    const actor = await this.requireManager(actorPlayerId, groupId);
+    await this.requireConnection(actorPlayerId, invitedPlayerId);
+    const latest = await this.latestMembership(
+      groupId,
+      invitedPlayerId,
+      this.database,
+    );
+    if (latest?.status === "ACTIVE")
+      return { outcome: "ALREADY_MEMBER" as const, groupId };
+    if (latest?.status === "BLOCKED")
+      throw new ApplicationError(
+        "member_blocked",
+        "Player cannot join this group",
+        409,
+      );
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return this.database.transaction(async (tx) => {
+      await tx
+        .update(groupConnectionInvitations)
+        .set({ status: "EXPIRED", respondedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(groupConnectionInvitations.groupId, groupId),
+            eq(groupConnectionInvitations.invitedPlayerId, invitedPlayerId),
+            eq(groupConnectionInvitations.status, "PENDING"),
+            lt(groupConnectionInvitations.expiresAt, now),
+          ),
+        );
+      const inserted = await tx
+        .insert(groupConnectionInvitations)
+        .values({
+          id: randomUUID(),
+          groupId,
+          invitedPlayerId,
+          invitedByPlayerId: actorPlayerId,
+          invitedByRole: actor.role,
+          expiresAt,
+        })
+        .onConflictDoNothing()
+        .returning();
+      const invitation =
+        inserted[0] ??
+        (await tx
+          .select()
+          .from(groupConnectionInvitations)
+          .where(
+            and(
+              eq(groupConnectionInvitations.groupId, groupId),
+              eq(groupConnectionInvitations.invitedPlayerId, invitedPlayerId),
+              eq(groupConnectionInvitations.status, "PENDING"),
+            ),
+          )
+          .limit(1)
+          .then((rows) => rows[0]));
+      if (!invitation)
+        throw new ApplicationError(
+          "concurrency_conflict",
+          "Invitation changed concurrently",
+          409,
+        );
+      return {
+        outcome: "INVITED" as const,
+        invitation: this.presentDirected(invitation),
+      };
+    });
+  }
+
+  async listDirectedFor(actorPlayerId: string) {
+    const rows = await this.database
+      .select({
+        invitation: groupConnectionInvitations,
+        groupName: groups.name,
+        inviterName: players.displayName,
+      })
+      .from(groupConnectionInvitations)
+      .innerJoin(groups, eq(groups.id, groupConnectionInvitations.groupId))
+      .innerJoin(
+        players,
+        eq(players.id, groupConnectionInvitations.invitedByPlayerId),
+      )
+      .where(eq(groupConnectionInvitations.invitedPlayerId, actorPlayerId))
+      .orderBy(desc(groupConnectionInvitations.createdAt))
+      .limit(100);
+    return rows.map((row) => ({
+      ...this.presentDirected(row.invitation),
+      group: { id: row.invitation.groupId, name: row.groupName },
+      invitedBy: {
+        id: row.invitation.invitedByPlayerId,
+        displayName: row.inviterName,
+      },
+    }));
+  }
+
+  async listDirectedForGroup(actorPlayerId: string, groupId: string) {
+    await this.requireManager(actorPlayerId, groupId);
+    const rows = await this.database
+      .select({
+        invitation: groupConnectionInvitations,
+        invitedPlayerName: players.displayName,
+      })
+      .from(groupConnectionInvitations)
+      .innerJoin(
+        players,
+        eq(players.id, groupConnectionInvitations.invitedPlayerId),
+      )
+      .where(eq(groupConnectionInvitations.groupId, groupId))
+      .orderBy(desc(groupConnectionInvitations.createdAt))
+      .limit(100);
+    return rows.map((row) => ({
+      ...this.presentDirected(row.invitation),
+      invitedPlayer: {
+        id: row.invitation.invitedPlayerId,
+        displayName: row.invitedPlayerName,
+      },
+      invitedByPlayerId: row.invitation.invitedByPlayerId,
+    }));
+  }
+
+  async acceptDirected(actorPlayerId: string, invitationId: string) {
+    return this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from ${groupConnectionInvitations} where id = ${invitationId} for update`,
+      );
+      const [invitation] = await tx
+        .select()
+        .from(groupConnectionInvitations)
+        .where(
+          and(
+            eq(groupConnectionInvitations.id, invitationId),
+            eq(groupConnectionInvitations.invitedPlayerId, actorPlayerId),
+          ),
+        )
+        .limit(1);
+      if (!invitation)
+        throw new ApplicationError(
+          "invitation_not_available",
+          "Invitation not available",
+          404,
+        );
+      if (invitation.status === "ACCEPTED")
+        return {
+          outcome: "ALREADY_MEMBER" as const,
+          groupId: invitation.groupId,
+        };
+      if (invitation.status !== "PENDING" || new Date() >= invitation.expiresAt)
+        this.unavailable();
+      const admission = await this.admitMember(
+        tx,
+        invitation.groupId,
+        actorPlayerId,
+      );
+      await tx
+        .update(groupConnectionInvitations)
+        .set({
+          status: "ACCEPTED",
+          respondedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(groupConnectionInvitations.id, invitation.id));
+      return { outcome: admission.outcome, groupId: invitation.groupId };
+    });
+  }
+
+  async rejectDirected(actorPlayerId: string, invitationId: string) {
+    return this.database.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from ${groupConnectionInvitations} where id = ${invitationId} for update`,
+      );
+      const [invitation] = await tx
+        .select()
+        .from(groupConnectionInvitations)
+        .where(
+          and(
+            eq(groupConnectionInvitations.id, invitationId),
+            eq(groupConnectionInvitations.invitedPlayerId, actorPlayerId),
+          ),
+        )
+        .limit(1);
+      if (!invitation)
+        throw new ApplicationError(
+          "invitation_not_available",
+          "Invitation not available",
+          404,
+        );
+      if (invitation.status === "REJECTED") return;
+      if (invitation.status !== "PENDING") this.unavailable();
+      await tx
+        .update(groupConnectionInvitations)
+        .set({
+          status: "REJECTED",
+          respondedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(groupConnectionInvitations.id, invitationId));
+    });
+  }
+
+  async revokeDirected(
+    actorPlayerId: string,
+    groupId: string,
+    invitationId: string,
+  ) {
+    return this.database.transaction(async (tx) => {
+      const actor = await this.requireManager(actorPlayerId, groupId, tx);
+      await tx.execute(
+        sql`select id from ${groupConnectionInvitations} where id = ${invitationId} and group_id = ${groupId} for update`,
+      );
+      const [invitation] = await tx
+        .select()
+        .from(groupConnectionInvitations)
+        .where(
+          and(
+            eq(groupConnectionInvitations.id, invitationId),
+            eq(groupConnectionInvitations.groupId, groupId),
+          ),
+        )
+        .limit(1);
+      if (!invitation) this.unavailable();
+      if (
+        actor.role === "MODERATOR" &&
+        (invitation.invitedByRole === "OWNER" ||
+          invitation.invitedByPlayerId !== actorPlayerId)
+      )
+        throw new ApplicationError("forbidden", "Forbidden", 403);
+      if (invitation.status !== "PENDING") return;
+      await tx
+        .update(groupConnectionInvitations)
+        .set({
+          status: "REVOKED",
+          revokedAt: new Date(),
+          revokedByPlayerId: actorPlayerId,
+          updatedAt: new Date(),
+        })
+        .where(eq(groupConnectionInvitations.id, invitation.id));
     });
   }
 
@@ -238,6 +474,83 @@ export class InvitationService {
       "Invitation is not available",
       409,
     );
+  }
+
+  private presentDirected(row: typeof groupConnectionInvitations.$inferSelect) {
+    return {
+      id: row.id,
+      status:
+        row.status === "PENDING" && new Date() >= row.expiresAt
+          ? ("EXPIRED" as const)
+          : row.status,
+      createdAt: row.createdAt.toISOString(),
+      expiresAt: row.expiresAt.toISOString(),
+    };
+  }
+
+  private latestMembership(
+    groupId: string,
+    playerId: string,
+    db: Database | Transaction,
+  ) {
+    return db
+      .select()
+      .from(groupMemberships)
+      .where(
+        and(
+          eq(groupMemberships.groupId, groupId),
+          eq(groupMemberships.playerId, playerId),
+        ),
+      )
+      .orderBy(desc(groupMemberships.createdAt), desc(groupMemberships.id))
+      .limit(1)
+      .then((rows) => rows[0]);
+  }
+
+  private async admitMember(
+    tx: Transaction,
+    groupId: string,
+    playerId: string,
+  ) {
+    const latest = await this.latestMembership(groupId, playerId, tx);
+    if (latest?.status === "BLOCKED")
+      throw new ApplicationError(
+        "member_blocked",
+        "You cannot join this group",
+        403,
+      );
+    if (latest?.status === "ACTIVE")
+      return { outcome: "ALREADY_MEMBER" as const, membershipId: latest.id };
+    const membershipId = randomUUID();
+    await tx.insert(groupMemberships).values({
+      id: membershipId,
+      groupId,
+      playerId,
+      role: "MEMBER",
+      capabilities: [],
+    });
+    return { outcome: "JOINED" as const, membershipId };
+  }
+
+  private async requireConnection(first: string, second: string) {
+    const [low, high] = first < second ? [first, second] : [second, first];
+    const [connection] = await this.database
+      .select({ id: playerConnections.id })
+      .from(playerConnections)
+      .where(
+        and(
+          eq(playerConnections.playerLowId, low),
+          eq(playerConnections.playerHighId, high),
+          eq(playerConnections.status, "ACCEPTED"),
+        ),
+      )
+      .limit(1);
+    if (!connection)
+      throw new ApplicationError(
+        "connection_required",
+        "An accepted connection is required",
+        409,
+      );
   }
 
   private async requireManager(

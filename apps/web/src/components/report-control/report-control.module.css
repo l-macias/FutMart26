@@ -1,0 +1,38 @@
+.wrapper,
+.form,
+.form label {
+  display: grid;
+  gap: var(--space-3);
+}
+.form {
+  max-inline-size: 32rem;
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  background: var(--background-surface);
+}
+.form label {
+  color: var(--foreground-muted);
+  font-size: var(--type-label-size);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.form select,
+.form textarea {
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--background-canvas);
+  color: var(--foreground-primary);
+}
+.form textarea {
+  min-block-size: 7rem;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.error {
+  color: var(--state-negative);
+}

@@ -10,11 +10,11 @@ import {
   matches,
   matchSportingResults,
   matchTeamAssignments,
-  votingSessions,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
 import { hasGroupCapability } from "../groups/capabilities.js";
+import { votingOpensAt } from "../voting/voting-window.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type DraftInput = {
@@ -24,14 +24,17 @@ type DraftInput = {
 };
 
 export class MatchResultService {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async saveDraft(actorPlayerId: string, matchId: string, input: DraftInput) {
     return this.database.transaction(async (tx) => {
       const match = await this.lockMatch(tx, matchId);
       await this.requireDraftAuthority(tx, actorPlayerId, match);
       this.requireClosureEditable(match);
-      await this.requireNoVoting(tx, matchId);
+      await this.requireNoVoting(tx, match);
       this.validateInputShape(input);
       const played = await this.playedAssignments(tx, matchId);
       const playedIds = new Set(played.map((row) => row.participantId));
@@ -41,7 +44,7 @@ export class MatchResultService {
           "Stats require a PLAYED assigned participant",
           409,
         );
-      const now = new Date();
+      const now = this.clock();
       await tx
         .insert(matchSportingResults)
         .values({
@@ -106,7 +109,7 @@ export class MatchResultService {
         "MATCH_MANAGE_STATS",
       );
       this.requireClosureEditable(match);
-      await this.requireNoVoting(tx, matchId);
+      await this.requireNoVoting(tx, match);
       const played = await this.playedAssignments(tx, matchId);
       const [playedCount] = await tx
         .select({ count: sql<number>`count(*)::int` })
@@ -124,7 +127,7 @@ export class MatchResultService {
           "Every PLAYED participant needs a locked team assignment",
           409,
         );
-      const now = new Date();
+      const now = this.clock();
       if (played.length === 0) {
         await tx
           .insert(matchSportingResults)
@@ -319,16 +322,30 @@ export class MatchResultService {
       );
   }
 
-  private async requireNoVoting(db: Database | Transaction, matchId: string) {
-    const [voting] = await db
-      .select({ id: votingSessions.id })
-      .from(votingSessions)
-      .where(eq(votingSessions.matchId, matchId))
+  private async requireNoVoting(
+    db: Database | Transaction,
+    match: typeof matches.$inferSelect,
+  ) {
+    const [result] = await db
+      .select({
+        status: matchSportingResults.status,
+        confirmedAt: matchSportingResults.confirmedAt,
+      })
+      .from(matchSportingResults)
+      .where(eq(matchSportingResults.matchId, match.id))
       .limit(1);
-    if (voting)
+    if (result?.status !== "CONFIRMED" || !result.confirmedAt) return;
+    if (
+      this.clock() >=
+      votingOpensAt(
+        match.scheduledAt,
+        match.durationMinutes,
+        result.confirmedAt,
+      )
+    )
       throw new ApplicationError(
         "sporting_result_locked",
-        "Sporting result is frozen after Voting exists",
+        "Sporting result is frozen after Voting becomes eligible",
         409,
       );
   }

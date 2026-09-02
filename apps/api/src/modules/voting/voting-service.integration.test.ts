@@ -77,10 +77,10 @@ void test(
     const players = new PlayerService(connection.db);
     const groups = new GroupService(connection.db);
     const matches = new MatchService(connection.db);
-    const completion = new MatchCompletionService(connection.db);
-    const teams = new MatchTeamService(connection.db);
-    const sportingResults = new MatchResultService(connection.db);
     let now = new Date("2027-08-01T22:00:00.000Z");
+    const completion = new MatchCompletionService(connection.db, () => now);
+    const teams = new MatchTeamService(connection.db);
+    const sportingResults = new MatchResultService(connection.db, () => now);
     const voting = new VotingService(connection.db, () => now);
 
     async function player(name: string) {
@@ -186,6 +186,30 @@ void test(
     );
 
     const main = await finishedRoster();
+    await assert.rejects(
+      () =>
+        completion.confirmRoster(owner.id, main.match.id, [
+          { participantId: main.ownerPart.id, attendance: "PLAYED" },
+          { participantId: main.aPart.id, attendance: "PLAYED" },
+          { participantId: main.bPart.id, attendance: "NO_SHOW" },
+          { participantId: main.guest.id, attendance: "PLAYED" },
+          { participantId: main.guestTwo.id, attendance: "PLAYED" },
+          { participantId: main.guestThree.id, attendance: "PLAYED" },
+        ]),
+      code("invalid_final_roster"),
+    );
+    await assert.rejects(
+      () =>
+        sportingResults.saveDraft(owner.id, main.match.id, {
+          teamAGoals: 0,
+          teamBGoals: 0,
+          participants: [],
+        }),
+      code("sporting_result_locked"),
+    );
+    const automatic = await voting.get(owner.id, main.match.id);
+    assert.equal(automatic.status, "OPEN");
+    assert.equal(automatic.openedAt, "2027-08-01T22:00:00.000Z");
     const opened = await Promise.all([
       voting.open(owner.id, main.match.id),
       voting.open(owner.id, main.match.id),

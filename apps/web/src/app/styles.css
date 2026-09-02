@@ -18,6 +18,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.app-state-page {
+  min-block-size: 100dvh;
+  max-inline-size: 48rem;
+  margin-inline: auto;
+  padding: clamp(4rem, 12vw, 8rem) var(--space-5);
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-4);
+}
+
 a {
   color: inherit;
   text-decoration: none;

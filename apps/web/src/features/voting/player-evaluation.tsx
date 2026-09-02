@@ -5,7 +5,7 @@ import {
   type VotingAttribute,
   type VotingParticipantView,
   votingAttributes,
-} from "./voting-mock-content";
+} from "./voting-types";
 import styles from "./voting.module.css";
 
 function AttributeSelector({

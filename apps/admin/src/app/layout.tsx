@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { AppProviders } from "./providers";
 import "./styles.css";
+import { AdminGate } from "../components/admin-gate";
 
 export const metadata: Metadata = {
   title: "F5 Groups Admin",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <AdminGate>{children}</AdminGate>
+        </AppProviders>
       </body>
     </html>
   );

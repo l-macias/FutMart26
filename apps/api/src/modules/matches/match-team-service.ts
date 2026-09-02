@@ -39,7 +39,7 @@ export class MatchTeamService {
         "MANUAL",
         null,
       );
-      return this.readLocked(tx, match.id);
+      return this.readLocked(tx, match.id, true);
     });
   }
 
@@ -121,7 +121,7 @@ export class MatchTeamService {
         proposal.algorithmVersion,
       );
       return {
-        ...(await this.readLocked(tx, match.id)),
+        ...(await this.readLocked(tx, match.id, true)),
         diagnostics: proposal.diagnostics,
       };
     });
@@ -129,7 +129,11 @@ export class MatchTeamService {
 
   async get(actorPlayerId: string, matchId: string) {
     const match = await this.requireReadableMatch(actorPlayerId, matchId);
-    return this.readLocked(this.database, match.id);
+    return this.readLocked(
+      this.database,
+      match.id,
+      await this.canManageTeams(actorPlayerId, match.groupId),
+    );
   }
 
   private async replaceLocked(
@@ -155,6 +159,12 @@ export class MatchTeamService {
       throw new ApplicationError(
         "invalid_team_assignment",
         "Only confirmed Match participants can be assigned",
+        409,
+      );
+    if (assignments.length !== confirmed.length)
+      throw new ApplicationError(
+        "invalid_team_assignment",
+        "Every confirmed participant must have exactly one team assignment",
         409,
       );
     await tx
@@ -195,7 +205,11 @@ export class MatchTeamService {
       .limit(20);
   }
 
-  private async readLocked(db: Database | Transaction, matchId: string) {
+  private async readLocked(
+    db: Database | Transaction,
+    matchId: string,
+    canManage = false,
+  ) {
     const [match] = await db
       .select()
       .from(matches)
@@ -212,6 +226,9 @@ export class MatchTeamService {
         playerName: players.displayName,
         guestName: matchParticipants.guestDisplayName,
         internalOvr: playerPerformances.internalOvr,
+        preferredRoles: playerFootballPreferences.preferredRoles,
+        willingToPlayGoalkeeper:
+          playerFootballPreferences.willingToPlayGoalkeeper,
       })
       .from(matchTeamAssignments)
       .innerJoin(
@@ -224,6 +241,13 @@ export class MatchTeamService {
         and(
           eq(playerPerformances.playerId, matchParticipants.playerId),
           eq(playerPerformances.discipline, "F5"),
+        ),
+      )
+      .leftJoin(
+        playerFootballPreferences,
+        and(
+          eq(playerFootballPreferences.playerId, matchParticipants.playerId),
+          eq(playerFootballPreferences.discipline, "F5"),
         ),
       )
       .where(eq(matchTeamAssignments.matchId, matchId))
@@ -240,29 +264,108 @@ export class MatchTeamService {
           playerId: row.playerId,
           displayName: row.kind === "PLAYER" ? row.playerName : row.guestName,
           internalOvr:
-            row.internalOvr ?? MATCHMAKING_V1_CONFIG.defaultInternalOvr,
+            row.kind === "PLAYER"
+              ? (row.internalOvr ?? MATCHMAKING_V1_CONFIG.defaultInternalOvr)
+              : null,
+          preferredRoles:
+            row.kind === "PLAYER" ? (row.preferredRoles ?? []) : [],
+          willingToPlayGoalkeeper:
+            row.kind === "PLAYER" && (row.willingToPlayGoalkeeper ?? false),
         }));
       const averageOvr =
         participants.length === 0
           ? null
           : participants
-              .reduce((sum, item) => sum.plus(item.internalOvr), new Decimal(0))
+              .reduce(
+                (sum, item) =>
+                  sum.plus(
+                    item.internalOvr ??
+                      MATCHMAKING_V1_CONFIG.defaultInternalOvr,
+                  ),
+                new Decimal(0),
+              )
               .dividedBy(participants.length)
               .toDecimalPlaces(6)
               .toFixed(6);
       return { participants, averageOvr };
     };
+    const teamA = side("TEAM_A");
+    const teamB = side("TEAM_B");
+    const confirmed = await db
+      .select({ id: matchParticipants.id })
+      .from(matchParticipants)
+      .where(
+        and(
+          eq(matchParticipants.matchId, matchId),
+          eq(matchParticipants.status, "CONFIRMED"),
+        ),
+      )
+      .orderBy(asc(matchParticipants.admissionOrder))
+      .limit(20);
+    const confirmedIds = new Set(confirmed.map((item) => item.id));
+    const assignedIds = new Set(rows.map((item) => item.participantId));
+    const exactRoster =
+      confirmedIds.size === assignedIds.size &&
+      [...confirmedIds].every((id) => assignedIds.has(id));
+    const willingA = teamA.participants.filter(
+      (item) => item.willingToPlayGoalkeeper,
+    ).length;
+    const willingB = teamB.participants.filter(
+      (item) => item.willingToPlayGoalkeeper,
+    ).length;
+    const totalWilling = willingA + willingB;
+    const diagnostics = [
+      totalWilling === 0
+        ? "NO_KEEPER_COVERAGE"
+        : totalWilling === 1 || willingA === 0 || willingB === 0
+          ? "INCOMPLETE_KEEPER_COVERAGE"
+          : "BALANCED",
+    ] as const;
     return {
-      TEAM_A: side("TEAM_A"),
-      TEAM_B: side("TEAM_B"),
+      TEAM_A: teamA,
+      TEAM_B: teamB,
       source: rows[0]?.source ?? null,
       algorithmVersion: rows[0]?.algorithmVersion ?? null,
       locked: match?.status === "STARTED" || match?.status === "FINISHED",
-      diagnostics:
-        rows[0]?.source === "INTELLIGENT"
-          ? (["NO_KEEPER_COVERAGE"] as string[])
-          : [],
+      canManage,
+      confirmedCount: confirmed.length,
+      assignedCount: rows.length,
+      readyToStart: exactRoster,
+      rosterChanged: rows.length > 0 && !exactRoster,
+      averageOvrDifference:
+        teamA.averageOvr === null || teamB.averageOvr === null
+          ? null
+          : new Decimal(teamA.averageOvr)
+              .minus(teamB.averageOvr)
+              .abs()
+              .toFixed(6),
+      diagnostics: [...diagnostics],
     };
+  }
+
+  private async canManageTeams(actorPlayerId: string, groupId: string) {
+    const [membership] = await this.database
+      .select({
+        role: groupMemberships.role,
+        capabilities: groupMemberships.capabilities,
+      })
+      .from(groupMemberships)
+      .where(
+        and(
+          eq(groupMemberships.groupId, groupId),
+          eq(groupMemberships.playerId, actorPlayerId),
+          eq(groupMemberships.status, "ACTIVE"),
+        ),
+      )
+      .limit(1);
+    return Boolean(
+      membership &&
+      hasGroupCapability(
+        membership.role,
+        membership.capabilities,
+        "MATCH_MANAGE_TEAMS",
+      ),
+    );
   }
 
   private async lockEditableMatch(

@@ -7,6 +7,7 @@ import {
   evaluationEvidence,
   matchParticipants,
   matches,
+  matchSportingResults,
   playerEvaluations,
   playerPerformances,
   progressionConfigVersions,
@@ -16,6 +17,7 @@ import {
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
+import { votingClosesAt, votingOpensAt } from "../voting/voting-window.js";
 import {
   ATTRIBUTES,
   type Attribute,
@@ -58,7 +60,7 @@ export class ProgressionService {
           409,
         );
       const processedAt = this.clock();
-      await this.requireEffectivelyClosedVoting(tx, matchId, processedAt);
+      await this.requireEffectivelyClosedVoting(tx, match, processedAt);
       const configRow = await this.resolveConfig(
         tx,
         match.discipline,
@@ -288,29 +290,63 @@ export class ProgressionService {
     scheduledAt: Date,
     now: Date,
   ) {
-    const rows = await tx.execute(sql`
-      select prior.id
-      from ${matches} prior
-      join ${matchParticipants} participant
-        on participant.match_id = prior.id
-       and participant.kind = 'PLAYER'
-       and participant.player_id = ${playerId}
-       and participant.status = 'CONFIRMED'
-       and participant.attendance = 'PLAYED'
-      join ${votingSessions} session
-        on session.match_id = prior.id
-       and (session.status = 'CLOSED' or session.closes_at <= ${now.toISOString()}::timestamptz)
-      left join ${progressionSnapshots} snapshot
-        on snapshot.match_id = prior.id
-       and snapshot.player_id = ${playerId}
-       and snapshot.discipline = prior.discipline
-      where prior.status = 'FINISHED'
-        and snapshot.id is null
-        and prior.id <> ${matchId}
-        and (prior.scheduled_at < ${scheduledAt.toISOString()}::timestamptz or (prior.scheduled_at = ${scheduledAt.toISOString()}::timestamptz and prior.id::text < ${matchId}::text))
-      limit 1
-    `);
-    if (rows.length > 0)
+    const rows = await tx
+      .select({
+        id: matches.id,
+        scheduledAt: matches.scheduledAt,
+        durationMinutes: matches.durationMinutes,
+        resultConfirmedAt: matchSportingResults.confirmedAt,
+        sessionStatus: votingSessions.status,
+        sessionClosesAt: votingSessions.closesAt,
+      })
+      .from(matches)
+      .innerJoin(
+        matchParticipants,
+        and(
+          eq(matchParticipants.matchId, matches.id),
+          eq(matchParticipants.kind, "PLAYER"),
+          eq(matchParticipants.playerId, playerId),
+          eq(matchParticipants.status, "CONFIRMED"),
+          eq(matchParticipants.attendance, "PLAYED"),
+        ),
+      )
+      .innerJoin(
+        matchSportingResults,
+        and(
+          eq(matchSportingResults.matchId, matches.id),
+          eq(matchSportingResults.status, "CONFIRMED"),
+        ),
+      )
+      .leftJoin(votingSessions, eq(votingSessions.matchId, matches.id))
+      .leftJoin(
+        progressionSnapshots,
+        and(
+          eq(progressionSnapshots.matchId, matches.id),
+          eq(progressionSnapshots.playerId, playerId),
+          eq(progressionSnapshots.discipline, matches.discipline),
+        ),
+      )
+      .where(
+        and(
+          eq(matches.status, "FINISHED"),
+          sql`${progressionSnapshots.id} is null`,
+          sql`${matches.id} <> ${matchId}`,
+          sql`(${matches.scheduledAt} < ${scheduledAt.toISOString()}::timestamptz or (${matches.scheduledAt} = ${scheduledAt.toISOString()}::timestamptz and ${matches.id}::text < ${matchId}::text))`,
+        ),
+      );
+
+    const hasEarlierReadyMatch = rows.some((row) => {
+      if (row.sessionStatus === "CLOSED") return true;
+      if (row.sessionClosesAt && row.sessionClosesAt <= now) return true;
+      if (!row.resultConfirmedAt) return false;
+      const opensAt = votingOpensAt(
+        row.scheduledAt,
+        row.durationMinutes,
+        row.resultConfirmedAt,
+      );
+      return votingClosesAt(opensAt) <= now;
+    });
+    if (hasEarlierReadyMatch)
       throw new ApplicationError(
         "progression_out_of_order",
         "An earlier closed Match must be processed first",
@@ -320,22 +356,59 @@ export class ProgressionService {
 
   private async requireEffectivelyClosedVoting(
     tx: Transaction,
-    matchId: string,
+    match: typeof matches.$inferSelect,
     now: Date,
   ) {
-    const locked = await tx.execute(
-      sql`select id from ${votingSessions} where match_id = ${matchId} for update`,
+    await tx.execute(
+      sql`select id from ${votingSessions} where match_id = ${match.id} for update`,
     );
-    if (locked.length === 0)
-      throw new ApplicationError(
-        "progression_not_ready",
-        "Voting session does not exist",
-        409,
-      );
-    const [session] = await tx
+    let [session] = await tx
       .select()
       .from(votingSessions)
-      .where(eq(votingSessions.matchId, matchId));
+      .where(eq(votingSessions.matchId, match.id));
+
+    if (!session) {
+      const [result] = await tx
+        .select({
+          status: matchSportingResults.status,
+          confirmedAt: matchSportingResults.confirmedAt,
+        })
+        .from(matchSportingResults)
+        .where(eq(matchSportingResults.matchId, match.id))
+        .limit(1);
+      if (result?.status !== "CONFIRMED" || !result.confirmedAt)
+        throw new ApplicationError(
+          "progression_not_ready",
+          "Sporting result is not confirmed",
+          409,
+        );
+      const openedAt = votingOpensAt(
+        match.scheduledAt,
+        match.durationMinutes,
+        result.confirmedAt,
+      );
+      const closesAt = votingClosesAt(openedAt);
+      if (now < closesAt)
+        throw new ApplicationError(
+          "progression_not_ready",
+          "Voting window is still open",
+          409,
+        );
+      await tx.insert(votingSessions).values({
+        id: randomUUID(),
+        matchId: match.id,
+        status: "CLOSED",
+        openedAt,
+        closesAt,
+        closedAt: closesAt,
+        closeReason: "DEADLINE",
+      });
+      [session] = await tx
+        .select()
+        .from(votingSessions)
+        .where(eq(votingSessions.matchId, match.id));
+    }
+
     if (session!.status === "OPEN" && now < session!.closesAt)
       throw new ApplicationError(
         "progression_not_ready",
@@ -347,7 +420,7 @@ export class ProgressionService {
         .update(votingSessions)
         .set({
           status: "CLOSED",
-          closedAt: now,
+          closedAt: session!.closesAt,
           closeReason: "DEADLINE",
           updatedAt: now,
         })

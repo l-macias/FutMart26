@@ -1,0 +1,57 @@
+.page,
+.header,
+.section,
+.list,
+.list li,
+.list li > div {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.page {
+  gap: var(--space-7);
+  padding-block-end: var(--space-7);
+}
+.header {
+  gap: var(--space-2);
+  padding-block: var(--space-4);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+.section {
+  gap: var(--space-3);
+}
+.list {
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.list li {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
+  background: var(--background-surface);
+}
+.list li > a,
+.list li > div {
+  gap: var(--space-1);
+  color: inherit;
+  text-decoration: none;
+}
+.list span {
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1.2
+    var(--font-interface, var(--font-interface-fallback));
+  text-transform: uppercase;
+}
+.actions {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: var(--space-2) !important;
+}
+@media (min-width: 40rem) {
+  .list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}

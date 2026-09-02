@@ -10,3 +10,6 @@ coverage/
 *.log
 .DS_Store
 *.txt
+playwright-report/
+test-results/
+.playwright/

@@ -1,0 +1,27 @@
+.page {
+  display: grid;
+  gap: var(--space-6);
+  max-inline-size: 48rem;
+  margin-inline: auto;
+  padding: var(--space-7) var(--space-5);
+  color: var(--foreground-primary);
+}
+.page header,
+.page section {
+  display: grid;
+  gap: var(--space-3);
+}
+.page section {
+  padding-inline-start: var(--space-4);
+  border-inline-start: var(--border-width-strong) solid var(--border-subtle);
+}
+.page h2,
+.page p {
+  margin: 0;
+}
+.page a {
+  color: var(--accent-primary);
+}
+.page code {
+  color: var(--accent-primary);
+}

@@ -14,6 +14,11 @@ import {
   assignObserverRequestSchema,
   replaceMatchTeamsRequestSchema,
   resultDraftRequestSchema,
+  administrativeCancelParticipantRequestSchema,
+  swapWaitlistParticipantRequestSchema,
+  replaceMatchRecruitmentRequestSchema,
+  recruitmentOpportunitiesQuerySchema,
+  personalMatchesQuerySchema,
 } from "@football/contracts";
 
 import { ApplicationError } from "../errors.js";
@@ -22,6 +27,7 @@ import { MatchService } from "./match-service.js";
 import { MatchCompletionService } from "./match-completion-service.js";
 import { MatchResultService } from "./match-result-service.js";
 import { MatchTeamService } from "./match-team-service.js";
+import { MatchRecruitmentService } from "./match-recruitment-service.js";
 
 export function createMatchRoutes(
   auth: FootballAuth,
@@ -30,6 +36,7 @@ export function createMatchRoutes(
   completion: MatchCompletionService,
   teams: MatchTeamService,
   results: MatchResultService,
+  recruitment: MatchRecruitmentService,
 ): FastifyPluginAsync {
   return (app) => {
     async function actor(request: { headers: NodeJS.Dict<string | string[]> }) {
@@ -52,13 +59,30 @@ export function createMatchRoutes(
       });
       return reply.status(201).send(match);
     });
+    app.get("/groups/:groupId/match-defaults", async (request) => {
+      const { groupId } = groupIdParamsSchema.parse(request.params);
+      return matches.defaults((await actor(request)).id, groupId);
+    });
     app.get("/groups/:groupId/matches", async (request) => {
       const { groupId } = groupIdParamsSchema.parse(request.params);
       return matches.list((await actor(request)).id, groupId);
     });
+    app.get("/me/matches", async (request) => {
+      const query = personalMatchesQuerySchema.parse(request.query);
+      return matches.listForPlayer((await actor(request)).id, query);
+    });
     app.get("/matches/:matchId", async (request) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);
       return matches.get((await actor(request)).id, matchId);
+    });
+    app.put("/matches/:matchId/recruitment", async (request) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = replaceMatchRecruitmentRequestSchema.parse(request.body);
+      return recruitment.replace((await actor(request)).id, matchId, body);
+    });
+    app.get("/me/recruitment/opportunities", async (request) => {
+      const query = recruitmentOpportunitiesQuerySchema.parse(request.query);
+      return recruitment.opportunities((await actor(request)).id, query);
     });
     app.post("/matches/:matchId/publish", async (request, reply) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);
@@ -95,6 +119,32 @@ export function createMatchRoutes(
     app.post("/matches/:matchId/leave", async (request, reply) => {
       const { matchId } = matchIdParamsSchema.parse(request.params);
       await matches.leave((await actor(request)).id, matchId);
+      return reply.status(204).send();
+    });
+    app.post(
+      "/matches/:matchId/participants/cancel",
+      async (request, reply) => {
+        const { matchId } = matchIdParamsSchema.parse(request.params);
+        const body = administrativeCancelParticipantRequestSchema.parse(
+          request.body,
+        );
+        await matches.cancelParticipant(
+          (await actor(request)).id,
+          matchId,
+          body.participantId,
+        );
+        return reply.status(204).send();
+      },
+    );
+    app.post("/matches/:matchId/waitlist/swap", async (request, reply) => {
+      const { matchId } = matchIdParamsSchema.parse(request.params);
+      const body = swapWaitlistParticipantRequestSchema.parse(request.body);
+      await matches.swapWaitlist(
+        (await actor(request)).id,
+        matchId,
+        body.promoteParticipantId,
+        body.demoteParticipantId,
+      );
       return reply.status(204).send();
     });
     app.post("/matches/:matchId/guests", async (request, reply) => {

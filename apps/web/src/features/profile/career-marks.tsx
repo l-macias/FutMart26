@@ -1,9 +1,11 @@
 import { Text } from "@football/ui";
+import type { RewardsResponse } from "@football/contracts";
 
-import { profileMock } from "./profile-mock-content";
 import styles from "./profile.module.css";
 
-export function CareerMarks() {
+export function CareerMarks({
+  rewards,
+}: Readonly<{ rewards: RewardsResponse }>) {
   return (
     <section aria-labelledby="marks-title" className={styles.panelSection}>
       <Text as="h2" id="marks-title" variant="heading-lg">
@@ -17,22 +19,22 @@ export function CareerMarks() {
           <Text tone="muted">Hitos verificables de carrera.</Text>
         </div>
         <ul className={styles.achievementList}>
-          {profileMock.achievements.map((achievement) => (
-            <li
-              className={
-                achievement.status === "locked" ? styles.locked : undefined
-              }
-              key={achievement.label}
-            >
+          {rewards.achievements.map((achievement) => (
+            <li key={achievement.type}>
               <span aria-hidden="true" className={styles.achievementMark} />
               <Text as="span" variant="label">
-                {achievement.label}
+                {achievement.title}
               </Text>
               <Text as="span" tone="muted" variant="metadata">
-                {achievement.status === "locked" ? "Bloqueado" : "Conseguido"}
+                {achievement.description}
               </Text>
             </li>
           ))}
+          {rewards.achievements.length === 0 ? (
+            <li>
+              <Text tone="muted">Tus primeros hitos aparecerán acá.</Text>
+            </li>
+          ) : null}
         </ul>
       </div>
       <div className={styles.markGroup}>
@@ -43,14 +45,25 @@ export function CareerMarks() {
           <Text tone="muted">Reconocimientos por rendimiento.</Text>
         </div>
         <ul className={styles.awardList}>
-          {profileMock.awards.map((award) => (
-            <li key={award}>
+          {rewards.recentAwards.map((award) => (
+            <li key={`${award.matchId}:${award.type}`}>
               <span aria-hidden="true" />
-              <Text as="span" variant="heading-md">
-                {award}
-              </Text>
+              <span>
+                <Text as="span" variant="heading-md">
+                  {award.title}
+                </Text>
+                <Text as="span" tone="muted" variant="metadata">
+                  {award.context.group.name}
+                </Text>
+              </span>
             </li>
           ))}
+          {rewards.recentAwards.length === 0 ? (
+            <li>
+              <span aria-hidden="true" />
+              <Text tone="muted">Todavía no recibiste premios de partido.</Text>
+            </li>
+          ) : null}
         </ul>
       </div>
     </section>

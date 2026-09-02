@@ -9,6 +9,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDatabase } from "@football/database";
 import {
   createGuestRequestSchema,
+  updateMatchRequestSchema,
   updateStatsRequestSchema,
 } from "@football/contracts";
 import {
@@ -201,6 +202,10 @@ void test(
       false,
     );
     assert.equal(
+      updateMatchRequestSchema.safeParse({ discipline: "F5" }).success,
+      false,
+    );
+    assert.equal(
       updateStatsRequestSchema.safeParse({
         participants: [{ participantId: randomUUID(), goals: 1.5, assists: 0 }],
       }).success,
@@ -223,6 +228,14 @@ void test(
       locationText: "Rosario",
     });
     await service.publish(moderator.id, moderatorDraft.id);
+    const moderatorMatchView = await service.get(
+      moderator.id,
+      moderatorDraft.id,
+    );
+    assert.equal(moderatorMatchView.canManage, true);
+    assert.equal(moderatorMatchView.canManageGuests, true);
+    assert.equal(moderatorMatchView.canComplete, true);
+    assert.equal(moderatorMatchView.canClose, true);
     const moderatorGuest = await service.addGuest(
       moderator.id,
       moderatorDraft.id,
@@ -267,6 +280,11 @@ void test(
     );
 
     await service.publish(owner.id, draft.id);
+    const memberMatchView = await service.get(playerA.id, draft.id);
+    assert.equal(memberMatchView.canManage, false);
+    assert.equal(memberMatchView.canManageGuests, false);
+    assert.equal(memberMatchView.canComplete, false);
+    assert.equal(memberMatchView.canClose, false);
     await assert.rejects(
       () =>
         connection.db.insert(matchParticipants).values({
@@ -416,9 +434,17 @@ void test(
     const rescheduledAt = new Date("2027-02-01T21:00:00.000Z");
     await service.update(owner.id, capacityMatch.id, {
       scheduledAt: rescheduledAt,
+      durationMinutes: 75,
+      locationText: "Nueva sede manual",
+      venueId: null,
+      courtId: null,
     });
     const afterReschedule = await roster(capacityMatch.id, owner.id);
     assert.equal(afterReschedule.confirmedCount, 3);
+    const editedMatch = await service.get(owner.id, capacityMatch.id);
+    assert.equal(editedMatch.scheduledAt, rescheduledAt.toISOString());
+    assert.equal(editedMatch.durationMinutes, 75);
+    assert.equal(editedMatch.locationText, "Nueva sede manual");
 
     const guestPlayerRace = await createOpenMatch(owner.id, group.id, 1);
     const admissionRace = await Promise.all([
@@ -510,6 +536,10 @@ void test(
         "Preserved guest",
       ),
     );
+    await assert.rejects(
+      () => service.cancel(playerA.id, cancelled.id),
+      hasCode("forbidden"),
+    );
     await service.cancel(owner.id, cancelled.id);
     const preserved = await connection.db
       .select()
@@ -519,6 +549,10 @@ void test(
     await assert.rejects(
       () => service.join(playerB.id, cancelled.id),
       hasCode("match_not_open"),
+    );
+    await assert.rejects(
+      () => service.start(owner.id, cancelled.id),
+      hasCode("invalid_match_transition"),
     );
 
     const [persistedLocked] = await connection.db

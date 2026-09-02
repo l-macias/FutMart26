@@ -1,0 +1,19 @@
+.status {
+  display: grid;
+  min-block-size: 100dvh;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  text-align: center;
+}
+
+.mark {
+  display: grid;
+  inline-size: 4rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: var(--border-width-strong) solid var(--accent-primary);
+  color: var(--accent-primary);
+  font: 800 var(--type-heading-lg-size) / 1 var(--font-display);
+}

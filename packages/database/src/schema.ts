@@ -1,8 +1,10 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   bigint,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -136,16 +138,305 @@ export const groupGuestStatus = pgEnum("group_guest_status", [
   "ARCHIVED",
   "DELETED",
 ]);
+export const venueStatus = pgEnum("venue_status", ["ACTIVE", "ARCHIVED"]);
+export const venueProvenance = pgEnum("venue_provenance", ["USER_CREATED"]);
+export const mediaAssetPurpose = pgEnum("media_asset_purpose", [
+  "PLAYER_AVATAR",
+]);
+export const mediaAssetStatus = pgEnum("media_asset_status", [
+  "PENDING",
+  "READY",
+  "DELETED",
+]);
+export const profileVisibility = pgEnum("profile_visibility", [
+  "PUBLIC",
+  "PRIVATE",
+]);
+export const playerAccountStatus = pgEnum("player_account_status", [
+  "ACTIVE",
+  "ANONYMIZED",
+]);
+export const policyType = pgEnum("policy_type", ["TERMS", "PRIVACY"]);
+export const abuseReportTargetType = pgEnum("abuse_report_target_type", [
+  "PLAYER",
+  "GROUP",
+  "MATCH",
+]);
+export const abuseReportReason = pgEnum("abuse_report_reason", [
+  "HARASSMENT",
+  "INAPPROPRIATE_CONTENT",
+  "IMPERSONATION",
+  "SPAM",
+  "SAFETY",
+  "OTHER",
+]);
+export const abuseReportStatus = pgEnum("abuse_report_status", [
+  "OPEN",
+  "RESOLVED",
+  "DISMISSED",
+]);
+export const adminRole = pgEnum("admin_role", ["SUPERADMIN"]);
+export const adminAuditAction = pgEnum("admin_audit_action", [
+  "ACCOUNT_SUSPENDED",
+  "ACCOUNT_REACTIVATED",
+  "PLAYER_NAME_MODERATED",
+  "PLAYER_AVATAR_REMOVED",
+  "GROUP_FORCED_PRIVATE",
+  "GROUP_NAME_MODERATED",
+  "GROUP_ARCHIVED",
+  "REPORT_RESOLVED",
+  "REPORT_DISMISSED",
+  "BALLOT_VOIDED",
+  "INVITATION_REVOKED",
+  "MATCH_CANCELLED_BY_ADMIN",
+]);
+export const adminTargetType = pgEnum("admin_target_type", [
+  "ACCOUNT",
+  "PLAYER",
+  "GROUP",
+  "MATCH",
+  "REPORT",
+  "BALLOT",
+  "INVITATION",
+]);
+
+export const adminGrants = pgTable("admin_grants", {
+  authUserId: text("auth_user_id")
+    .primaryKey()
+    .references(() => authUser.id, { onDelete: "restrict" }),
+  role: adminRole("role").default("SUPERADMIN").notNull(),
+  grantedAt: timestamp("granted_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const accountSuspensions = pgTable(
+  "account_suspensions",
+  {
+    id: uuid("id").primaryKey(),
+    authUserId: text("auth_user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    suspendedByAuthUserId: text("suspended_by_auth_user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "restrict" }),
+    suspendedAt: timestamp("suspended_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+    reactivatedAt: timestamp("reactivated_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    reactivatedByAuthUserId: text("reactivated_by_auth_user_id").references(
+      () => authUser.id,
+      { onDelete: "restrict" },
+    ),
+  },
+  (table) => [
+    uniqueIndex("account_suspensions_active_user_uq")
+      .on(table.authUserId)
+      .where(sql`${table.reactivatedAt} is null`),
+    index("account_suspensions_user_time_idx").on(
+      table.authUserId,
+      table.suspendedAt,
+    ),
+    check(
+      "account_suspensions_reactivation_ck",
+      sql`(${table.reactivatedAt} is null and ${table.reactivatedByAuthUserId} is null) or (${table.reactivatedAt} is not null and ${table.reactivatedByAuthUserId} is not null)`,
+    ),
+  ],
+);
+
+export const adminAuditEvents = pgTable(
+  "admin_audit_events",
+  {
+    id: uuid("id").primaryKey(),
+    actorAuthUserId: text("actor_auth_user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "restrict" }),
+    action: adminAuditAction("action").notNull(),
+    targetType: adminTargetType("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    reason: text("reason").notNull(),
+    metadata:
+      jsonb("metadata").$type<
+        Record<string, string | number | boolean | null>
+      >(),
+    requestId: text("request_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("admin_audit_events_created_idx").on(table.createdAt, table.id),
+    index("admin_audit_events_target_idx").on(
+      table.targetType,
+      table.targetId,
+      table.createdAt,
+    ),
+    check(
+      "admin_audit_events_reason_length_ck",
+      sql`char_length(btrim(${table.reason})) between 5 and 500`,
+    ),
+  ],
+);
+
+export const policyAcceptances = pgTable(
+  "policy_acceptances",
+  {
+    id: uuid("id").primaryKey(),
+    authUserId: text("auth_user_id")
+      .notNull()
+      .references(() => authUser.id, { onDelete: "cascade" }),
+    type: policyType("type").notNull(),
+    version: text("version").notNull(),
+    acceptedAt: timestamp("accepted_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("policy_acceptances_user_type_version_uq").on(
+      table.authUserId,
+      table.type,
+      table.version,
+    ),
+    index("policy_acceptances_user_idx").on(table.authUserId),
+  ],
+);
 
 export const players = pgTable("players", {
   id: uuid("id").primaryKey(),
   authUserId: text("auth_user_id")
-    .notNull()
     .unique()
-    .references(() => authUser.id, { onDelete: "restrict" }),
+    .references(() => authUser.id, { onDelete: "set null" }),
   displayName: text("display_name").notNull(),
+  dateOfBirth: date("date_of_birth", { mode: "string" }),
+  profileVisibility: profileVisibility("profile_visibility")
+    .default("PUBLIC")
+    .notNull(),
+  accountStatus: playerAccountStatus("account_status")
+    .default("ACTIVE")
+    .notNull(),
+  anonymizedAt: timestamp("anonymized_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  avatarMediaAssetId: uuid("avatar_media_asset_id").references(
+    (): AnyPgColumn => mediaAssets.id,
+    { onDelete: "restrict" },
+  ),
   ...timestamps,
 });
+
+export const mediaAssets = pgTable(
+  "media_assets",
+  {
+    id: uuid("id").primaryKey(),
+    ownerPlayerId: uuid("owner_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    purpose: mediaAssetPurpose("purpose").notNull(),
+    storageKey: text("storage_key").notNull().unique(),
+    mimeType: text("mime_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    status: mediaAssetStatus("status").default("PENDING").notNull(),
+    version: integer("version").default(1).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("media_assets_owner_status_idx").on(
+      table.ownerPlayerId,
+      table.status,
+    ),
+    check("media_assets_byte_size_positive_ck", sql`${table.byteSize} > 0`),
+    check(
+      "media_assets_dimensions_positive_ck",
+      sql`${table.width} > 0 and ${table.height} > 0`,
+    ),
+    check("media_assets_version_positive_ck", sql`${table.version} > 0`),
+  ],
+);
+
+// Venues are global references. Creation never grants global edit ownership.
+export const venues = pgTable(
+  "venues",
+  {
+    id: uuid("id").primaryKey(),
+    displayName: text("display_name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    city: text("city").notNull(),
+    normalizedCity: text("normalized_city").notNull(),
+    countryCode: text("country_code"),
+    provinceCode: text("province_code"),
+    address: text("address"),
+    status: venueStatus("status").default("ACTIVE").notNull(),
+    provenance: venueProvenance("provenance").default("USER_CREATED").notNull(),
+    createdByPlayerId: uuid("created_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "venues_names_nonempty_ck",
+      sql`btrim(${table.displayName}) <> '' and btrim(${table.normalizedName}) <> '' and btrim(${table.city}) <> '' and btrim(${table.normalizedCity}) <> ''`,
+    ),
+    check(
+      "venues_country_code_format_ck",
+      sql`${table.countryCode} is null or ${table.countryCode} ~ '^[A-Z]{2}$'`,
+    ),
+    check(
+      "venues_province_code_format_ck",
+      sql`${table.provinceCode} is null or ${table.provinceCode} ~ '^[A-Z]{2}-[A-Z0-9]{1,3}$'`,
+    ),
+    check(
+      "venues_province_country_ck",
+      sql`${table.provinceCode} is null or (${table.countryCode} is not null and split_part(${table.provinceCode}, '-', 1) = ${table.countryCode})`,
+    ),
+    uniqueIndex("venues_active_name_city_uq")
+      .on(table.normalizedName, table.normalizedCity)
+      .where(sql`${table.status} = 'ACTIVE'`),
+    index("venues_search_idx").on(
+      table.normalizedCity,
+      table.normalizedName,
+      table.status,
+    ),
+  ],
+);
+
+export const venueCourts = pgTable(
+  "venue_courts",
+  {
+    id: uuid("id").primaryKey(),
+    venueId: uuid("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "restrict" }),
+    displayName: text("display_name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    status: venueStatus("status").default("ACTIVE").notNull(),
+    createdByPlayerId: uuid("created_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "venue_courts_name_nonempty_ck",
+      sql`btrim(${table.displayName}) <> '' and btrim(${table.normalizedName}) <> ''`,
+    ),
+    uniqueIndex("venue_courts_active_name_uq")
+      .on(table.venueId, table.normalizedName)
+      .where(sql`${table.status} = 'ACTIVE'`),
+    uniqueIndex("venue_courts_id_venue_uq").on(table.id, table.venueId),
+    index("venue_courts_venue_status_idx").on(table.venueId, table.status),
+  ],
+);
 
 export const groups = pgTable(
   "groups",
@@ -153,6 +444,7 @@ export const groups = pgTable(
     id: uuid("id").primaryKey(),
     name: text("name").notNull(),
     status: groupStatus("status").default("ACTIVE").notNull(),
+    visibility: profileVisibility("visibility").default("PUBLIC").notNull(),
     createdByPlayerId: uuid("created_by_player_id")
       .notNull()
       .references(() => players.id, { onDelete: "restrict" }),
@@ -170,6 +462,96 @@ export const groups = pgTable(
       sql`${table.defaultGuestAllowancePerMember} >= 0`,
     ),
     index("groups_created_by_idx").on(table.createdByPlayerId),
+  ],
+);
+
+export const abuseReports = pgTable(
+  "abuse_reports",
+  {
+    id: uuid("id").primaryKey(),
+    reporterPlayerId: uuid("reporter_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    targetType: abuseReportTargetType("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    reason: abuseReportReason("reason").notNull(),
+    comment: text("comment"),
+    status: abuseReportStatus("status").default("OPEN").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp("resolved_at", { mode: "date", withTimezone: true }),
+    handledByAuthUserId: text("handled_by_auth_user_id").references(
+      () => authUser.id,
+      { onDelete: "restrict" },
+    ),
+    resolutionNote: text("resolution_note"),
+  },
+  (table) => [
+    check(
+      "abuse_reports_comment_length_ck",
+      sql`${table.comment} is null or char_length(${table.comment}) <= 1000`,
+    ),
+    check(
+      "abuse_reports_resolution_ck",
+      sql`(${table.status} = 'OPEN' and ${table.resolvedAt} is null and ${table.handledByAuthUserId} is null) or (${table.status} <> 'OPEN' and ${table.resolvedAt} is not null)`,
+    ),
+    check(
+      "abuse_reports_resolution_note_length_ck",
+      sql`${table.resolutionNote} is null or char_length(${table.resolutionNote}) <= 1000`,
+    ),
+    index("abuse_reports_reporter_created_idx").on(
+      table.reporterPlayerId,
+      table.createdAt,
+    ),
+    index("abuse_reports_status_created_idx").on(table.status, table.createdAt),
+  ],
+);
+
+export const groupMatchDefaults = pgTable(
+  "group_match_defaults",
+  {
+    groupId: uuid("group_id")
+      .primaryKey()
+      .references(() => groups.id, { onDelete: "restrict" }),
+    discipline: text("discipline").default("F5").notNull(),
+    defaultVenueId: uuid("default_venue_id").references(() => venues.id, {
+      onDelete: "restrict",
+    }),
+    defaultCourtId: uuid("default_court_id"),
+    defaultLocationText: text("default_location_text"),
+    defaultStartTime: text("default_start_time"),
+    defaultDurationMinutes: integer("default_duration_minutes")
+      .default(60)
+      .notNull(),
+    defaultCapacity: integer("default_capacity").default(10).notNull(),
+    updatedByPlayerId: uuid("updated_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.defaultCourtId, table.defaultVenueId],
+      foreignColumns: [venueCourts.id, venueCourts.venueId],
+      name: "group_match_defaults_court_venue_fk",
+    }).onDelete("restrict"),
+    check(
+      "group_match_defaults_discipline_ck",
+      sql`${table.discipline} = 'F5'`,
+    ),
+    check(
+      "group_match_defaults_duration_ck",
+      sql`${table.defaultDurationMinutes} > 0`,
+    ),
+    check(
+      "group_match_defaults_capacity_ck",
+      sql`${table.defaultCapacity} > 0`,
+    ),
+    check(
+      "group_match_defaults_court_requires_venue_ck",
+      sql`${table.defaultCourtId} is null or ${table.defaultVenueId} is not null`,
+    ),
   ],
 );
 
@@ -410,6 +792,42 @@ export const matchStatus = pgEnum("match_status", [
   "FINISHED",
   "CANCELLED",
 ]);
+export const notificationType = pgEnum("notification_type", [
+  "VOTING_AVAILABLE",
+  "PROGRESSION_AVAILABLE",
+  "MATCH_CANCELLED",
+  "ACHIEVEMENT_EARNED",
+  "AWARD_EARNED",
+  "CONNECTION_REQUESTED",
+  "CONNECTION_ACCEPTED",
+  "GROUP_INVITATION_RECEIVED",
+  "MATCH_INVITATION_RECEIVED",
+]);
+export const playerConnectionStatus = pgEnum("player_connection_status", [
+  "PENDING",
+  "ACCEPTED",
+]);
+export const directedInvitationStatus = pgEnum("directed_invitation_status", [
+  "PENDING",
+  "ACCEPTED",
+  "REJECTED",
+  "REVOKED",
+  "EXPIRED",
+]);
+export const achievementType = pgEnum("achievement_type", [
+  "FIRST_MATCH",
+  "FIVE_MATCHES",
+  "TEN_MATCHES",
+  "FIRST_GOAL",
+  "HAT_TRICK",
+  "FIRST_ASSIST",
+  "HIGH_RATING",
+]);
+export const matchAwardType = pgEnum("match_award_type", [
+  "TOP_RATED",
+  "TOP_SCORER",
+  "TOP_ASSIST",
+]);
 export const matchParticipantKind = pgEnum("match_participant_kind", [
   "PLAYER",
   "GUEST",
@@ -434,7 +852,6 @@ export const sportingResultStatus = pgEnum("sporting_result_status", [
   "NOT_PLAYED",
 ]);
 
-// locationText is display-only in V1. Future Venue/geography IDs will be separate fields.
 export const matches = pgTable(
   "matches",
   {
@@ -450,7 +867,13 @@ export const matches = pgTable(
     }).notNull(),
     durationMinutes: integer("duration_minutes").notNull(),
     capacity: integer("capacity").notNull(),
+    recruitmentEnabled: boolean("recruitment_enabled").default(false).notNull(),
+    // Text is a historical display snapshot even when structured IDs are used.
     locationText: text("location_text").notNull(),
+    venueId: uuid("venue_id").references(() => venues.id, {
+      onDelete: "restrict",
+    }),
+    courtId: uuid("court_id"),
     createdByPlayerId: uuid("created_by_player_id")
       .notNull()
       .references(() => players.id, { onDelete: "restrict" }),
@@ -487,10 +910,270 @@ export const matches = pgTable(
     ...timestamps,
   },
   (table) => [
+    foreignKey({
+      columns: [table.courtId, table.venueId],
+      foreignColumns: [venueCourts.id, venueCourts.venueId],
+      name: "matches_court_venue_fk",
+    }).onDelete("restrict"),
     check("matches_duration_positive_ck", sql`${table.durationMinutes} > 0`),
     check("matches_capacity_positive_ck", sql`${table.capacity} > 0`),
+    check(
+      "matches_court_requires_venue_ck",
+      sql`${table.courtId} is null or ${table.venueId} is not null`,
+    ),
     index("matches_group_scheduled_idx").on(table.groupId, table.scheduledAt),
     index("matches_group_status_idx").on(table.groupId, table.status),
+    index("matches_recruitment_open_scheduled_idx")
+      .on(table.scheduledAt, table.id)
+      .where(sql`${table.recruitmentEnabled} and ${table.status} = 'OPEN'`),
+  ],
+);
+
+export const matchRecruitmentNeeds = pgTable(
+  "match_recruitment_needs",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    role: footballRole("role").notNull(),
+    quantity: integer("quantity").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("match_recruitment_needs_match_role_uq").on(
+      table.matchId,
+      table.role,
+    ),
+    check(
+      "match_recruitment_needs_quantity_positive_ck",
+      sql`${table.quantity} > 0`,
+    ),
+  ],
+);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey(),
+    recipientPlayerId: uuid("recipient_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    type: notificationType("type").notNull(),
+    matchId: uuid("match_id").references(() => matches.id, {
+      onDelete: "restrict",
+    }),
+    relatedPlayerId: uuid("related_player_id").references(() => players.id, {
+      onDelete: "restrict",
+    }),
+    groupId: uuid("group_id").references(() => groups.id, {
+      onDelete: "restrict",
+    }),
+    deduplicationKey: text("deduplication_key").notNull(),
+    readAt: timestamp("read_at", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("notifications_deduplication_key_uq").on(
+      table.deduplicationKey,
+    ),
+    index("notifications_recipient_created_idx").on(
+      table.recipientPlayerId,
+      table.createdAt,
+      table.id,
+    ),
+    index("notifications_recipient_unread_idx")
+      .on(table.recipientPlayerId, table.createdAt)
+      .where(sql`${table.readAt} is null`),
+  ],
+);
+
+export const playerConnections = pgTable(
+  "player_connections",
+  {
+    id: uuid("id").primaryKey(),
+    playerLowId: uuid("player_low_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    playerHighId: uuid("player_high_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    requesterPlayerId: uuid("requester_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    status: playerConnectionStatus("status").default("PENDING").notNull(),
+    requestedAt: timestamp("requested_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+    acceptedAt: timestamp("accepted_at", { mode: "date", withTimezone: true }),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "player_connections_distinct_players_ck",
+      sql`${table.playerLowId} < ${table.playerHighId}`,
+    ),
+    check(
+      "player_connections_requester_in_pair_ck",
+      sql`${table.requesterPlayerId} in (${table.playerLowId}, ${table.playerHighId})`,
+    ),
+    check(
+      "player_connections_accepted_at_ck",
+      sql`(${table.status} = 'PENDING' and ${table.acceptedAt} is null) or (${table.status} = 'ACCEPTED' and ${table.acceptedAt} is not null)`,
+    ),
+    uniqueIndex("player_connections_pair_uq").on(
+      table.playerLowId,
+      table.playerHighId,
+    ),
+    index("player_connections_low_status_time_idx").on(
+      table.playerLowId,
+      table.status,
+      table.acceptedAt,
+    ),
+    index("player_connections_high_status_time_idx").on(
+      table.playerHighId,
+      table.status,
+      table.acceptedAt,
+    ),
+    index("player_connections_requester_status_time_idx").on(
+      table.requesterPlayerId,
+      table.status,
+      table.requestedAt,
+    ),
+  ],
+);
+
+export const groupConnectionInvitations = pgTable(
+  "group_connection_invitations",
+  {
+    id: uuid("id").primaryKey(),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "restrict" }),
+    invitedPlayerId: uuid("invited_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    invitedByPlayerId: uuid("invited_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    invitedByRole: membershipRole("invited_by_role").notNull(),
+    status: directedInvitationStatus("status").default("PENDING").notNull(),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    respondedAt: timestamp("responded_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
+    revokedByPlayerId: uuid("revoked_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "group_connection_invitations_distinct_players_ck",
+      sql`${table.invitedPlayerId} <> ${table.invitedByPlayerId}`,
+    ),
+    uniqueIndex("group_connection_invitations_pending_uq")
+      .on(table.groupId, table.invitedPlayerId)
+      .where(sql`${table.status} = 'PENDING'`),
+    index("group_connection_invitations_recipient_status_time_idx").on(
+      table.invitedPlayerId,
+      table.status,
+      table.createdAt,
+    ),
+    index("group_connection_invitations_group_status_time_idx").on(
+      table.groupId,
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const matchPlayerInvitations = pgTable(
+  "match_player_invitations",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    invitedPlayerId: uuid("invited_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    invitedByPlayerId: uuid("invited_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    status: directedInvitationStatus("status").default("PENDING").notNull(),
+    respondedAt: timestamp("responded_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
+    revokedByPlayerId: uuid("revoked_by_player_id").references(
+      () => players.id,
+      { onDelete: "restrict" },
+    ),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "match_player_invitations_distinct_players_ck",
+      sql`${table.invitedPlayerId} <> ${table.invitedByPlayerId}`,
+    ),
+    uniqueIndex("match_player_invitations_pending_uq")
+      .on(table.matchId, table.invitedPlayerId)
+      .where(sql`${table.status} = 'PENDING'`),
+    index("match_player_invitations_recipient_status_time_idx").on(
+      table.invitedPlayerId,
+      table.status,
+      table.createdAt,
+    ),
+    index("match_player_invitations_match_status_time_idx").on(
+      table.matchId,
+      table.status,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const matchScheduleChanges = pgTable(
+  "match_schedule_changes",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    previousScheduledAt: timestamp("previous_scheduled_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    nextScheduledAt: timestamp("next_scheduled_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    changedByPlayerId: uuid("changed_by_player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    changedAt: timestamp("changed_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("match_schedule_changes_match_time_idx").on(
+      table.matchId,
+      table.changedAt,
+    ),
   ],
 );
 
@@ -563,6 +1246,11 @@ export const matchParticipants = pgTable(
       .on(table.matchId, table.playerId)
       .where(
         sql`${table.kind} = 'PLAYER' and ${table.status} in ('CONFIRMED', 'WAITLISTED')`,
+      ),
+    uniqueIndex("match_participants_active_group_guest_uq")
+      .on(table.matchId, table.groupGuestId)
+      .where(
+        sql`${table.kind} = 'GUEST' and ${table.status} in ('CONFIRMED', 'WAITLISTED')`,
       ),
     index("match_participants_match_status_order_idx").on(
       table.matchId,
@@ -755,6 +1443,10 @@ export const votingBallots = pgTable(
     voidedByPlayerId: uuid("voided_by_player_id").references(() => players.id, {
       onDelete: "restrict",
     }),
+    voidedByAuthUserId: text("voided_by_auth_user_id").references(
+      () => authUser.id,
+      { onDelete: "restrict" },
+    ),
     ...timestamps,
   },
   (table) => [
@@ -768,7 +1460,7 @@ export const votingBallots = pgTable(
     ),
     check(
       "voting_ballots_void_evidence_ck",
-      sql`(${table.status} = 'VALID' and ${table.voidedAt} is null and ${table.voidedByPlayerId} is null) or (${table.status} = 'VOIDED' and ${table.voidedAt} is not null and ${table.voidedByPlayerId} is not null)`,
+      sql`(${table.status} = 'VALID' and ${table.voidedAt} is null and ${table.voidedByPlayerId} is null and ${table.voidedByAuthUserId} is null) or (${table.status} = 'VOIDED' and ${table.voidedAt} is not null and ((${table.voidedByPlayerId} is not null)::int + (${table.voidedByAuthUserId} is not null)::int) = 1)`,
     ),
   ],
 );
@@ -1031,5 +1723,72 @@ export const progressionSnapshots = pgTable(
       "progression_snapshots_counts_ck",
       sql`${table.evaluationsReceived} >= 0 and ${table.eligibleEvaluatorsForTarget} >= ${table.evaluationsReceived}`,
     ),
+  ],
+);
+
+export const playerAchievements = pgTable(
+  "player_achievements",
+  {
+    id: uuid("id").primaryKey(),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    type: achievementType("type").notNull(),
+    sourceMatchId: uuid("source_match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    earnedAt: timestamp("earned_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("player_achievements_player_type_uq").on(
+      table.playerId,
+      table.type,
+    ),
+    index("player_achievements_player_earned_idx").on(
+      table.playerId,
+      table.earnedAt,
+      table.id,
+    ),
+    index("player_achievements_source_match_idx").on(table.sourceMatchId),
+  ],
+);
+
+export const matchAwards = pgTable(
+  "match_awards",
+  {
+    id: uuid("id").primaryKey(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "restrict" }),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "restrict" }),
+    type: matchAwardType("type").notNull(),
+    awardedAt: timestamp("awarded_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("match_awards_match_player_type_uq").on(
+      table.matchId,
+      table.playerId,
+      table.type,
+    ),
+    index("match_awards_player_awarded_idx").on(
+      table.playerId,
+      table.awardedAt,
+      table.id,
+    ),
+    index("match_awards_match_idx").on(table.matchId),
   ],
 );

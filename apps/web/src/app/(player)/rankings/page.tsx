@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/components/placeholder-screen/placeholder-screen";
+import { redirect } from "next/navigation";
 
-export default function RankingsPlaceholderPage() {
-  return <PlaceholderScreen index="04" title="Rankings" />;
+export default function RankingsPage() {
+  redirect("/rankings/global");
 }

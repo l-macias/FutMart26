@@ -18,6 +18,7 @@ import {
 import { ApplicationError } from "../errors.js";
 import { hasGroupCapability } from "../groups/capabilities.js";
 import { VOTING_V1_CONFIG } from "./voting-config.js";
+import { votingClosesAt, votingOpensAt } from "./voting-window.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Attribute =
@@ -47,45 +48,7 @@ export class VotingService {
     return this.database.transaction(async (tx) => {
       const match = await this.lockMatch(tx, matchId);
       await this.requireVotingManager(tx, actorPlayerId, match.groupId);
-      const existing = await this.sessionByMatch(tx, matchId);
-      if (existing) return this.applyDeadline(tx, existing);
-      if (match.status !== "FINISHED" || !match.rosterConfirmedAt)
-        throw new ApplicationError(
-          "roster_not_confirmed",
-          "Final roster is not confirmed",
-          409,
-        );
-      const [sportingResult] = await tx
-        .select({ status: matchSportingResults.status })
-        .from(matchSportingResults)
-        .where(eq(matchSportingResults.matchId, matchId))
-        .limit(1);
-      if (!sportingResult || sportingResult.status !== "CONFIRMED")
-        throw new ApplicationError(
-          "sporting_result_not_confirmed",
-          "Sporting result must be confirmed before Voting opens",
-          409,
-        );
-      const now = this.clock();
-      const eligibleAfter = this.eligibleAfter(match);
-      if (now < eligibleAfter)
-        throw new ApplicationError(
-          "voting_not_eligible_yet",
-          "Voting is not eligible yet",
-          409,
-          { votingEligibleAfter: eligibleAfter.toISOString() },
-        );
-      const session = {
-        id: randomUUID(),
-        matchId,
-        status: "OPEN" as const,
-        openedAt: now,
-        closesAt: new Date(
-          now.getTime() + VOTING_V1_CONFIG.durationHours * 3_600_000,
-        ),
-      };
-      await tx.insert(votingSessions).values(session);
-      return session;
+      return this.ensureSession(tx, match);
     });
   }
 
@@ -93,21 +56,17 @@ export class VotingService {
     return this.database.transaction(async (tx) => {
       const match = await this.lockMatch(tx, matchId);
       await this.requireRead(tx, actorPlayerId, match.groupId);
-      const session = await this.sessionByMatch(tx, matchId);
-      if (!session)
-        throw new ApplicationError(
-          "voting_not_found",
-          "Voting session not found",
-          404,
-        );
-      const effective = await this.applyDeadline(tx, session);
+      const existing = await this.sessionByMatch(tx, matchId);
+      const effective = existing
+        ? await this.applyDeadline(tx, existing)
+        : await this.ensureSession(tx, match);
       const targets = await this.playedParticipants(tx, matchId);
       const [ownBallot] = await tx
         .select({ id: votingBallots.id, mode: votingBallots.mode })
         .from(votingBallots)
         .where(
           and(
-            eq(votingBallots.sessionId, session.id),
+            eq(votingBallots.sessionId, effective.id),
             eq(votingBallots.voterPlayerId, actorPlayerId),
           ),
         )
@@ -435,7 +394,7 @@ export class VotingService {
         .update(votingSessions)
         .set({
           status: "CLOSED",
-          closedAt: now,
+          closedAt: session.closesAt,
           closeReason: "DEADLINE",
           updatedAt: now,
         })
@@ -443,18 +402,69 @@ export class VotingService {
       return {
         ...session,
         status: "CLOSED" as const,
-        closedAt: now,
+        closedAt: session.closesAt,
         closeReason: "DEADLINE" as const,
       };
     }
     return session;
   }
 
-  private eligibleAfter(match: typeof matches.$inferSelect) {
-    return new Date(
-      match.scheduledAt.getTime() +
-        (match.durationMinutes + VOTING_V1_CONFIG.gracePeriodMinutes) * 60_000,
+  private async ensureSession(
+    tx: Transaction,
+    match: typeof matches.$inferSelect,
+  ) {
+    const existing = await this.sessionByMatch(tx, match.id);
+    if (existing) return this.applyDeadline(tx, existing);
+    if (match.status !== "FINISHED" || !match.rosterConfirmedAt)
+      throw new ApplicationError(
+        "roster_not_confirmed",
+        "Final roster is not confirmed",
+        409,
+      );
+    const [sportingResult] = await tx
+      .select({
+        status: matchSportingResults.status,
+        confirmedAt: matchSportingResults.confirmedAt,
+      })
+      .from(matchSportingResults)
+      .where(eq(matchSportingResults.matchId, match.id))
+      .limit(1);
+    if (
+      !sportingResult ||
+      sportingResult.status !== "CONFIRMED" ||
+      !sportingResult.confirmedAt
+    )
+      throw new ApplicationError(
+        "sporting_result_not_confirmed",
+        "Sporting result must be confirmed before Voting opens",
+        409,
+      );
+    const openedAt = votingOpensAt(
+      match.scheduledAt,
+      match.durationMinutes,
+      sportingResult.confirmedAt,
     );
+    const now = this.clock();
+    if (now < openedAt)
+      throw new ApplicationError(
+        "voting_not_eligible_yet",
+        "Voting is not eligible yet",
+        409,
+        { votingEligibleAfter: openedAt.toISOString() },
+      );
+    const session = {
+      id: randomUUID(),
+      matchId: match.id,
+      status: "OPEN" as const,
+      openedAt,
+      closesAt: votingClosesAt(openedAt),
+      closedAt: null,
+      closeReason: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await tx.insert(votingSessions).values(session);
+    return this.applyDeadline(tx, session);
   }
 
   private sessionByMatch(db: Transaction, matchId: string) {

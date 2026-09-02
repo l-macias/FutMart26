@@ -47,6 +47,27 @@
   gap: var(--space-2);
 }
 
+.notificationUtility {
+  position: relative;
+}
+
+.unreadBadge {
+  position: absolute;
+  inset-block-start: calc(var(--space-1) * -1);
+  inset-inline-end: calc(var(--space-1) * -1);
+  display: grid;
+  min-inline-size: var(--space-5);
+  block-size: var(--space-5);
+  place-items: center;
+  padding-inline: var(--space-1);
+  border: var(--border-width-thin) solid var(--background-canvas);
+  border-radius: var(--radius-round);
+  background: var(--accent-primary);
+  color: var(--background-canvas);
+  font: 800 var(--type-metadata-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+}
+
 .utilities svg {
   inline-size: var(--space-5);
   stroke: currentColor;

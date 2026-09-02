@@ -1,6 +1,6 @@
 import { Button, Text } from "@football/ui";
 
-import type { VotingParticipantView } from "./voting-mock-content";
+import type { VotingParticipantView } from "./voting-types";
 import styles from "./voting.module.css";
 
 export type QuickCategory = "standout" | "improvement";

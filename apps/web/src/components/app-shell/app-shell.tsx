@@ -1,23 +1,34 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { IconButton, Text } from "@football/ui";
 
+import { api } from "@/lib/api/resources";
+import { queryKeys } from "@/lib/api/query-keys";
+import { authClient } from "@/lib/auth/auth-client";
 import styles from "./app-shell.module.css";
 
 const navigation = [
-  { href: "/", label: "Home", mark: "01" },
+  { href: "/", label: "Inicio", mark: "01" },
   { href: "/play", label: "Jugar", mark: "02" },
   { href: "/groups", label: "Grupos", mark: "03" },
-  { href: "/rankings", label: "Rankings", mark: "04" },
+  { href: "/rankings/global", label: "Rankings", mark: "04" },
   { href: "/profile", label: "Perfil", mark: "05" },
 ] as const;
 
 export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const unread = useQuery({
+    queryKey: queryKeys.notificationUnreadCount,
+    queryFn: api.notificationUnreadCount,
+  });
 
   return (
     <div className={styles.shell}>
@@ -37,9 +48,29 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         </Link>
 
         <div className={styles.utilities}>
-          <IconButton disabled label="Notificaciones, próximamente">
+          <Link
+            aria-label="Buscar jugadores"
+            className="ui-icon-button"
+            href="/players"
+          >
+            <SearchIcon />
+          </Link>
+          <Link
+            aria-label={
+              unread.data?.count
+                ? `Notificaciones, ${unread.data.count} sin leer`
+                : "Notificaciones"
+            }
+            className={`${styles.notificationUtility} ui-icon-button`}
+            href="/notifications"
+          >
             <NotificationIcon />
-          </IconButton>
+            {unread.data?.count ? (
+              <span aria-hidden="true" className={styles.unreadBadge}>
+                {unread.data.count > 99 ? "99+" : unread.data.count}
+              </span>
+            ) : null}
+          </Link>
           <Link
             aria-label="Abrir perfil"
             className="ui-icon-button"
@@ -47,6 +78,18 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           >
             <ProfileIcon />
           </Link>
+          <IconButton
+            label="Cerrar sesión"
+            onClick={() => {
+              void authClient.signOut().then((result) => {
+                if (result.error) return;
+                queryClient.clear();
+                router.replace("/auth");
+              });
+            }}
+          >
+            <LogoutIcon />
+          </IconButton>
         </div>
       </header>
 
@@ -89,11 +132,29 @@ function NotificationIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+      <circle cx="10.5" cy="10.5" r="5.5" />
+      <path d="m15 15 4 4" />
+    </svg>
+  );
+}
+
 function ProfileIcon() {
   return (
     <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
       <circle cx="12" cy="8" r="3" />
       <path d="M6.5 19a5.5 5.5 0 0 1 11 0" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
+      <path d="M10 5H5v14h5" />
+      <path d="M13 8l4 4-4 4M8 12h9" />
     </svg>
   );
 }

@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: football_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d football_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/football_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/football_test
+      BETTER_AUTH_SECRET: ci-only-secret-with-at-least-32-characters
+      BETTER_AUTH_URL: http://localhost:4000
+      AUTH_REQUIRE_EMAIL_VERIFICATION: "false"
+      NEXT_PUBLIC_AUTH_REQUIRE_EMAIL_VERIFICATION: "false"
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      WEB_URL: http://localhost:3000
+      ADMIN_URL: http://localhost:3001
+      SUPPORT_EMAIL: support@example.test
+      OBJECT_STORAGE_ENABLED: "false"
+      NODE_ENV: test
+      LOG_LEVEL: silent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test --force
+      - run: pnpm build
+      - run: pnpm format:check
+      - run: git diff --check
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: football_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d football_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/football_e2e
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/football_e2e
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e:critical
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-artifacts
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7

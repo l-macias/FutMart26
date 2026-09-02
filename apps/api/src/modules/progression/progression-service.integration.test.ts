@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 
 import { createDatabase } from "@football/database";
+import { progressionHistoryQuerySchema } from "@football/contracts";
 import {
   authUser,
   groupMemberships,
@@ -23,6 +24,7 @@ import { MatchService } from "../matches/match-service.js";
 import { MatchResultService } from "../matches/match-result-service.js";
 import { MatchTeamService } from "../matches/match-team-service.js";
 import { VotingService } from "../voting/voting-service.js";
+import { RewardService } from "../rewards/reward-service.js";
 import { seedGroupGuest } from "../../test-support/group-guest.js";
 import {
   PROGRESSION_V1_1_CONFIG,
@@ -30,6 +32,8 @@ import {
   progressionConfigSchema,
 } from "./progression-config.js";
 import { ProgressionService } from "./progression-service.js";
+import { ProgressionHistoryService } from "./progression-history-service.js";
+import { ProgressionRevealService } from "./progression-reveal-service.js";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const safeUrl =
@@ -63,12 +67,20 @@ void test(
     const playerService = new PlayerService(connection.db);
     const groups = new GroupService(connection.db);
     const matchService = new MatchService(connection.db);
-    const completion = new MatchCompletionService(connection.db);
-    const teams = new MatchTeamService(connection.db);
-    const results = new MatchResultService(connection.db);
     let now = new Date("2028-01-01T12:00:00.000Z");
+    const completion = new MatchCompletionService(connection.db, () => now);
+    const teams = new MatchTeamService(connection.db);
+    const results = new MatchResultService(connection.db, () => now);
     const voting = new VotingService(connection.db, () => now);
     const progression = new ProgressionService(connection.db, () => now);
+    const rewards = new RewardService(connection.db);
+    const history = new ProgressionHistoryService(connection.db);
+    const reveals = new ProgressionRevealService(
+      connection.db,
+      progression,
+      rewards,
+      () => now,
+    );
 
     const [configRow] = await connection.db
       .select()
@@ -205,6 +217,22 @@ void test(
       base.members[2]!.id,
     );
     const baseSession = await voting.open(base.owner.id, baseMatch.match.id);
+    assert.equal(
+      (await reveals.get(base.owner.id, baseMatch.match.id)).status,
+      "VOTING_OPEN",
+    );
+    await assert.rejects(
+      () => reveals.get(base.members[1]!.id, baseMatch.match.id),
+      hasCode("forbidden"),
+    );
+    await assert.rejects(
+      () => reveals.get(base.members[2]!.id, baseMatch.match.id),
+      hasCode("forbidden"),
+    );
+    await assert.rejects(
+      () => reveals.get(baseMatch.guest!.id, baseMatch.match.id),
+      hasCode("forbidden"),
+    );
     await assert.rejects(
       () => progression.processMatch(baseMatch.match.id),
       hasCode("progression_not_ready"),
@@ -230,6 +258,50 @@ void test(
     );
     assert.equal(ownerPerformance?.internalOvr, "60.000000000000");
     assert.equal(ownerPerformance?.processedMatchCount, 1);
+    const noEvidenceReveal = await reveals.get(
+      base.owner.id,
+      baseMatch.match.id,
+    );
+    assert.equal(noEvidenceReveal.status, "AVAILABLE");
+    if (noEvidenceReveal.status === "AVAILABLE") {
+      assert.equal(noEvidenceReveal.snapshot.processingOutcome, "NO_EVIDENCE");
+      assert.equal(
+        noEvidenceReveal.snapshot.overall.before,
+        noEvidenceReveal.snapshot.overall.after,
+      );
+      assert.equal(noEvidenceReveal.snapshot.aggregatedRating, null);
+    }
+    const noEvidenceHistory = await history.list(base.owner.id, { limit: 20 });
+    assert.equal(noEvidenceHistory.items.length, 1);
+    assert.equal(
+      noEvidenceHistory.items[0]?.snapshot.processingOutcome,
+      "NO_EVIDENCE",
+    );
+    assert.equal(noEvidenceHistory.items[0]?.snapshot.aggregatedRating, null);
+    assert.equal(noEvidenceHistory.items[0]?.context.group.id, base.group.id);
+    assert.deepEqual(noEvidenceHistory.items[0]?.context.result, {
+      teamAGoals: 0,
+      teamBGoals: 0,
+      winner: "DRAW",
+    });
+    assert.equal(
+      (await history.list(base.members[1]!.id, { limit: 20 })).items.length,
+      0,
+    );
+    const alreadyMaterialized = await Promise.all([
+      reveals.materialize(base.owner.id, baseMatch.match.id),
+      reveals.materialize(base.owner.id, baseMatch.match.id),
+    ]);
+    assert.ok(alreadyMaterialized.every((item) => item.status === "AVAILABLE"));
+    assert.ok(
+      alreadyMaterialized.every(
+        (item) =>
+          item.status === "AVAILABLE" &&
+          item.rewards.achievements.some(
+            (achievement) => achievement.type === "FIRST_MATCH",
+          ),
+      ),
+    );
     assert.equal(
       basePerformances.some((row) => row.playerId === base.members[1]!.id),
       false,
@@ -289,6 +361,173 @@ void test(
       2,
     );
 
+    // History is private by construction, strictly validated and keyset-paginated.
+    assert.deepEqual(progressionHistoryQuerySchema.parse({}), { limit: 20 });
+    assert.equal(
+      progressionHistoryQuerySchema.parse({ limit: "50" }).limit,
+      50,
+    );
+    assert.throws(() => progressionHistoryQuerySchema.parse({ limit: 51 }));
+    assert.throws(() =>
+      progressionHistoryQuerySchema.parse({ playerId: base.members[0]!.id }),
+    );
+    await assert.rejects(
+      () => history.list(base.owner.id, { limit: 1, cursor: "not+a+cursor" }),
+      hasCode("invalid_cursor"),
+    );
+    const firstHistoryPage = await history.list(base.owner.id, { limit: 1 });
+    assert.equal(firstHistoryPage.items.length, 1);
+    assert.equal(
+      firstHistoryPage.items[0]?.context.matchId,
+      votedMatch.match.id,
+    );
+    assert.ok(firstHistoryPage.nextCursor);
+    const secondHistoryPage = await history.list(base.owner.id, {
+      limit: 1,
+      cursor: firstHistoryPage.nextCursor,
+    });
+    assert.equal(secondHistoryPage.items.length, 1);
+    assert.equal(
+      secondHistoryPage.items[0]?.context.matchId,
+      baseMatch.match.id,
+    );
+    assert.equal(secondHistoryPage.nextCursor, null);
+    assert.notEqual(
+      firstHistoryPage.items[0]?.context.matchId,
+      secondHistoryPage.items[0]?.context.matchId,
+    );
+
+    // Equal scheduled times use Match UUID as the stable canonical tie-break.
+    const tiedScheduledAt = new Date("2027-03-01T10:00:00.000Z");
+    const tiedMatches = await Promise.all([
+      completedMatch(
+        base.owner.id,
+        base.group.id,
+        [base.owner.id, base.members[0]!.id],
+        tiedScheduledAt,
+      ),
+      completedMatch(
+        base.owner.id,
+        base.group.id,
+        [base.owner.id, base.members[0]!.id],
+        tiedScheduledAt,
+      ),
+    ]);
+    const tiedAscending = [...tiedMatches].sort((left, right) =>
+      left.match.id.localeCompare(right.match.id),
+    );
+    now = new Date(now.getTime() + 19 * 60 * 60 * 1000);
+    await progression.processMatch(tiedAscending[0]!.match.id);
+    await progression.processMatch(tiedAscending[1]!.match.id);
+    const tiedHistory = await history.list(base.owner.id, { limit: 2 });
+    assert.deepEqual(
+      tiedHistory.items.map((item) => item.context.matchId),
+      [...tiedAscending].reverse().map((item) => item.match.id),
+    );
+    assert.ok(
+      tiedHistory.items.every(
+        (item) => item.snapshot.configVersion === PROGRESSION_V1_1_VERSION,
+      ),
+    );
+    const tiedPageOne = await history.list(base.owner.id, { limit: 1 });
+    const tiedPageTwo = await history.list(base.owner.id, {
+      limit: 1,
+      cursor: tiedPageOne.nextCursor!,
+    });
+    assert.deepEqual(
+      [
+        tiedPageOne.items[0]?.context.matchId,
+        tiedPageTwo.items[0]?.context.matchId,
+      ],
+      [...tiedAscending].reverse().map((item) => item.match.id),
+    );
+
+    // The read model preserves the immutable config reference of every row.
+    const versioned = await groupWithMembers("versioned history", 0);
+    const versionedMatches = await Promise.all([
+      completedMatch(
+        versioned.owner.id,
+        versioned.group.id,
+        [versioned.owner.id],
+        new Date("2027-06-01T10:00:00.000Z"),
+      ),
+      completedMatch(
+        versioned.owner.id,
+        versioned.group.id,
+        [versioned.owner.id],
+        new Date("2027-06-02T10:00:00.000Z"),
+      ),
+    ]);
+    const [templateSnapshot] = await connection.db
+      .select()
+      .from(progressionSnapshots)
+      .where(eq(progressionSnapshots.matchId, tiedAscending[0]!.match.id))
+      .limit(1);
+    assert.ok(templateSnapshot);
+    const futureConfigId = randomUUID();
+    const futureVersion = `history-${randomUUID()}`;
+    await connection.db.insert(progressionConfigVersions).values({
+      id: futureConfigId,
+      discipline: "F5",
+      version: futureVersion,
+      document: PROGRESSION_V1_1_CONFIG,
+      activatedAt: new Date("2500-01-01T00:00:00.000Z"),
+    });
+    await connection.db.insert(progressionSnapshots).values([
+      {
+        ...templateSnapshot,
+        id: randomUUID(),
+        playerId: versioned.owner.id,
+        matchId: versionedMatches[0].match.id,
+        configVersionId: configRow.id,
+      },
+      {
+        ...templateSnapshot,
+        id: randomUUID(),
+        playerId: versioned.owner.id,
+        matchId: versionedMatches[1].match.id,
+        configVersionId: futureConfigId,
+      },
+    ]);
+    const versionedHistory = await history.list(versioned.owner.id, {
+      limit: 20,
+    });
+    assert.deepEqual(
+      versionedHistory.items.map((item) => item.snapshot.configVersion),
+      [futureVersion, PROGRESSION_V1_1_VERSION],
+    );
+
+    // An elapsed window without a materialized VotingSession is processed lazily.
+    const lazy = await groupWithMembers("lazy reveal", 1);
+    const lazyMatch = await completedMatch(
+      lazy.owner.id,
+      lazy.group.id,
+      [lazy.owner.id, lazy.members[0]!.id],
+      new Date("2028-02-01T10:00:00.000Z"),
+    );
+    now = new Date(now.getTime() + 19 * 60 * 60 * 1000);
+    const lazyPending = await reveals.get(lazy.owner.id, lazyMatch.match.id);
+    assert.deepEqual(
+      lazyPending.status === "PROGRESSION_PENDING"
+        ? lazyPending.reason
+        : lazyPending.status,
+      "READY_TO_MATERIALIZE",
+    );
+    const lazyConcurrent = await Promise.all([
+      reveals.materialize(lazy.owner.id, lazyMatch.match.id),
+      reveals.materialize(lazy.owner.id, lazyMatch.match.id),
+    ]);
+    assert.ok(lazyConcurrent.every((item) => item.status === "AVAILABLE"));
+    assert.equal(
+      (
+        await connection.db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(progressionSnapshots)
+          .where(eq(progressionSnapshots.matchId, lazyMatch.match.id))
+      )[0]?.count,
+      2,
+    );
+
     await assert.rejects(
       () =>
         connection.db
@@ -341,7 +580,15 @@ void test(
     if (race[1].status === "rejected")
       assert.ok(hasCode("progression_out_of_order")(race[1].reason));
     await progression.processMatch(early.match.id);
+    const historicalBeforeLater = await reveals.get(
+      ordered.owner.id,
+      early.match.id,
+    );
     await progression.processMatch(late.match.id);
+    assert.deepEqual(
+      await reveals.get(ordered.owner.id, early.match.id),
+      historicalBeforeLater,
+    );
     const orderedPerformance = await connection.db
       .select()
       .from(playerPerformances)
@@ -386,6 +633,13 @@ void test(
       () => progression.processMatch(current.match.id),
       hasCode("progression_out_of_order"),
     );
+    const orderedPending = await reveals.materialize(
+      sorted[0]!.id,
+      current.match.id,
+    );
+    assert.equal(orderedPending.status, "PROGRESSION_PENDING");
+    if (orderedPending.status === "PROGRESSION_PENDING")
+      assert.equal(orderedPending.reason, "EARLIER_MATCH_PENDING");
     const partialSnapshots = await connection.db
       .select({ count: sql<number>`count(*)::int` })
       .from(progressionSnapshots)

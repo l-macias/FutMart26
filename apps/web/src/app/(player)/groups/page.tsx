@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from "@/components/placeholder-screen/placeholder-screen";
+import { GroupsScreen } from "@/features/groups/groups-screen";
 
-export default function GroupsPlaceholderPage() {
-  return <PlaceholderScreen index="03" title="Grupos" />;
+export default function GroupsPage() {
+  return <GroupsScreen />;
 }

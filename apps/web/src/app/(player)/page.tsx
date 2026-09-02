@@ -1,5 +1,5 @@
-import { HomeScreen } from "@/features/home/home-screen";
+import { GlobalHomeScreen } from "@/features/global-home/global-home-screen";
 
 export default function HomePage() {
-  return <HomeScreen />;
+  return <GlobalHomeScreen />;
 }

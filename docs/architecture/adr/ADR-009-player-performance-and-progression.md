@@ -18,7 +18,7 @@ Raw ballots remain evidence. Processing creates one immutable snapshot per Playe
 
 The historical order for a Player is `(Match.scheduledAt, Match.id)`. A Match cannot process for that Player while an earlier effectively-closed, eligible Match lacks a snapshot. This prevents request arrival order from becoming sporting history; the UUID is only a stable tie-break for equal scheduled times.
 
-The Match row serializes whole-Match retries and effective Voting closure. Player-performance rows are provisioned through a unique `(playerId, discipline)` constraint and locked in ascending Player ID order. A unique snapshot constraint provides the final idempotency guard. Distinct Matches touching the same Player therefore consume a single before-state chain; later work either observes the earlier commit or fails with `progression_out_of_order` and can be retried.
+The Match row serializes whole-Match retries and effective Voting closure. Progression derives the effective Voting window from Match timing and sporting-result confirmation, so it does not depend on a prior visit or administrative opening. Once an unmaterialized window has elapsed, Progression may create its session directly as `CLOSED` with `closedAt = closesAt`. Player-performance rows are provisioned through a unique `(playerId, discipline)` constraint and locked in ascending Player ID order. A unique snapshot constraint provides the final idempotency guard. Distinct Matches touching the same Player therefore consume a single before-state chain; later work either observes the earlier commit or fails with `progression_out_of_order` and can be retried.
 
 ## Consequences
 

@@ -1,0 +1,209 @@
+.playerCard {
+  --card-master-rows: 16% 44% 12% 22% 6%;
+
+  position: relative;
+  display: grid;
+  inline-size: clamp(13.75rem, 72vw, 17.5rem);
+  aspect-ratio: 2 / 3;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: transparent;
+  container-type: inline-size;
+  isolation: isolate;
+  animation: card-enter var(--motion-transition-duration)
+    var(--motion-ease-emphasized) both;
+}
+
+.skinLayer,
+.artworkLayer,
+.frameLayer,
+.dataLayer {
+  grid-area: 1 / 1;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.skinLayer {
+  z-index: 1;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.artworkLayer {
+  position: absolute;
+  inset-block-start: 12.78%;
+  inset-inline-start: 15%;
+  z-index: 2;
+  inline-size: 70%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  clip-path: polygon(8% 0, 92% 0, 100% 8%, 100% 100%, 0 100%, 0 8%);
+  background: var(--background-surface);
+}
+
+.artworkLayer img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.frameLayer {
+  z-index: 4;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+}
+
+.playerSilhouette {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  fill: var(--foreground-muted);
+  opacity: 0.42;
+}
+
+.dataLayer {
+  z-index: 5;
+  display: grid;
+  grid-template-rows: var(--card-master-rows);
+  padding: 6%;
+}
+
+.skinFill {
+  fill: var(--background-elevated);
+}
+
+.pitchZone {
+  fill: var(--background-surface);
+  opacity: 0.72;
+}
+
+.pitchMark {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 3;
+  opacity: 0.5;
+}
+
+.outerFrame,
+.innerFrame,
+.accentFrame,
+.statDivider {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.outerFrame {
+  stroke: var(--accent-primary);
+  stroke-width: 6;
+}
+
+.innerFrame,
+.statDivider {
+  stroke: var(--border-strong);
+  stroke-width: 2;
+}
+
+.accentFrame {
+  stroke: var(--accent-primary);
+  stroke-width: 4;
+}
+
+.cardTop {
+  display: flex;
+  min-inline-size: 0;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTop > span {
+  display: grid;
+}
+
+.cardOverall {
+  color: var(--accent-primary);
+  font-size: clamp(2.75rem, 16cqi, 4.75rem);
+  font-weight: 800;
+}
+
+.cardDiscipline {
+  padding-block-start: var(--space-2);
+  color: var(--foreground-primary);
+  font-weight: 800;
+}
+
+.cardName {
+  align-self: end;
+  overflow: hidden;
+  font-size: clamp(2rem, 12cqi, 3.5rem);
+  font-weight: 800;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: center;
+  padding: 0;
+  margin: 0;
+  border-block: var(--border-width-thin) solid var(--border-strong);
+}
+
+.cardStats > div {
+  display: grid;
+  grid-template-columns: auto auto;
+  min-inline-size: 0;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.cardStats dt,
+.cardStats dd {
+  margin: 0;
+  font-family: var(--font-display, var(--font-display-fallback));
+  line-height: var(--type-leading-tight);
+}
+
+.cardStats dt {
+  color: var(--foreground-muted);
+  font-size: clamp(0.625rem, 3.4cqi, var(--type-label-size));
+  font-weight: 700;
+}
+
+.cardStats dd {
+  color: var(--foreground-primary);
+  font-size: clamp(var(--type-label-size), 4.5cqi, var(--type-heading-md-size));
+  font-weight: 800;
+}
+
+.cardFooter {
+  align-self: end;
+  justify-self: center;
+  color: var(--accent-primary);
+  font-size: clamp(0.625rem, 3.5cqi, var(--type-label-size));
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-3));
+  }
+}
+
+@media (min-width: 64rem) {
+  .playerCard {
+    inline-size: clamp(18.75rem, 28vw, 23.75rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playerCard {
+    animation: none;
+  }
+}

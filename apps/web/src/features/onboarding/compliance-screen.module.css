@@ -1,0 +1,65 @@
+.page,
+.header,
+.form,
+.field {
+  display: grid;
+}
+.page {
+  max-inline-size: 42rem;
+  min-block-size: 100dvh;
+  margin-inline: auto;
+  align-content: center;
+  gap: var(--space-6);
+  padding: var(--space-5);
+}
+.header,
+.form {
+  gap: var(--space-4);
+}
+.form {
+  padding: var(--space-5);
+  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
+  background: var(--background-surface);
+}
+.field {
+  gap: var(--space-2);
+  color: var(--foreground-muted);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.field input {
+  min-block-size: var(--touch-target-min);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--background-canvas);
+  color: var(--foreground-primary);
+}
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.check input {
+  inline-size: 1.2rem;
+  block-size: 1.2rem;
+  accent-color: var(--accent-primary);
+}
+.check a {
+  color: var(--accent-primary);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.error {
+  color: var(--state-negative);
+}
+.state {
+  display: grid;
+  min-block-size: 100dvh;
+  place-items: center;
+  padding: var(--space-5);
+  color: var(--foreground-muted);
+}

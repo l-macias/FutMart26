@@ -86,6 +86,20 @@ Use TanStack Query or equivalent.
 
 Do not duplicate API state into a global client store without a concrete need.
 
+### Query reliability policy
+
+The QueryClient does not retry domain/auth/validation failures. Network reads
+may retry twice; server failures retry once. Mutations never retry globally.
+Default freshness is 30 seconds with explicit categories available to features:
+
+- volatile (Match/Voting/Notifications): 10 seconds;
+- semi-stable (Rankings/Discovery/Activity): 60 seconds;
+- stable (identity/policies/catalogs): 5 minutes.
+
+Logout and account deletion clear private cache. Product mutations invalidate
+only affected projections. Search requests receive TanStack's `AbortSignal` so
+obsolete responses cannot replace newer results.
+
 ## Local state
 
 Prefer component/local feature state.

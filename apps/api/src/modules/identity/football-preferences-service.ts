@@ -25,6 +25,7 @@ export class FootballPreferencesService {
     return row
       ? this.present(row)
       : {
+          configured: false,
           discipline: "F5" as const,
           preferredRoles: [] as FootballRole[],
           willingToPlayGoalkeeper: false,
@@ -61,6 +62,7 @@ export class FootballPreferencesService {
 
   private present(row: typeof playerFootballPreferences.$inferSelect) {
     return {
+      configured: true,
       discipline: "F5" as const,
       preferredRoles: row.preferredRoles,
       willingToPlayGoalkeeper: row.willingToPlayGoalkeeper,

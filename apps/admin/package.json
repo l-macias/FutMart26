@@ -5,14 +5,19 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "build": "next build",
+    "start": "next start --port 3001",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node scripts/check-route-integrity.mjs"
   },
   "dependencies": {
+    "@football/auth": "workspace:*",
+    "@football/contracts": "workspace:*",
     "@tanstack/react-query": "^5.85.5",
     "next": "^16.0.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@football/config": "workspace:*",

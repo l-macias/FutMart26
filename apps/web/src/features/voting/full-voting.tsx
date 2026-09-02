@@ -4,7 +4,7 @@ import type {
   EvaluationDraft,
   VotingAttribute,
   VotingParticipantView,
-} from "./voting-mock-content";
+} from "./voting-types";
 import { PlayerEvaluation } from "./player-evaluation";
 import styles from "./voting.module.css";
 

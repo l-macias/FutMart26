@@ -1,0 +1,23 @@
+.dialog {
+  inline-size: min(28rem, calc(100% - var(--space-6)));
+  padding: 0;
+  border: var(--border-width-thin) solid var(--border-accent);
+  background: var(--background-elevated);
+  color: var(--foreground-primary);
+}
+
+.dialog::backdrop {
+  background: color-mix(in srgb, var(--background-canvas) 82%, transparent);
+}
+
+.content {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}

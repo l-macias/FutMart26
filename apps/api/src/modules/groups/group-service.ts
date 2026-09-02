@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@football/database";
 import {
   groupMemberships,
   groupRoleChanges,
   groups,
+  matches,
   players,
 } from "@football/database/schema";
 import { ApplicationError } from "../errors.js";
@@ -49,6 +50,7 @@ export class GroupService {
         id: groups.id,
         name: groups.name,
         status: groups.status,
+        visibility: groups.visibility,
         role: groupMemberships.role,
         capabilities: groupMemberships.capabilities,
       })
@@ -86,18 +88,25 @@ export class GroupService {
       id: group.id,
       name: group.name,
       status: group.status,
+      visibility: group.visibility,
       role: membership.role,
       capabilities: groupCapabilities(membership.role, membership.capabilities),
     };
   }
 
-  async members(actorPlayerId: string, groupId: string) {
-    await this.requireCapability(
+  async members(
+    actorPlayerId: string,
+    groupId: string,
+    includeBlocked = false,
+  ) {
+    const actor = await this.requireCapability(
       this.database,
       actorPlayerId,
       groupId,
       "GROUP_READ",
     );
+    if (includeBlocked && actor.role !== "OWNER")
+      throw new ApplicationError("forbidden", "Forbidden", 403);
     const memberships = await this.database
       .select({
         id: groupMemberships.id,
@@ -113,7 +122,9 @@ export class GroupService {
       .where(
         and(
           eq(groupMemberships.groupId, groupId),
-          eq(groupMemberships.status, "ACTIVE"),
+          includeBlocked
+            ? inArray(groupMemberships.status, ["ACTIVE", "BLOCKED"])
+            : eq(groupMemberships.status, "ACTIVE"),
         ),
       )
       .orderBy(asc(groupMemberships.joinedAt), asc(groupMemberships.id))
@@ -122,6 +133,76 @@ export class GroupService {
       ...membership,
       capabilities: groupCapabilities(membership.role, membership.capabilities),
     }));
+  }
+
+  async rename(actorPlayerId: string, groupId: string, name: string) {
+    return this.database.transaction(async (tx) => {
+      await this.lockActiveGroup(tx, groupId);
+      const actor = await this.requireActiveMembership(
+        tx,
+        actorPlayerId,
+        groupId,
+      );
+      if (actor.role !== "OWNER")
+        throw new ApplicationError(
+          "forbidden",
+          "Only the owner can rename the group",
+          403,
+        );
+      const [updated] = await tx
+        .update(groups)
+        .set({ name, updatedAt: new Date() })
+        .where(eq(groups.id, groupId))
+        .returning({
+          id: groups.id,
+          name: groups.name,
+          status: groups.status,
+          visibility: groups.visibility,
+        });
+      return {
+        ...updated!,
+        role: actor.role,
+        capabilities: groupCapabilities(actor.role, actor.capabilities),
+      };
+    });
+  }
+
+  async setVisibility(
+    actorPlayerId: string,
+    groupId: string,
+    visibility: "PUBLIC" | "PRIVATE",
+  ) {
+    return this.database.transaction(async (tx) => {
+      await this.lockActiveGroup(tx, groupId);
+      const actor = await this.requireActiveMembership(
+        tx,
+        actorPlayerId,
+        groupId,
+      );
+      if (actor.role !== "OWNER")
+        throw new ApplicationError(
+          "forbidden",
+          "Only the owner can change group privacy",
+          403,
+        );
+      await tx
+        .update(groups)
+        .set({ visibility, updatedAt: new Date() })
+        .where(eq(groups.id, groupId));
+      return { visibility };
+    });
+  }
+
+  async archive(actorPlayerId: string, groupId: string) {
+    return this.database.transaction(async (tx) => {
+      await this.lockActiveGroup(tx, groupId);
+      await this.requireCapability(tx, actorPlayerId, groupId, "GROUP_ARCHIVE");
+      await this.ensureNoActiveMatches(tx, groupId);
+      await tx
+        .update(groups)
+        .set({ status: "ARCHIVED", updatedAt: new Date() })
+        .where(eq(groups.id, groupId));
+    });
   }
 
   async changeModerator(
@@ -297,14 +378,16 @@ export class GroupService {
         )
         .limit(1);
       const successor = candidates[0];
-      await this.endMembership(tx, actor.id, "LEFT");
       if (!successor) {
+        await this.ensureNoActiveMatches(tx, groupId);
+        await this.endMembership(tx, actor.id, "LEFT");
         await tx
           .update(groups)
           .set({ status: "ARCHIVED", updatedAt: new Date() })
           .where(eq(groups.id, groupId));
         return;
       }
+      await this.endMembership(tx, actor.id, "LEFT");
       await tx
         .update(groupMemberships)
         .set({
@@ -433,6 +516,25 @@ export class GroupService {
         "group_not_found",
         "Active group not found",
         404,
+      );
+  }
+
+  private async ensureNoActiveMatches(db: DatabaseExecutor, groupId: string) {
+    const [activeMatch] = await db
+      .select({ id: matches.id })
+      .from(matches)
+      .where(
+        and(
+          eq(matches.groupId, groupId),
+          inArray(matches.status, ["DRAFT", "OPEN", "STARTED"]),
+        ),
+      )
+      .limit(1);
+    if (activeMatch)
+      throw new ApplicationError(
+        "active_matches_prevent_archive",
+        "Resolve active matches before archiving the group",
+        409,
       );
   }
 
