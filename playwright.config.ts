@@ -19,6 +19,7 @@ const sharedEnvironment = {
   NODE_ENV: "test",
   LOG_LEVEL: "silent",
 };
+const nextServerEnvironment = { ...sharedEnvironment, NODE_ENV: "production" };
 
 export default defineConfig({
   testDir: "./e2e",
@@ -37,23 +38,23 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      command: "pnpm --filter @football/api dev",
+      command: "pnpm --filter @football/api start:e2e",
       url: "http://127.0.0.1:4000/ready",
       env: sharedEnvironment,
       reuseExistingServer: false,
       timeout: 120_000,
     },
     {
-      command: "pnpm --filter @football/web dev",
+      command: "pnpm --filter @football/web start",
       url: "http://127.0.0.1:3000/auth",
-      env: sharedEnvironment,
+      env: nextServerEnvironment,
       reuseExistingServer: false,
       timeout: 120_000,
     },
     {
-      command: "pnpm --filter @football/admin dev",
+      command: "pnpm --filter @football/admin start",
       url: "http://127.0.0.1:3001",
-      env: sharedEnvironment,
+      env: nextServerEnvironment,
       reuseExistingServer: false,
       timeout: 120_000,
     },
