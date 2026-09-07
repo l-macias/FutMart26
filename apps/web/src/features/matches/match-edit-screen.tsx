@@ -82,11 +82,15 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
           queryKey: queryKeys.matches(match.data!.groupId),
         }),
         queryClient.invalidateQueries({
+          queryKey: queryKeys.groupOverview(match.data!.groupId),
+        }),
+        queryClient.invalidateQueries({
           queryKey: queryKeys.recruitmentOpportunities,
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.personalMatchesRoot,
         }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.personalHome }),
       ]);
     },
   });
@@ -122,7 +126,8 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
           Este partido ya no se puede editar.
         </Text>
         <Text tone="muted">
-          Sólo un actor autorizado puede cambiar un partido en Draft u Open.
+          Sólo una persona autorizada puede cambiar un partido en borrador o
+          abierto.
         </Text>
       </main>
     );
@@ -134,10 +139,11 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
       </Link>
       <div>
         <Text tone="accent" variant="label">
-          {match.data.status} · EDITAR PARTIDO
+          {match.data.status === "DRAFT" ? "BORRADOR" : "ABIERTO"} · ADMINISTRAR
+          PARTIDO
         </Text>
-        <Text as="h1" variant="display-lg">
-          Ajustar convocatoria.
+        <Text as="h1" variant="heading-lg">
+          Datos del partido
         </Text>
         <Text tone="muted">
           La disciplina sigue siendo F5. Cambiar fecha, hora o lugar no elimina
@@ -148,7 +154,7 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
       <div className={styles.formGrid}>
         <section className={styles.formSection}>
           <Text as="h2" variant="heading-lg">
-            Cuándo y cuánto.
+            Fecha y cupo
           </Text>
           <label>
             <span>Fecha y hora</span>
@@ -196,7 +202,7 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
 
         <section className={styles.formSection}>
           <Text as="h2" variant="heading-lg">
-            Dónde jugamos.
+            Sede
           </Text>
           <label>
             <span>Buscar sede o escribir ubicación manual</span>

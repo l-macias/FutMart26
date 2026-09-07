@@ -65,7 +65,10 @@ import { AbuseReportService } from "./modules/privacy/abuse-report-service.js";
 import { createAbuseReportRoutes } from "./modules/privacy/abuse-report-routes.js";
 import { AdminService } from "./modules/admin/admin-service.js";
 import { createAdminRoutes } from "./modules/admin/admin-routes.js";
+import { AdminErrorBuffer } from "./modules/admin/admin-error-buffer.js";
 import { ReadinessService } from "./runtime/readiness.js";
+import { createHomeRoutes } from "./modules/home/home-routes.js";
+import { HomeService } from "./modules/home/home-service.js";
 
 export function buildApp(
   config: ApiConfig,
@@ -75,6 +78,7 @@ export function buildApp(
     storage?: StorageProvider;
   },
 ) {
+  const adminErrors = new AdminErrorBuffer();
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
     genReqId: (request) => {
@@ -140,21 +144,33 @@ export function buildApp(
           : isValidationError
             ? 400
             : 500;
+    const errorCode =
+      error instanceof ApplicationError
+        ? error.code
+        : constraint === "group_memberships_active_player_uq"
+          ? "already_member"
+          : constraint === "group_memberships_active_owner_uq"
+            ? "ownership_invariant_violation"
+            : constraint === "match_participants_active_player_uq"
+              ? "already_joined"
+              : databaseConflict
+                ? "concurrency_conflict"
+                : statusCode === 400
+                  ? "bad_request"
+                  : "internal_server_error";
+    adminErrors.record({
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      requestId: request.id,
+      method: request.method,
+      route: request.routeOptions.url ?? request.url.split("?", 1)[0] ?? "/",
+      status: statusCode,
+      durationMs: Math.max(0, Math.round(reply.elapsedTime)),
+      errorCode,
+      safeMessage: "",
+    });
     return reply.status(statusCode).send({
-      error:
-        error instanceof ApplicationError
-          ? error.code
-          : constraint === "group_memberships_active_player_uq"
-            ? "already_member"
-            : constraint === "group_memberships_active_owner_uq"
-              ? "ownership_invariant_violation"
-              : constraint === "match_participants_active_player_uq"
-                ? "already_joined"
-                : databaseConflict
-                  ? "concurrency_conflict"
-                  : statusCode === 400
-                    ? "bad_request"
-                    : "internal_server_error",
+      error: errorCode,
       requestId: request.id,
       ...(error instanceof ApplicationError && error.details
         ? { details: error.details }
@@ -291,6 +307,7 @@ export function buildApp(
       adminService,
       config,
       readiness,
+      adminErrors,
     ),
   );
   app.register(
@@ -389,6 +406,19 @@ export function buildApp(
       dependencies.auth,
       new PlayerService(dependencies.database),
       notificationService,
+    ),
+  );
+  app.register(
+    createHomeRoutes(
+      dependencies.auth,
+      new PlayerService(dependencies.database),
+      new HomeService(
+        new MatchService(dependencies.database, recruitmentService),
+        recruitmentService,
+        notificationService,
+        new PlayerPerformanceReadService(dependencies.database),
+        new GlobalRankingService(dependencies.database),
+      ),
     ),
   );
   app.register(

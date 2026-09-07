@@ -115,7 +115,8 @@ export function ResetPasswordScreen({
             autoComplete="new-password"
             disabled={!token}
             label="Nueva contraseña"
-            minLength={12}
+            maxLength={128}
+            minLength={8}
             name="password"
             type="password"
           />
@@ -123,7 +124,8 @@ export function ResetPasswordScreen({
             autoComplete="new-password"
             disabled={!token}
             label="Confirmar contraseña"
-            minLength={12}
+            maxLength={128}
+            minLength={8}
             name="confirmation"
             type="password"
           />
@@ -255,6 +257,7 @@ function Field({
   autoComplete: string;
   disabled?: boolean;
   label: string;
+  maxLength?: number;
   minLength?: number;
   name: string;
   type: string;

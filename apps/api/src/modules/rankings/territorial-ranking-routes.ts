@@ -39,6 +39,9 @@ export function createTerritorialRankingRoutes(
         query,
       );
     });
+    app.get("/rankings/contexts/F5", async (request) =>
+      rankings.contexts((await actor(request)).id),
+    );
     app.get("/rankings/cities/:cityKey/F5", async (request) => {
       const { cityKey } = cityRankingParamsSchema.parse(request.params);
       const query = territorialRankingQuerySchema.parse(request.query);

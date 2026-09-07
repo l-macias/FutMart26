@@ -11,6 +11,21 @@ const optionalNonEmpty = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.string().min(1).optional(),
 );
+const optionalUrl = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.url().optional(),
+);
+const optionalGitSha = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z
+    .string()
+    .regex(/^[0-9a-f]{40}$/i, "GIT_SHA must be a full 40-character SHA")
+    .optional(),
+);
+const optionalBuildTimestamp = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.iso.datetime().optional(),
+);
 
 const trustProxy = z.preprocess((value) => {
   if (value === undefined || value === "") return false;
@@ -60,19 +75,21 @@ const environmentSchema = z
     SMTP_HOST: optionalNonEmpty,
     SMTP_PORT: z.coerce.number().int().positive().max(65_535).default(587),
     SMTP_SECURE: environmentBoolean.default(false),
+    SMTP_REQUIRE_TLS: environmentBoolean.default(true),
     SMTP_USER: optionalNonEmpty,
     SMTP_PASSWORD: optionalNonEmpty,
     MAIL_FROM: optionalNonEmpty,
     OBJECT_STORAGE_ENABLED: environmentBoolean.default(false),
-    OBJECT_STORAGE_ENDPOINT: z.url().optional(),
+    OBJECT_STORAGE_ENDPOINT: optionalUrl,
     OBJECT_STORAGE_REGION: z.string().min(1).default("us-east-1"),
-    OBJECT_STORAGE_BUCKET: z.string().min(1).optional(),
-    OBJECT_STORAGE_ACCESS_KEY: z.string().min(1).optional(),
-    OBJECT_STORAGE_SECRET_KEY: z.string().min(1).optional(),
+    OBJECT_STORAGE_BUCKET: optionalNonEmpty,
+    OBJECT_STORAGE_ACCESS_KEY: optionalNonEmpty,
+    OBJECT_STORAGE_SECRET_KEY: optionalNonEmpty,
     OBJECT_STORAGE_FORCE_PATH_STYLE: environmentBoolean.default(true),
     OBJECT_STORAGE_READINESS_CHECK: environmentBoolean.default(true),
     APP_VERSION: optionalNonEmpty,
-    GIT_SHA: optionalNonEmpty,
+    GIT_SHA: optionalGitSha,
+    BUILD_TIMESTAMP: optionalBuildTimestamp,
   })
   .superRefine((value, context) => {
     if (value.OBJECT_STORAGE_ENABLED) {
@@ -112,6 +129,15 @@ const environmentSchema = z
           message: "BETTER_AUTH_URL must use HTTPS in production",
         });
       }
+      if (
+        value.OBJECT_STORAGE_ENDPOINT &&
+        !value.OBJECT_STORAGE_ENDPOINT.startsWith("https://")
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["OBJECT_STORAGE_ENDPOINT"],
+          message: "OBJECT_STORAGE_ENDPOINT must use HTTPS in production",
+        });
       for (const [key, url] of [
         ["WEB_URL", value.WEB_URL],
         ["ADMIN_URL", value.ADMIN_URL],
@@ -137,6 +163,18 @@ const environmentSchema = z
           path: ["OBJECT_STORAGE_ENABLED"],
           message: "Object storage must be enabled in production",
         });
+      for (const key of [
+        "APP_VERSION",
+        "GIT_SHA",
+        "BUILD_TIMESTAMP",
+      ] as const) {
+        if (!value[key])
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: `${key} is required in production`,
+          });
+      }
     }
   });
 

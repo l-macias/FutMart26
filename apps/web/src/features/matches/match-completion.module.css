@@ -1,7 +1,7 @@
 .page {
   display: grid;
   min-inline-size: 0;
-  gap: var(--space-7);
+  gap: var(--section-gap);
   max-inline-size: var(--content-wide);
   margin-inline: auto;
   padding-block-end: var(--space-8);
@@ -14,7 +14,7 @@
 .review {
   display: grid;
   min-inline-size: 0;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 .header > a,
 .doneActions a {
@@ -68,7 +68,7 @@
   display: grid;
   min-inline-size: 0;
   gap: var(--space-3);
-  padding: var(--space-5);
+  padding: var(--space-4);
 }
 .attendance {
   display: grid;
@@ -82,6 +82,7 @@
   background: transparent;
   color: inherit;
   text-align: start;
+  cursor: pointer;
 }
 .attendance[aria-pressed="true"] > span {
   color: var(--accent-primary);
@@ -186,9 +187,11 @@
 .dialog {
   inline-size: min(30rem, calc(100% - var(--space-6)));
   padding: 0;
-  border: var(--border-width-thin) solid var(--border-accent);
-  background: var(--background-elevated);
+  border: var(--border-width-thin) solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  background: var(--color-overlay);
   color: var(--foreground-primary);
+  box-shadow: var(--elevation-overlay);
 }
 .dialog::backdrop {
   background: color-mix(in srgb, var(--background-canvas) 82%, transparent);

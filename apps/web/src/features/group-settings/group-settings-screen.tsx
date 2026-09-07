@@ -3,11 +3,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
-import { Button, Text } from "@football/ui";
+import { Badge, Button, Text } from "@football/ui";
 import type { MembershipResponse } from "@football/contracts";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
+import { InviteConnectionControl } from "@/features/directed-invitations/invite-connection-control";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -19,6 +26,8 @@ type Command = {
   confirmLabel: string;
   run: () => Promise<void>;
   leaveAfter?: boolean;
+  successMessage?: string;
+  tone?: "default" | "danger";
 };
 type Capability = MembershipResponse["capabilities"][number];
 
@@ -42,6 +51,11 @@ const capabilityLabels: Partial<Record<Capability, string>> = {
 };
 
 const configurableCapabilities = Object.keys(capabilityLabels) as Capability[];
+const roleLabels: Record<MembershipResponse["role"], string> = {
+  OWNER: "PROPIETARIO",
+  MODERATOR: "MOD",
+  MEMBER: "Miembro",
+};
 
 export function GroupSettingsScreen({
   groupId,
@@ -51,6 +65,16 @@ export function GroupSettingsScreen({
   const [confirm, setConfirm] = useState<Command | null>(null);
   const [name, setName] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [createdInvitationUrl, setCreatedInvitationUrl] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timeout = window.setTimeout(() => setFeedback(null), 3_500);
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
 
   const group = useQuery({
     queryKey: queryKeys.group(groupId),
@@ -91,6 +115,7 @@ export function GroupSettingsScreen({
     onSuccess: async (_, item) => {
       await invalidateGroupManagement(queryClient, groupId);
       setConfirm(null);
+      setFeedback(item.successMessage ?? "Cambios guardados.");
       if (item.leaveAfter) router.push("/groups");
     },
   });
@@ -131,9 +156,9 @@ export function GroupSettingsScreen({
     "GROUP_MANAGE_GUEST_POLICY",
   );
 
-  async function submitRename(event: FormEvent<HTMLFormElement>) {
+  function submitRename(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await command.mutateAsync({
+    command.mutate({
       title: "Cambiar nombre",
       message: "",
       confirmLabel: "Guardar",
@@ -149,17 +174,26 @@ export function GroupSettingsScreen({
       <Link className={styles.back} href={`/groups/${groupId}`}>
         ← VOLVER AL GRUPO
       </Link>
-      <header className={styles.hero}>
+      <header className={styles.header}>
         <div>
           <Text tone="accent" variant="label">
-            CONFIGURACIÓN · {group.data.status}
+            GRUPO
           </Text>
-          <Text as="h1" variant="display-lg">
+          <Text as="h1" variant="heading-lg">
+            Configuración del grupo
+          </Text>
+          <Text as="h2" className={styles.groupName} variant="heading-md">
             {group.data.name}
           </Text>
-          <Text tone="muted">
-            Operaciones del vestuario según tu rol y permisos actuales.
-          </Text>
+          <div className={styles.headerMeta}>
+            {group.data.role !== "MEMBER" ? (
+              <Badge kind="role">{roleLabels[group.data.role]}</Badge>
+            ) : null}
+            {group.data.visibility === "PRIVATE" ? (
+              <Badge kind="state">PRIVADO</Badge>
+            ) : null}
+            {isArchived ? <Badge kind="state">ARCHIVADO</Badge> : null}
+          </div>
         </div>
       </header>
 
@@ -173,91 +207,104 @@ export function GroupSettingsScreen({
         </section>
       )}
 
-      <section className={styles.section}>
-        <SectionHeading eyebrow="IDENTIDAD" title="Nombre deportivo" />
+      <SettingsSection
+        defaultOpen
+        eyebrow="GENERAL"
+        summary={`${group.data.name} · ${group.data.visibility === "PUBLIC" ? "Público" : "Privado"}`}
+        title="Identidad y privacidad"
+      >
         {isOwner && !isArchived ? (
-          <form
-            className={styles.inlineForm}
-            onSubmit={(event) => void submitRename(event)}
-          >
-            <label>
-              <span>Nombre del grupo</span>
-              <input
-                maxLength={100}
-                onChange={(event) => setName(event.target.value)}
-                placeholder={group.data.name}
-                value={name}
-              />
-            </label>
-            <Button
-              disabled={command.isPending || name.trim().length === 0}
-              type="submit"
-            >
-              Guardar nombre
-            </Button>
-          </form>
+          <>
+            <form className={styles.inlineForm} onSubmit={submitRename}>
+              <label>
+                <span>Nombre del grupo</span>
+                <input
+                  maxLength={100}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder={group.data.name}
+                  value={name}
+                />
+              </label>
+              <Button
+                disabled={command.isPending || name.trim().length === 0}
+                type="submit"
+              >
+                Guardar nombre
+              </Button>
+            </form>
+            <div className={styles.subsection}>
+              <h3>VISIBILIDAD</h3>
+              <p className={styles.muted}>
+                Público permite aparecer en búsqueda. Privado conserva miembros,
+                partidos y permisos, pero deja de aparecer allí.
+              </p>
+              <div className={styles.actions}>
+                <Button
+                  disabled={
+                    command.isPending || group.data.visibility === "PUBLIC"
+                  }
+                  onClick={() =>
+                    command.mutate({
+                      title: "Visibilidad pública",
+                      message: "",
+                      confirmLabel: "Guardar",
+                      run: async () => {
+                        await api.updateGroupPrivacy(groupId, {
+                          visibility: "PUBLIC",
+                        });
+                      },
+                    })
+                  }
+                >
+                  Público
+                </Button>
+                <Button
+                  disabled={
+                    command.isPending || group.data.visibility === "PRIVATE"
+                  }
+                  onClick={() =>
+                    command.mutate({
+                      title: "Visibilidad privada",
+                      message: "",
+                      confirmLabel: "Guardar",
+                      run: async () => {
+                        await api.updateGroupPrivacy(groupId, {
+                          visibility: "PRIVATE",
+                        });
+                      },
+                    })
+                  }
+                  variant="secondary"
+                >
+                  Privado
+                </Button>
+              </div>
+            </div>
+          </>
         ) : (
-          <p className={styles.muted}>Sólo el owner puede cambiar el nombre.</p>
-        )}
-      </section>
-
-      {isOwner ? (
-        <section className={styles.section}>
-          <SectionHeading eyebrow="VISIBILIDAD" title="Discovery del grupo" />
           <p className={styles.muted}>
-            Público permite que el nombre aparezca en búsqueda y actividad
-            destacada. Privado no cambia membresías, partidos ni permisos.
+            El grupo es{" "}
+            {group.data.visibility === "PUBLIC" ? "público" : "privado"}. Sólo
+            el propietario puede cambiar su identidad y privacidad.
           </p>
-          <div className={styles.actions}>
-            <Button
-              disabled={command.isPending || group.data.visibility === "PUBLIC"}
-              onClick={() =>
-                void command.mutateAsync({
-                  title: "Visibilidad pública",
-                  message: "",
-                  confirmLabel: "Guardar",
-                  run: async () => {
-                    await api.updateGroupPrivacy(groupId, {
-                      visibility: "PUBLIC",
-                    });
-                  },
-                })
-              }
-            >
-              Público
-            </Button>
-            <Button
-              disabled={
-                command.isPending || group.data.visibility === "PRIVATE"
-              }
-              onClick={() =>
-                void command.mutateAsync({
-                  title: "Visibilidad privada",
-                  message: "",
-                  confirmLabel: "Guardar",
-                  run: async () => {
-                    await api.updateGroupPrivacy(groupId, {
-                      visibility: "PRIVATE",
-                    });
-                  },
-                })
-              }
-              variant="secondary"
-            >
-              Privado
-            </Button>
-          </div>
-        </section>
-      ) : null}
+        )}
+      </SettingsSection>
 
-      <section className={styles.section}>
-        <SectionHeading eyebrow="EQUIPO" title="Miembros y autoridad" />
-        <div className={styles.rows}>
+      <SettingsSection
+        eyebrow="MIEMBROS"
+        summary={`${activeMembers.length} miembros · roles y permisos delegados`}
+        title="Plantel y autoridad"
+      >
+        <div className={`${styles.rows} ui-list`}>
           {activeMembers.map((member) => (
-            <article className={styles.row} key={member.id}>
+            <article className={`${styles.row} ui-row`} key={member.id}>
               <div>
                 <strong>{member.player.displayName}</strong>
-                <small>{member.role}</small>
+                {member.role !== "MEMBER" ? (
+                  <Badge kind="role">{roleLabels[member.role]}</Badge>
+                ) : (
+                  <small>{roleLabels[member.role]}</small>
+                )}
               </div>
               {!isArchived && member.player.id !== me.data.id && (
                 <div className={styles.actions}>
@@ -270,9 +317,10 @@ export function GroupSettingsScreen({
                           confirmLabel: "Promover",
                           run: () =>
                             api.promoteGroupMember(groupId, member.player.id),
+                          successMessage: "Moderador actualizado.",
                         })
                       }
-                      variant="secondary"
+                      variant="management"
                     >
                       Hacer moderador
                     </Button>
@@ -286,9 +334,10 @@ export function GroupSettingsScreen({
                           confirmLabel: "Quitar rol",
                           run: () =>
                             api.demoteGroupMember(groupId, member.player.id),
+                          successMessage: "Rol de moderador actualizado.",
                         })
                       }
-                      variant="secondary"
+                      variant="management"
                     >
                       Quitar moderador
                     </Button>
@@ -302,9 +351,10 @@ export function GroupSettingsScreen({
                           confirmLabel: "Remover",
                           run: () =>
                             api.removeGroupMember(groupId, member.player.id),
+                          tone: "danger",
                         })
                       }
-                      variant="secondary"
+                      variant="danger"
                     >
                       Remover
                     </Button>
@@ -318,9 +368,10 @@ export function GroupSettingsScreen({
                           confirmLabel: "Bloquear",
                           run: () =>
                             api.blockGroupMember(groupId, member.player.id),
+                          tone: "danger",
                         })
                       }
-                      variant="secondary"
+                      variant="danger"
                     >
                       Bloquear
                     </Button>
@@ -343,6 +394,7 @@ export function GroupSettingsScreen({
                             capabilities,
                           },
                         ),
+                      successMessage: "Permisos guardados.",
                     })
                   }
                 />
@@ -357,7 +409,7 @@ export function GroupSettingsScreen({
               <div className={styles.row} key={member.id}>
                 <div>
                   <strong>{member.player.displayName}</strong>
-                  <small>BLOCKED</small>
+                  <small>BLOQUEADO</small>
                 </div>
                 <Button
                   onClick={() =>
@@ -378,41 +430,64 @@ export function GroupSettingsScreen({
             ))}
           </div>
         )}
-      </section>
-
-      {isOwner && !isArchived && (
-        <section className={styles.section}>
-          <SectionHeading eyebrow="PROPIEDAD" title="Transferir el grupo" />
-          <p className={styles.muted}>
-            La transferencia es atómica. Vos pasarás a ser miembro.
-          </p>
-          <div className={styles.actions}>
-            {activeMembers
-              .filter((member) => member.player.id !== me.data.id)
-              .map((member) => (
-                <Button
-                  key={member.id}
-                  onClick={() =>
-                    setConfirm({
-                      title: "Transferir ownership",
-                      message: `${member.player.displayName} será el único owner y vos quedarás como miembro.`,
-                      confirmLabel: "Transferir",
-                      run: () =>
-                        api.transferGroupOwnership(groupId, member.player.id),
-                    })
-                  }
-                  variant="secondary"
-                >
-                  Transferir a {member.player.displayName}
-                </Button>
-              ))}
-          </div>
-        </section>
-      )}
+      </SettingsSection>
 
       {canManageInvitations && !isArchived && (
-        <section className={styles.section}>
-          <SectionHeading eyebrow="INVITACIONES" title="Accesos emitidos" />
+        <SettingsSection
+          eyebrow="INVITACIONES"
+          summary="Jugadores, conexiones y enlaces activos"
+          title="Invitar al grupo"
+        >
+          <div className={styles.actions}>
+            <InviteConnectionControl destinationId={groupId} kind="group" />
+            <Button
+              disabled={command.isPending}
+              onClick={() =>
+                command.mutate({
+                  title: "Crear enlace",
+                  message: "",
+                  confirmLabel: "Crear",
+                  run: async () => {
+                    const created = await api.createInvitation(groupId, {
+                      type: "SINGLE_USE",
+                    });
+                    setCreatedInvitationUrl(
+                      `${window.location.origin}/invite/${created.token}`,
+                    );
+                  },
+                  successMessage: "Enlace de invitación creado.",
+                })
+              }
+              variant="secondary"
+            >
+              Crear enlace de un uso
+            </Button>
+          </div>
+          {createdInvitationUrl ? (
+            <div className={styles.invitationLink} role="status">
+              <span>ENLACE LISTO</span>
+              <input
+                aria-label="Enlace de invitación creado"
+                readOnly
+                value={createdInvitationUrl}
+              />
+              <Button
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(createdInvitationUrl)
+                    .then(() => setFeedback("Enlace copiado."))
+                    .catch(() =>
+                      setFeedback(
+                        "No pudimos copiarlo automáticamente. Seleccioná el enlace.",
+                      ),
+                    );
+                }}
+                variant="quiet"
+              >
+                Copiar enlace
+              </Button>
+            </div>
+          ) : null}
           <InvitationRows
             directed={directedInvitations.data ?? []}
             loading={invitations.isPending || directedInvitations.isPending}
@@ -439,35 +514,38 @@ export function GroupSettingsScreen({
               {invitations.error?.message ?? directedInvitations.error?.message}
             </p>
           )}
-          <Link
-            className="ui-button ui-button--secondary"
-            href={`/groups/${groupId}`}
-          >
-            Crear o compartir invitación
-          </Link>
-        </section>
+        </SettingsSection>
       )}
 
       {canReadGuests && (guests.isPending || guestPolicy.isPending) && (
-        <section className={styles.section}>
-          <SectionHeading eyebrow="INVITADOS" title="Directorio del grupo" />
+        <SettingsSection
+          eyebrow="INVITADOS"
+          summary="Identidades reutilizables para partidos"
+          title="Directorio del grupo"
+        >
           <p className={styles.muted} role="status">
             Cargando invitados…
           </p>
-        </section>
+        </SettingsSection>
       )}
       {canReadGuests && (guests.isError || guestPolicy.isError) && (
-        <section className={styles.section}>
-          <SectionHeading eyebrow="INVITADOS" title="Directorio del grupo" />
+        <SettingsSection
+          eyebrow="INVITADOS"
+          summary="Identidades reutilizables para partidos"
+          title="Directorio del grupo"
+        >
           <p className={styles.error} role="alert">
             {guests.error?.message ?? guestPolicy.error?.message}
           </p>
-        </section>
+        </SettingsSection>
       )}
 
       {canReadGuests && guests.data && guestPolicy.data && (
-        <section className={styles.section}>
-          <SectionHeading eyebrow="INVITADOS" title="Directorio del grupo" />
+        <SettingsSection
+          eyebrow="INVITADOS"
+          summary={`${guests.data.filter((guest) => guest.status === "ACTIVE").length} activos · archivo reversible`}
+          title="Directorio del grupo"
+        >
           {canManageGuestPolicy && (
             <label className={styles.toggle}>
               <input
@@ -519,7 +597,7 @@ export function GroupSettingsScreen({
               Agregar
             </Button>
           </form>
-          <div className={styles.rows}>
+          <div className={`${styles.rows} ui-list`}>
             {guests.data.map((guest) => (
               <GuestRow
                 canManage={canManageGuests}
@@ -532,15 +610,7 @@ export function GroupSettingsScreen({
                       "Seguirá en el historial, pero no estará disponible para nuevas convocatorias.",
                     confirmLabel: "Archivar",
                     run: () => api.archiveGroupGuest(groupId, guest.id),
-                  })
-                }
-                onRemove={() =>
-                  setConfirm({
-                    title: "Quitar invitado",
-                    message:
-                      "Se conserva la evidencia de sus partidos anteriores.",
-                    confirmLabel: "Quitar",
-                    run: () => api.removeGroupGuest(groupId, guest.id),
+                    tone: "danger",
                   })
                 }
                 onRename={(displayName) =>
@@ -563,7 +633,42 @@ export function GroupSettingsScreen({
               />
             ))}
           </div>
-        </section>
+        </SettingsSection>
+      )}
+
+      {isOwner && !isArchived && (
+        <SettingsSection
+          eyebrow="PROPIEDAD"
+          summary="Transferencia sensible y atómica"
+          title="Propietario del grupo"
+        >
+          <p className={styles.muted}>
+            Sos el propietario actual. Al transferir, la otra persona será la
+            única propietaria y vos pasarás a ser miembro.
+          </p>
+          <div className={styles.actions}>
+            {activeMembers
+              .filter((member) => member.player.id !== me.data.id)
+              .map((member) => (
+                <Button
+                  key={member.id}
+                  onClick={() =>
+                    setConfirm({
+                      title: "Transferir propiedad",
+                      message: `${member.player.displayName} será la única persona propietaria del grupo y vos quedarás como miembro.`,
+                      confirmLabel: "Transferir propiedad",
+                      run: () =>
+                        api.transferGroupOwnership(groupId, member.player.id),
+                      tone: "danger",
+                    })
+                  }
+                  variant="danger"
+                >
+                  Transferir a {member.player.displayName}
+                </Button>
+              ))}
+          </div>
+        </SettingsSection>
       )}
 
       {!isArchived && (
@@ -575,14 +680,15 @@ export function GroupSettingsScreen({
                 setConfirm({
                   title: "Salir del grupo",
                   message: isOwner
-                    ? "El dominio elegirá sucesor entre moderadores y miembros. Si sos el único miembro, el grupo se archivará."
-                    : "Tu membership terminará, pero tu historia deportiva se conserva.",
+                    ? "Se elegirá un sucesor entre moderadores y miembros. Si sos el único miembro, el grupo se archivará."
+                    : "Dejarás de ser miembro, pero tu historia deportiva se conserva.",
                   confirmLabel: "Salir",
                   run: () => api.leaveGroup(groupId),
                   leaveAfter: true,
+                  tone: "danger",
                 })
               }
-              variant="secondary"
+              variant="danger"
             >
               Salir del grupo
             </Button>
@@ -592,11 +698,13 @@ export function GroupSettingsScreen({
                   setConfirm({
                     title: "Archivar grupo",
                     message:
-                      "No se borrará la historia. Debés resolver antes todos los partidos Draft, Open o Started.",
+                      "No se borrará la historia. Debés resolver antes todos los partidos en borrador, abiertos o en juego.",
                     confirmLabel: "Archivar",
                     run: () => api.archiveGroup(groupId),
+                    tone: "danger",
                   })
                 }
+                variant="danger"
               >
                 Archivar grupo
               </Button>
@@ -610,6 +718,11 @@ export function GroupSettingsScreen({
           {command.error.message}
         </p>
       )}
+      {feedback && !command.isError && (
+        <p className={styles.feedback} role="status">
+          {feedback}
+        </p>
+      )}
       <ConfirmDialog
         confirmDisabled={command.isPending}
         confirmLabel={confirm?.confirmLabel ?? "Confirmar"}
@@ -617,6 +730,7 @@ export function GroupSettingsScreen({
         onCancel={() => setConfirm(null)}
         onConfirm={() => confirm && command.mutate(confirm)}
         open={Boolean(confirm)}
+        tone={confirm?.tone}
         title={confirm?.title ?? "Confirmar"}
       />
     </main>
@@ -636,6 +750,44 @@ function SectionHeading({
         {title}
       </Text>
     </header>
+  );
+}
+
+function SettingsSection({
+  children,
+  defaultOpen = false,
+  eyebrow,
+  summary,
+  title,
+}: Readonly<{
+  children: ReactNode;
+  defaultOpen?: boolean;
+  eyebrow: string;
+  summary: string;
+  title: string;
+}>) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <details
+      className={styles.settingsSection}
+      onToggle={(event) => setIsOpen(event.currentTarget.open)}
+      open={isOpen}
+    >
+      <summary>
+        <span>
+          <Text tone="accent" variant="label">
+            {eyebrow}
+          </Text>
+          <Text as="span" variant="heading-lg">
+            {title}
+          </Text>
+        </span>
+        <Text tone="muted" variant="metadata">
+          {summary}
+        </Text>
+      </summary>
+      <div className={styles.settingsContent}>{children}</div>
+    </details>
   );
 }
 
@@ -702,42 +854,46 @@ function InvitationRows({
   }>;
 }>) {
   if (loading) return <p className={styles.muted}>Cargando invitaciones…</p>;
-  if (tokens.length === 0 && directed.length === 0)
-    return <p className={styles.muted}>No hay invitaciones emitidas.</p>;
+  const activeTokens = tokens.filter((item) => item.status === "ACTIVE");
+  const pendingDirected = directed.filter((item) => item.status === "PENDING");
+  if (activeTokens.length === 0 && pendingDirected.length === 0)
+    return (
+      <p className={styles.muted}>
+        Todavía no hay invitaciones pendientes ni enlaces activos.
+      </p>
+    );
   return (
     <div className={styles.rows}>
-      {tokens.map((item) => (
+      {activeTokens.map((item) => (
         <div className={styles.row} key={item.id}>
           <div>
-            <strong>ENLACE · {item.type}</strong>
+            <strong>
+              ENLACE · {item.type === "SINGLE_USE" ? "UN USO" : "TEMPORAL"}
+            </strong>
             <small>
-              {item.status} · {item.useCount} usos · por{" "}
+              ACTIVO · {item.useCount} usos · creado por{" "}
               {item.createdByDisplayName}
             </small>
           </div>
-          {item.status === "ACTIVE" && (
-            <Button onClick={() => onRevokeToken(item.id)} variant="secondary">
-              Revocar
-            </Button>
-          )}
+          <Button onClick={() => onRevokeToken(item.id)} variant="secondary">
+            Revocar
+          </Button>
         </div>
       ))}
-      {directed.map((item) => (
+      {pendingDirected.map((item) => (
         <div className={styles.row} key={item.id}>
           <div>
             <strong>{item.invitedPlayer.displayName}</strong>
-            <small>DIRIGIDA · {item.status}</small>
+            <small>INVITACIÓN DIRECTA · PENDIENTE</small>
           </div>
-          {item.status === "PENDING" && (
-            <Button
-              onClick={() =>
-                onRevokeDirected(item.id, item.invitedPlayer.displayName)
-              }
-              variant="secondary"
-            >
-              Revocar
-            </Button>
-          )}
+          <Button
+            onClick={() =>
+              onRevokeDirected(item.id, item.invitedPlayer.displayName)
+            }
+            variant="secondary"
+          >
+            Revocar
+          </Button>
         </div>
       ))}
     </div>
@@ -748,7 +904,6 @@ function GuestRow({
   canManage,
   guest,
   onArchive,
-  onRemove,
   onRename,
   onRestore,
 }: Readonly<{
@@ -760,7 +915,6 @@ function GuestRow({
     matchesPlayed: number;
   };
   onArchive: () => void;
-  onRemove: () => void;
   onRename: (displayName: string) => void;
   onRestore: () => void;
 }>) {
@@ -770,7 +924,8 @@ function GuestRow({
       <div>
         <strong>{guest.displayName}</strong>
         <small>
-          {guest.status} · {guest.matchesPlayed} partidos
+          {guest.status === "ACTIVE" ? "ACTIVO" : "ARCHIVADO"} ·{" "}
+          {guest.matchesPlayed} partidos
         </small>
       </div>
       {canManage && guest.status !== "DELETED" && (
@@ -799,9 +954,6 @@ function GuestRow({
               Restaurar
             </Button>
           )}
-          <Button onClick={onRemove} variant="secondary">
-            Quitar
-          </Button>
         </div>
       )}
     </div>
@@ -815,6 +967,9 @@ async function invalidateGroupManagement(
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.groups }),
     queryClient.invalidateQueries({ queryKey: queryKeys.group(groupId) }),
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.groupOverview(groupId),
+    }),
     queryClient.invalidateQueries({
       queryKey: ["groups", groupId, "members"],
     }),

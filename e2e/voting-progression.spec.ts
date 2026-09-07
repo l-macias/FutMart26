@@ -39,6 +39,8 @@ test("@critical voting closes and progression appears in reveal/history", async 
     );
     await applyApiSession(owner.api, page.context());
     await page.goto(`/play/matches/${match.id}/progression`);
+    const skipRevealIntro = page.getByRole("button", { name: "Saltar" });
+    if (await skipRevealIntro.isVisible()) await skipRevealIntro.click();
     await expect(
       page.getByText(/OVR|PROGRESIÓN|EVIDENCIA/i).first(),
     ).toBeVisible();

@@ -3,31 +3,42 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 
-import type { NotificationListResponse } from "@football/contracts";
 import { TacticalDivider } from "@football/football-ui";
-import { Button, Surface, Text } from "@football/ui";
+import { Button, Text } from "@football/ui";
 
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import { queryPolicy } from "@/lib/api/query-policy";
+import {
+  formatNotificationTimestamp,
+  notificationEventLabel,
+  type NotificationItem,
+} from "./notification-copy";
+import { refreshNotificationState } from "./notification-state";
 
 import styles from "./notifications.module.css";
 
-type NotificationItem = NotificationListResponse["items"][number];
-
 export function NotificationsScreen() {
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const unread = useQuery({
+    ...queryPolicy.volatile,
+    queryKey: queryKeys.notificationUnreadCount,
+    queryFn: api.notificationUnreadCount,
+  });
   const inbox = useInfiniteQuery({
     ...queryPolicy.volatile,
-    queryKey: queryKeys.notifications,
-    queryFn: ({ pageParam }) => api.notifications(pageParam ?? undefined),
+    queryKey: queryKeys.notificationInbox(unreadOnly),
+    queryFn: ({ pageParam }) =>
+      api.notifications(pageParam ?? undefined, 20, unreadOnly),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
@@ -35,14 +46,13 @@ export function NotificationsScreen() {
     mutationFn: ({ id }: { id: string; href: string }) =>
       api.markNotificationRead(id),
     onSuccess: async (_, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.notificationUnreadCount,
-        }),
-      ]);
+      await refreshNotificationState(queryClient);
       router.push(variables.href);
     },
+  });
+  const markAll = useMutation({
+    mutationFn: api.markAllNotificationsRead,
+    onSuccess: () => refreshNotificationState(queryClient),
   });
 
   if (inbox.isPending) return <PageState title="Buscando novedades…" />;
@@ -69,64 +79,100 @@ export function NotificationsScreen() {
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
-        <Text as="span" tone="accent" variant="label">
-          Bandeja del jugador
-        </Text>
-        <Text as="h1" variant="display-lg">
-          Notificaciones
-        </Text>
-        <Text tone="muted">
-          Votaciones, progreso y cambios importantes de tus partidos.
-        </Text>
+        <div>
+          <Text as="span" tone="accent" variant="label">
+            Tu historial
+          </Text>
+          <Text as="h1" variant="display-lg">
+            Notificaciones
+          </Text>
+          <Text tone="muted">
+            Todo lo que pasó y lo que todavía requiere tu atención.
+          </Text>
+        </div>
+        {(unread.data?.count ?? 0) > 0 ? (
+          <Button
+            disabled={markAll.isPending}
+            onClick={() => markAll.mutate()}
+            variant="quiet"
+          >
+            {markAll.isPending ? "Marcando…" : "Marcar todas como leídas"}
+          </Button>
+        ) : null}
       </header>
       <TacticalDivider />
 
+      <div className={styles.toolbar}>
+        <div
+          aria-label="Filtrar notificaciones"
+          className={styles.filters}
+          role="group"
+        >
+          <button
+            aria-pressed={!unreadOnly}
+            onClick={() => setUnreadOnly(false)}
+            type="button"
+          >
+            Todas
+          </button>
+          <button
+            aria-pressed={unreadOnly}
+            onClick={() => setUnreadOnly(true)}
+            type="button"
+          >
+            No leídas
+          </button>
+        </div>
+      </div>
+
       {items.length === 0 ? (
-        <Surface className={styles.emptyState}>
-          <span aria-hidden="true" className={styles.emptyMark}>
-            F5
-          </span>
+        <div className={styles.emptyState}>
           <Text as="h2" variant="heading-lg">
-            Todo al día
+            {unreadOnly
+              ? "No tenés notificaciones sin leer"
+              : "No tenés notificaciones"}
           </Text>
           <Text tone="muted">
-            Cuando haya una votación, un progreso o un partido cancelado lo vas
-            a encontrar acá.
+            {unreadOnly
+              ? "Todo está al día. Las notificaciones informativas siguen disponibles en Todas."
+              : "Cuando haya novedades importantes las vas a encontrar acá."}
           </Text>
-          <Link className="ui-button ui-button--primary" href="/play">
-            Ir a jugar
-          </Link>
-        </Surface>
+        </div>
       ) : (
         <section className={styles.inbox}>
-          <ol className={styles.notificationList}>
+          <ol className={`${styles.notificationList} ui-list`}>
             {items.map((item) => (
-              <li key={item.id}>
-                <Surface
-                  className={`${styles.notification} ${item.readAt ? styles.read : styles.unread}`}
+              <li
+                className={item.readAt ? styles.read : styles.unread}
+                key={item.id}
+              >
+                <Link
+                  aria-label={`${item.title}. Abrir destino`}
+                  className={`${styles.notificationRow} ui-row`}
+                  href={item.target.href}
+                  onClick={(event) => openNotification(event, item)}
                 >
                   <span aria-hidden="true" className={styles.eventMark} />
-                  <div>
+                  <span className={styles.notificationContent}>
                     <Text as="span" tone="muted" variant="metadata">
-                      {eventLabel(item.type)} ·{" "}
-                      {formatTimestamp(item.createdAt)}
+                      {notificationEventLabel(item.type)} ·{" "}
+                      <time dateTime={item.createdAt}>
+                        {formatNotificationTimestamp(item.createdAt)}
+                      </time>
                     </Text>
-                    <Text as="h2" variant="heading-md">
+                    <Text as="span" variant="heading-md">
                       {item.title}
                     </Text>
-                    <Text tone="muted">{item.body}</Text>
-                    <Link
-                      aria-label={`${item.title}. Abrir destino`}
-                      className={styles.notificationLink}
-                      href={item.target.href}
-                      onClick={(event) => openNotification(event, item)}
-                    >
-                      {markRead.isPending && markRead.variables?.id === item.id
-                        ? "Abriendo…"
-                        : "Ver detalle"}
-                    </Link>
-                  </div>
-                </Surface>
+                    <Text as="span" tone="muted">
+                      {item.body}
+                    </Text>
+                  </span>
+                  <span aria-hidden="true" className={styles.rowAction}>
+                    {markRead.isPending && markRead.variables?.id === item.id
+                      ? "…"
+                      : "→"}
+                  </span>
+                </Link>
               </li>
             ))}
           </ol>
@@ -144,13 +190,13 @@ export function NotificationsScreen() {
               No pudimos cargar más notificaciones.
             </p>
           ) : null}
-          {markRead.isError ? (
-            <p className={styles.error} role="alert">
-              No pudimos marcar la notificación como leída.
-            </p>
-          ) : null}
         </section>
       )}
+      {markRead.isError || markAll.isError ? (
+        <p className={styles.error} role="alert">
+          No pudimos actualizar tus notificaciones. Intentá nuevamente.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -166,27 +212,4 @@ function PageState({
       </Text>
     </div>
   );
-}
-
-function eventLabel(type: NotificationItem["type"]) {
-  return {
-    VOTING_AVAILABLE: "Votación",
-    PROGRESSION_AVAILABLE: "Progresión",
-    MATCH_CANCELLED: "Partido",
-    ACHIEVEMENT_EARNED: "Logro",
-    AWARD_EARNED: "Premio",
-    CONNECTION_REQUESTED: "Conexión",
-    CONNECTION_ACCEPTED: "Conexión",
-    GROUP_INVITATION_RECEIVED: "Invitación",
-    MATCH_INVITATION_RECEIVED: "Invitación",
-  }[type];
-}
-
-function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }

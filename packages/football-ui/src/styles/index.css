@@ -1,4 +1,5 @@
 .football-overall {
+  --overall-value-size: var(--type-score-size);
   display: inline-grid;
   min-inline-size: calc(var(--space-9) + var(--space-5));
   justify-items: center;
@@ -9,10 +10,20 @@
 }
 
 .football-overall__value {
-  font: 800 var(--type-score-size) / var(--type-leading-tight)
+  font: 800 var(--overall-value-size) / var(--type-leading-tight)
     var(--font-display, var(--font-display-fallback));
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--type-tracking-display);
+}
+
+.football-overall--compact {
+  --overall-value-size: var(--type-heading-lg-size);
+  min-inline-size: auto;
+  padding: var(--space-2) var(--space-3);
+}
+
+.football-overall--feature {
+  --overall-value-size: var(--type-display-xl-size);
 }
 
 .football-overall__label {

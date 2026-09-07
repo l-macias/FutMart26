@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "test": "node --env-file-if-exists=../../.env --import tsx --test --test-concurrency=1 src/**/*.test.ts",
     "admin:grant": "node --env-file-if-exists=../../.env --import tsx src/scripts/grant-superadmin.ts",
+    "backup:offsite": "node --env-file-if-exists=../../.env --import tsx src/scripts/upload-backup.ts",
     "prod:check": "node --env-file-if-exists=../../.env --import tsx src/scripts/prod-check.ts"
   },
   "dependencies": {

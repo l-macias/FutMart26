@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, inArray, lt, gte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, gte, sql } from "drizzle-orm";
 
 import type { Database } from "@football/database";
 import {
@@ -209,7 +209,7 @@ export class MatchService {
 
   async listForPlayer(
     actorPlayerId: string,
-    limits: { upcomingLimit: number; recentLimit: number },
+    limits: { upcomingLimit: number; historyLimit: number },
   ) {
     const now = new Date();
     const select = {
@@ -250,6 +250,9 @@ export class MatchService {
         order by participant_self.joined_at desc
         limit 1
       )`,
+      resultStatus: matchSportingResults.status,
+      teamAGoals: matchSportingResults.teamAGoals,
+      teamBGoals: matchSportingResults.teamBGoals,
     };
     const base = () =>
       this.database
@@ -271,33 +274,53 @@ export class MatchService {
             eq(venueCourts.id, matches.courtId),
             eq(venueCourts.venueId, matches.venueId),
           ),
+        )
+        .leftJoin(
+          matchSportingResults,
+          eq(matchSportingResults.matchId, matches.id),
         );
-    const [upcoming, recent] = await Promise.all([
+    const actorParticipated = sql`exists (
+      select 1 from ${matchParticipants} own_participation
+      where own_participation.match_id = ${matches.id}
+        and own_participation.kind = 'PLAYER'
+        and own_participation.player_id = ${actorPlayerId}
+    )`;
+    const actorIsActive = sql`exists (
+      select 1 from ${matchParticipants} own_participation
+      where own_participation.match_id = ${matches.id}
+        and own_participation.kind = 'PLAYER'
+        and own_participation.player_id = ${actorPlayerId}
+        and own_participation.status in ('CONFIRMED', 'WAITLISTED')
+    )`;
+    const [currentRows, upcoming, history] = await Promise.all([
+      base()
+        .where(and(eq(matches.status, "STARTED"), actorIsActive))
+        .orderBy(desc(matches.scheduledAt), asc(matches.id))
+        .limit(1),
       base()
         .where(
           and(
-            inArray(matches.status, ["DRAFT", "OPEN"]),
+            eq(matches.status, "OPEN"),
             gte(matches.scheduledAt, now),
+            actorIsActive,
           ),
         )
         .orderBy(asc(matches.scheduledAt), asc(matches.id))
         .limit(limits.upcomingLimit),
       base()
         .where(
-          or(
-            inArray(matches.status, ["STARTED", "FINISHED"]),
-            and(
-              lt(matches.scheduledAt, now),
-              inArray(matches.status, ["DRAFT", "OPEN"]),
-            ),
+          and(
+            inArray(matches.status, ["FINISHED", "CANCELLED"]),
+            actorParticipated,
           ),
         )
         .orderBy(desc(matches.scheduledAt), asc(matches.id))
-        .limit(limits.recentLimit),
+        .limit(limits.historyLimit),
     ]);
     return {
+      current: currentRows[0] ? this.personalSummary(currentRows[0]) : null,
       upcoming: upcoming.map((row) => this.personalSummary(row)),
-      recent: recent.map((row) => this.personalSummary(row)),
+      history: history.map((row) => this.personalSummary(row)),
     };
   }
 
@@ -1185,6 +1208,9 @@ export class MatchService {
     waitlistCount: number;
     participationStatus: "CONFIRMED" | "WAITLISTED" | null;
     waitlistPosition: number | null;
+    resultStatus: "DRAFT" | "CONFIRMED" | "NOT_PLAYED" | null;
+    teamAGoals: number | null;
+    teamBGoals: number | null;
   }) {
     return {
       id: row.match.id,
@@ -1225,6 +1251,12 @@ export class MatchService {
             waitlistPosition: row.waitlistPosition,
           }
         : null,
+      result:
+        row.resultStatus === "CONFIRMED" &&
+        row.teamAGoals !== null &&
+        row.teamBGoals !== null
+          ? { teamAGoals: row.teamAGoals, teamBGoals: row.teamBGoals }
+          : null,
     };
   }
 

@@ -17,6 +17,7 @@ import {
   updateMatchRequestSchema,
   matchSchema,
   personalMatchesResponseSchema,
+  personalHomeResponseSchema,
   matchTeamsSchema,
   finalRosterRequestSchema,
   finalRosterSchema,
@@ -34,13 +35,17 @@ import {
   progressionRevealSchema,
   progressionHistoryResponseSchema,
   notificationListResponseSchema,
+  notificationMarkAllReadResponseSchema,
   notificationUnreadCountSchema,
   rewardsResponseSchema,
   groupRankingResponseSchema,
   groupActivityResponseSchema,
   groupStatsSchema,
+  groupOverviewResponseSchema,
   territorialRankingResponseSchema,
+  rankingContextsResponseSchema,
   publicPlayerProfileSchema,
+  ownPlayerProfileSchema,
   playerSearchResponseSchema,
   directedInvitationInboxSchema,
   groupDirectedInvitationAcceptSchema,
@@ -59,6 +64,8 @@ import {
   featuredGroupsResponseSchema,
   globalSearchResponseSchema,
   managedGroupDirectedInvitationSchema,
+  groupInvitationCandidateSchema,
+  playerGroupInvitationOptionsSchema,
   moderatorCapabilitiesRequestSchema,
   updateGroupRequestSchema,
   complianceStatusSchema,
@@ -72,6 +79,8 @@ import {
 import { apiRequest } from "./client";
 
 export const api = {
+  ownProfile: () =>
+    apiRequest("/me/profile", { schema: ownPlayerProfileSchema }),
   me: () => apiRequest("/me/player", { schema: privatePlayerSchema }),
   updatePlayer: (input: z.infer<typeof updatePlayerRequestSchema>) =>
     apiRequest("/me/player", {
@@ -136,6 +145,10 @@ export const api = {
       schema: globalRankingResponseSchema,
     });
   },
+  rankingContexts: () =>
+    apiRequest("/rankings/contexts/F5", {
+      schema: rankingContextsResponseSchema,
+    }),
   featuredPlayers: (period: "7d" | "30d" = "30d", limit = 5) => {
     const params = new URLSearchParams({ period, limit: String(limit) });
     return apiRequest(`/discovery/players/featured?${params}`, {
@@ -251,6 +264,10 @@ export const api = {
   groups: () => apiRequest("/groups", { schema: z.array(groupSchema) }),
   group: (groupId: string) =>
     apiRequest(`/groups/${groupId}`, { schema: groupSchema }),
+  groupOverview: (groupId: string) =>
+    apiRequest(`/groups/${groupId}/overview`, {
+      schema: groupOverviewResponseSchema,
+    }),
   groupRanking: (groupId: string, cursor?: string, limit = 20) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (cursor) params.set("cursor", cursor);
@@ -309,7 +326,7 @@ export const api = {
     apiRequest(`/groups/${groupId}`, {
       method: "PATCH",
       body: JSON.stringify(input),
-      schema: updateGroupPrivacyRequestSchema,
+      schema: groupSchema,
     }),
   updateGroupPrivacy: (
     groupId: string,
@@ -318,7 +335,7 @@ export const api = {
     apiRequest(`/groups/${groupId}/privacy`, {
       method: "PATCH",
       body: JSON.stringify(input),
-      schema: groupSchema,
+      schema: updateGroupPrivacyRequestSchema,
     }),
   archiveGroup: (groupId: string) =>
     apiRequest<void>(`/groups/${groupId}/archive`, { method: "POST" }),
@@ -385,6 +402,14 @@ export const api = {
     apiRequest(`/groups/${groupId}/connection-invitations`, {
       schema: z.array(managedGroupDirectedInvitationSchema),
     }),
+  groupInvitationCandidates: (groupId: string) =>
+    apiRequest(`/groups/${groupId}/connection-invitation-candidates`, {
+      schema: z.array(groupInvitationCandidateSchema),
+    }),
+  playerGroupInvitationOptions: (playerId: string) =>
+    apiRequest(`/players/${playerId}/group-invitation-options`, {
+      schema: playerGroupInvitationOptionsSchema,
+    }),
   revokeDirectedGroupInvitation: (groupId: string, invitationId: string) =>
     apiRequest<void>(
       `/groups/${groupId}/connection-invitations/${invitationId}`,
@@ -401,10 +426,12 @@ export const api = {
     }),
   matches: (groupId: string) =>
     apiRequest(`/groups/${groupId}/matches`, { schema: z.array(matchSchema) }),
-  personalMatches: (upcomingLimit = 5, recentLimit = 5) => {
+  personalHome: () =>
+    apiRequest("/me/home", { schema: personalHomeResponseSchema }),
+  personalMatches: (upcomingLimit = 5, historyLimit = 5) => {
     const params = new URLSearchParams({
       upcomingLimit: String(upcomingLimit),
-      recentLimit: String(recentLimit),
+      historyLimit: String(historyLimit),
     });
     return apiRequest(`/me/matches?${params}`, {
       schema: personalMatchesResponseSchema,
@@ -576,9 +603,10 @@ export const api = {
     });
   },
   rewards: () => apiRequest("/me/rewards", { schema: rewardsResponseSchema }),
-  notifications: (cursor?: string, limit = 20) => {
+  notifications: (cursor?: string, limit = 20, unreadOnly = false) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (cursor) params.set("cursor", cursor);
+    if (unreadOnly) params.set("unreadOnly", "true");
     return apiRequest(`/me/notifications?${params}`, {
       schema: notificationListResponseSchema,
     });
@@ -591,6 +619,11 @@ export const api = {
     apiRequest(`/me/notifications/${notificationId}/read`, {
       method: "POST",
       schema: z.object({ readAt: z.iso.datetime() }),
+    }),
+  markAllNotificationsRead: () =>
+    apiRequest("/me/notifications/read-all", {
+      method: "POST",
+      schema: notificationMarkAllReadResponseSchema,
     }),
   joinMatch: (matchId: string) =>
     apiRequest(`/matches/${matchId}/join`, {

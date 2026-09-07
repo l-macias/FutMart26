@@ -13,6 +13,7 @@ export const readinessResponseSchema = z.object({
   storage: z.enum(["ready", "configured", "disabled", "unavailable"]),
   version: z.string().nullable(),
   gitSha: z.string().nullable(),
+  buildTimestamp: z.iso.datetime().nullable(),
 });
 export type ReadinessResponse = z.infer<typeof readinessResponseSchema>;
 
@@ -77,6 +78,33 @@ export const avatarCropSchema = z
     zoom: z.coerce.number().min(1).max(3).default(1),
   })
   .strict();
+export function avatarCropRectangle(
+  width: number,
+  height: number,
+  crop: { cropX: number; cropY: number; zoom: number },
+) {
+  const baseWidth = Math.min(width, Math.floor(height * (4 / 5)));
+  const baseHeight = Math.min(height, Math.floor(baseWidth / (4 / 5)));
+  const cropWidth = Math.max(1, Math.floor(baseWidth / crop.zoom));
+  const cropHeight = Math.max(1, Math.floor(baseHeight / crop.zoom));
+  return {
+    left: clampCrop(
+      Math.round(crop.cropX * width - cropWidth / 2),
+      0,
+      width - cropWidth,
+    ),
+    top: clampCrop(
+      Math.round(crop.cropY * height - cropHeight / 2),
+      0,
+      height - cropHeight,
+    ),
+    width: cropWidth,
+    height: cropHeight,
+  };
+}
+function clampCrop(value: number, minimum: number, maximum: number) {
+  return Math.min(Math.max(value, minimum), maximum);
+}
 export const mediaAssetParamsSchema = z.object({ assetId: idSchema });
 export type UpdatePlayerRequest = z.infer<typeof updatePlayerRequestSchema>;
 export const groupRoleSchema = z.enum(["OWNER", "MODERATOR", "MEMBER"]);
@@ -207,15 +235,13 @@ export const footballPreferencesRequestSchema = z
       });
     if (new Set(value.strengths).size !== value.strengths.length)
       context.addIssue({ code: "custom", message: "Duplicate strengths" });
-    if (
-      value.preferredRoles.includes("PORTERO") &&
-      !value.willingToPlayGoalkeeper
-    )
-      context.addIssue({
-        code: "custom",
-        message: "PORTERO requires goalkeeper willingness",
-      });
-  });
+  })
+  .transform((value) => ({
+    ...value,
+    willingToPlayGoalkeeper: value.preferredRoles.includes("PORTERO")
+      ? true
+      : value.willingToPlayGoalkeeper,
+  }));
 export const footballPreferencesSchema = z.object({
   configured: z.boolean(),
   discipline: z.literal("F5"),
@@ -322,9 +348,17 @@ export const earnedMatchAwardSchema = z.object({
     scheduledAt: z.iso.datetime(),
   }),
 });
+export const awardSummarySchema = z.object({
+  type: awardTypeSchema,
+  title: z.string(),
+  description: z.string(),
+  count: z.number().int().positive(),
+  latestAwardedAt: z.iso.datetime(),
+});
 export const rewardsResponseSchema = z.object({
   achievements: z.array(earnedAchievementSchema),
   recentAwards: z.array(earnedMatchAwardSchema),
+  awardSummary: z.array(awardSummarySchema),
 });
 export type RewardsResponse = z.infer<typeof rewardsResponseSchema>;
 export const publicPlayerParamsSchema = z.object({ playerId: idSchema });
@@ -337,18 +371,12 @@ export const playerSearchQuerySchema = z
 const publicAchievementSchema = earnedAchievementSchema.omit({
   sourceMatchId: true,
 });
-const publicAwardSchema = z.object({
-  type: awardTypeSchema,
-  awardedAt: z.iso.datetime(),
-  scheduledAt: z.iso.datetime(),
-  title: z.string(),
-  description: z.string(),
-});
 const publicPerformanceSchema = playerF5PerformanceSchema.pick({
   discipline: true,
   initialized: true,
   overall: true,
   attributes: true,
+  ratingProfile: true,
   processedMatchCount: true,
 });
 const visiblePublicPlayerProfileSchema = z.object({
@@ -364,11 +392,13 @@ const visiblePublicPlayerProfileSchema = z.object({
     .nullable(),
   rewards: z.object({
     achievements: z.array(publicAchievementSchema),
-    recentAwards: z.array(publicAwardSchema).max(5),
+    awardSummary: z.array(awardSummarySchema).max(3),
   }),
+  groups: z.array(z.object({ id: idSchema, name: z.string() })).max(6),
   summary: z.object({
     totalGoals: z.number().int().nonnegative(),
     totalAssists: z.number().int().nonnegative(),
+    averageRating: progressionDecimalSchema.nullable(),
     achievementCount: z.number().int().nonnegative(),
     awardCount: z.number().int().nonnegative(),
   }),
@@ -384,6 +414,40 @@ export const publicPlayerProfileSchema = z.discriminatedUnion("visibility", [
   privatePublicPlayerProfileSchema,
 ]);
 export type PublicPlayerProfile = z.infer<typeof publicPlayerProfileSchema>;
+export const ownPlayerProfileSchema = z.object({
+  player: playerWithImageSchema.extend({
+    profileVisibility: profileVisibilitySchema,
+  }),
+  performance: publicPerformanceSchema,
+  footballProfile: footballPreferencesSchema
+    .pick({
+      preferredRoles: true,
+      willingToPlayGoalkeeper: true,
+      strengths: true,
+    })
+    .nullable(),
+  rewards: z.object({
+    achievements: z.array(publicAchievementSchema),
+    awardSummary: z.array(awardSummarySchema).max(3),
+  }),
+  groups: z
+    .array(
+      z.object({
+        id: idSchema,
+        name: z.string(),
+        visibility: profileVisibilitySchema,
+      }),
+    )
+    .max(6),
+  summary: z.object({
+    totalGoals: z.number().int().nonnegative(),
+    totalAssists: z.number().int().nonnegative(),
+    averageRating: progressionDecimalSchema.nullable(),
+    achievementCount: z.number().int().nonnegative(),
+    awardCount: z.number().int().nonnegative(),
+  }),
+});
+export type OwnPlayerProfile = z.infer<typeof ownPlayerProfileSchema>;
 export const playerSearchResponseSchema = z.object({
   items: z.array(
     z.object({
@@ -539,6 +603,19 @@ export const managedGroupDirectedInvitationSchema = z.object({
   invitedByPlayerId: idSchema,
   createdAt: z.iso.datetime(),
   expiresAt: z.iso.datetime(),
+});
+export const groupInvitationCandidateSchema = z.object({
+  player: playerSchema,
+  overall: z.number().nullable(),
+  processedMatchCount: z.number().int().nonnegative(),
+});
+export const playerGroupInvitationOptionsSchema = z.object({
+  items: z.array(
+    z.object({
+      group: z.object({ id: idSchema, name: z.string() }),
+      state: z.enum(["AVAILABLE", "PENDING"]),
+    }),
+  ),
 });
 export const matchDirectedInvitationSchema = z.object({
   id: idSchema,
@@ -797,6 +874,37 @@ export type TerritorialRankingResponse = z.infer<
   typeof territorialRankingResponseSchema
 >;
 
+export const rankingContextsResponseSchema = z.object({
+  discipline: z.literal("F5"),
+  groups: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+    }),
+  ),
+  cities: z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      rankedPlayerCount: z.number().int().positive(),
+      actorMatchesPlayed: z.number().int().nonnegative(),
+    }),
+  ),
+  venues: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+      city: z.string(),
+      cityKey: z.string(),
+      rankedPlayerCount: z.number().int().positive(),
+      actorMatchesPlayed: z.number().int().nonnegative(),
+    }),
+  ),
+});
+export type RankingContextsResponse = z.infer<
+  typeof rankingContextsResponseSchema
+>;
+
 export const globalRankingQuerySchema = groupRankingQuerySchema;
 export const globalRankingResponseSchema = z.object({
   scope: z.object({ type: z.literal("GLOBAL"), label: z.literal("Global") }),
@@ -896,7 +1004,13 @@ export const globalSearchQuerySchema = z
   .strict();
 export const globalSearchResponseSchema = z.object({
   players: playerSearchResponseSchema.shape.items,
-  groups: z.array(z.object({ id: idSchema, name: z.string() })),
+  groups: z.array(
+    z.object({
+      id: idSchema,
+      name: z.string(),
+      target: z.object({ href: z.string().startsWith("/") }).nullable(),
+    }),
+  ),
 });
 export type GlobalSearchResponse = z.infer<typeof globalSearchResponseSchema>;
 
@@ -984,11 +1098,17 @@ export const notificationTypeSchema = z.enum([
   "CONNECTION_ACCEPTED",
   "GROUP_INVITATION_RECEIVED",
   "MATCH_INVITATION_RECEIVED",
+  "GROUP_MODERATOR_GRANTED",
+  "GROUP_MODERATOR_REMOVED",
 ]);
 export const notificationListQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(50).default(20),
     cursor: z.string().min(1).max(500).optional(),
+    unreadOnly: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .optional(),
   })
   .strict();
 export const notificationParamsSchema = z.object({
@@ -1009,6 +1129,9 @@ export const notificationListResponseSchema = z.object({
 });
 export const notificationUnreadCountSchema = z.object({
   count: z.number().int().nonnegative(),
+});
+export const notificationMarkAllReadResponseSchema = z.object({
+  updatedCount: z.number().int().nonnegative(),
 });
 export type NotificationListResponse = z.infer<
   typeof notificationListResponseSchema
@@ -1297,6 +1420,33 @@ export const matchSchema = z.object({
     })
     .nullable(),
 });
+export const groupOverviewMatchSchema = z.object({
+  id: idSchema,
+  status: matchStatusSchema,
+  scheduledAt: z.iso.datetime(),
+  locationText: z.string(),
+  capacity: z.number().int().positive(),
+  confirmedCount: z.number().int().nonnegative(),
+  waitlistCount: z.number().int().nonnegative(),
+  participationStatus: z.enum(["CONFIRMED", "WAITLISTED"]).nullable(),
+  result: z
+    .object({
+      teamAGoals: z.number().int().nonnegative(),
+      teamBGoals: z.number().int().nonnegative(),
+    })
+    .nullable(),
+});
+export const groupOverviewResponseSchema = z.object({
+  group: groupSchema,
+  memberCount: z.number().int().nonnegative(),
+  rosterPreview: z.array(membershipSchema).max(6),
+  nextMatch: groupOverviewMatchSchema.nullable(),
+  upcomingMatches: z.array(groupOverviewMatchSchema).max(6),
+  historyMatches: z.array(groupOverviewMatchSchema).max(5),
+  canManageGroup: z.boolean(),
+  canCreateMatch: z.boolean(),
+});
+export type GroupOverviewResponse = z.infer<typeof groupOverviewResponseSchema>;
 export const personalMatchSchema = z.object({
   id: idSchema,
   group: z.object({ id: idSchema, name: z.string() }),
@@ -1316,15 +1466,50 @@ export const personalMatchSchema = z.object({
       waitlistPosition: z.number().int().positive().nullable(),
     })
     .nullable(),
+  result: z
+    .object({
+      teamAGoals: z.number().int().nonnegative(),
+      teamBGoals: z.number().int().nonnegative(),
+    })
+    .nullable(),
 });
 export const personalMatchesQuerySchema = z.object({
   upcomingLimit: z.coerce.number().int().min(1).max(20).default(5),
-  recentLimit: z.coerce.number().int().min(1).max(20).default(5),
+  historyLimit: z.coerce.number().int().min(1).max(20).default(5),
 });
 export const personalMatchesResponseSchema = z.object({
+  current: personalMatchSchema.nullable(),
   upcoming: z.array(personalMatchSchema),
-  recent: z.array(personalMatchSchema),
+  history: z.array(personalMatchSchema),
 });
+export type PersonalMatch = z.infer<typeof personalMatchSchema>;
+
+export const personalHomeResponseSchema = z.object({
+  player: playerSchema,
+  currentOrNextMatch: personalMatchSchema.nullable(),
+  attention: z.object({
+    available: z.boolean(),
+    items: z.array(notificationSchema).max(5),
+  }),
+  opportunities: z.object({
+    available: z.boolean(),
+    items: z.array(recruitmentOpportunitySchema).max(3),
+  }),
+  progress: z.object({
+    overall: z.number(),
+    initialized: z.boolean(),
+    processedMatchCount: z.number().int().nonnegative(),
+  }),
+  globalPosition: z.discriminatedUnion("ranked", [
+    z.object({
+      ranked: z.literal(true),
+      position: z.number().int().positive(),
+      overall: progressionDecimalSchema,
+    }),
+    z.object({ ranked: z.literal(false) }),
+  ]),
+});
+export type PersonalHomeResponse = z.infer<typeof personalHomeResponseSchema>;
 export const rosterParticipantSchema = z.object({
   id: idSchema,
   kind: matchParticipantKindSchema,
@@ -1374,6 +1559,7 @@ export const finalRosterSchema = z.object({
       playerId: idSchema.nullable(),
       displayName: z.string(),
       attendance: attendanceSchema.nullable(),
+      isCurrentActor: z.boolean(),
     }),
   ),
 });
@@ -1412,6 +1598,7 @@ export const matchTeamParticipantSchema = z.object({
   internalOvr: z.string().nullable(),
   preferredRoles: z.array(footballRoleSchema).max(2),
   willingToPlayGoalkeeper: z.boolean(),
+  rating: progressionDecimalSchema.nullable(),
 });
 const matchTeamSideReadSchema = z.object({
   participants: z.array(matchTeamParticipantSchema),
@@ -1532,6 +1719,7 @@ export const adminReportSchema = z.object({
 export const adminAuditEventSchema = z.object({
   id: idSchema,
   actorAuthUserId: z.string(),
+  actorEmail: z.email().nullable(),
   action: z.string(),
   targetType: z.string(),
   targetId: z.string(),
@@ -1550,9 +1738,12 @@ export const adminSystemStatusSchema = z.object({
   storageConfigured: z.boolean(),
   storageStatus: readinessResponseSchema.shape.storage,
   mailConfigured: z.boolean(),
+  migrationsStatus: readinessResponseSchema.shape.migrations,
   emailVerificationRequired: z.boolean(),
   appVersion: z.string().nullable(),
   gitSha: z.string().nullable(),
+  buildTimestamp: z.iso.datetime().nullable(),
+  uptimeSeconds: z.number().int().nonnegative(),
 });
 export const adminMutationSchema = z.object({ reason: adminReasonSchema });
 export const adminModerateNameSchema = z.object({

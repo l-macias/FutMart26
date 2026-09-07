@@ -1,8 +1,9 @@
 .page {
   display: grid;
-  gap: var(--space-7);
+  gap: var(--section-gap);
   max-inline-size: var(--content-wide);
   margin-inline: auto;
+  padding-block-end: var(--space-8);
 }
 .hero,
 .detailHero {
@@ -228,7 +229,7 @@
   min-block-size: 4.5rem;
   border-block-end: var(--border-width-thin) solid var(--border-subtle);
 }
-.matchRow > span {
+.matchDate {
   color: var(--accent-primary);
   font-family: var(--font-display);
   font-weight: 800;
@@ -238,6 +239,11 @@
   min-inline-size: 0;
   overflow-wrap: anywhere;
   text-transform: uppercase;
+}
+
+.matchRow :global(.ui-row__content) {
+  display: grid;
+  gap: var(--space-1);
 }
 .matchRow > small {
   color: var(--foreground-muted);
@@ -317,6 +323,302 @@
 .status {
   color: var(--foreground-muted);
 }
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-2) var(--space-4);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.groupHeaderArchived {
+  border-block-end-color: color-mix(
+    in srgb,
+    var(--state-warning) 42%,
+    var(--border-subtle)
+  );
+}
+
+.groupTitle {
+  max-inline-size: 22ch;
+}
+
+.groupHeader > div:first-child,
+.headerMeta,
+.overviewMain,
+.overviewAside,
+.nextMatch,
+.rosterSection,
+.compactSection,
+.managementCallout,
+.compactEmpty {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.headerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: end;
+  gap: var(--space-2);
+  color: var(--foreground-muted);
+  font-size: var(--type-metadata-size);
+  font-weight: 800;
+  letter-spacing: var(--type-tracking-label);
+}
+
+.headerMeta > span:not(:global(.ui-badge)) {
+  padding-inline: var(--space-1);
+}
+
+.archivedBadge {
+  border-color: color-mix(in srgb, var(--state-warning) 55%, transparent);
+  color: var(--state-warning);
+}
+
+.archivedNotice {
+  margin: 0;
+  padding: var(--space-3);
+  border-inline-start: var(--border-width-strong) solid var(--state-warning);
+  color: var(--foreground-muted);
+  background: var(--background-surface);
+}
+
+.overviewGrid {
+  display: grid;
+  gap: var(--section-gap);
+}
+
+.overviewGridArchived .nextMatch {
+  border-color: color-mix(
+    in srgb,
+    var(--state-warning) 38%,
+    var(--border-subtle)
+  );
+  background: var(--background-surface);
+}
+
+.overviewMain,
+.overviewAside {
+  align-content: start;
+  gap: var(--section-gap);
+}
+
+.nextMatch {
+  justify-items: start;
+  overflow: hidden;
+  padding: var(--density-feature-padding);
+  border-inline-start-width: var(--border-width-strong);
+  border-inline-start-color: var(--pitch-surface);
+  background-image: linear-gradient(
+    115deg,
+    transparent 0 70%,
+    color-mix(in srgb, var(--pitch-surface) 14%, transparent) 70% 100%
+  );
+}
+
+.nextMatchHeader {
+  display: flex;
+  inline-size: 100%;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.nextMatchHeader > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.capacity {
+  color: var(--accent-primary);
+  font: 900 var(--type-score-size) / 0.82 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.capacity small {
+  display: block;
+  margin-block-start: var(--space-2);
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1 var(--font-interface);
+  letter-spacing: var(--type-tracking-label);
+  text-align: end;
+}
+
+.actorStatus {
+  margin: 0;
+  color: var(--state-positive);
+  font-size: var(--type-label-size);
+  font-weight: 800;
+}
+
+.rosterSection,
+.matchesSection,
+.compactSection {
+  padding-block-end: var(--space-4);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.rosterSearch {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--foreground-muted);
+  font-size: var(--type-metadata-size);
+  font-weight: 800;
+}
+
+.rosterSearch input {
+  min-block-size: var(--touch-target-min);
+  border: var(--border-width-thin) solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding-inline: var(--space-3);
+  background: var(--background-elevated);
+  color: var(--foreground-primary);
+}
+
+.member {
+  min-block-size: var(--row-min-height-compact);
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-block: var(--density-compact-padding);
+  color: inherit;
+  text-decoration: none;
+}
+
+.member + .member,
+.rankPreview + .rankPreview,
+.activityRow + .activityRow {
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.member strong,
+.rankPreview span,
+.matchRow strong {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member strong {
+  font-family: var(--font-interface);
+  font-size: var(--type-body-size);
+  text-transform: none;
+}
+
+.matchTabs {
+  display: flex;
+  gap: var(--space-2);
+  border-block-end: var(--border-width-thin) solid var(--border-strong);
+}
+
+.matchTabs button {
+  min-block-size: var(--touch-target-min);
+  border: 0;
+  border-block-end: var(--border-width-strong) solid transparent;
+  padding-inline: var(--space-3);
+  color: var(--foreground-muted);
+  background: transparent;
+  cursor: pointer;
+  font: 800 var(--type-label-size) / 1 var(--font-interface);
+  letter-spacing: var(--type-tracking-label);
+}
+
+.matchTabs button:hover {
+  color: var(--foreground-primary);
+  background: color-mix(in srgb, var(--background-elevated) 72%, transparent);
+}
+
+.matchTabs button[aria-pressed="true"] {
+  border-block-end-color: var(--accent-primary);
+  color: var(--foreground-primary);
+}
+
+.compactSection {
+  gap: var(--space-3);
+}
+
+.statsStrip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.statsStrip > div {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.statsStrip strong {
+  font-size: var(--type-heading-md-size);
+}
+
+.rankPreview {
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  min-block-size: var(--row-min-height-compact);
+  padding: var(--density-compact-padding) 0;
+  border: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rankPreview:first-child > strong,
+.rankPreview:first-child > b {
+  color: var(--accent-primary);
+}
+
+.rankPreview > strong,
+.rankPreview > b {
+  font: 900 var(--type-heading-md-size) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankPreview > strong {
+  color: var(--foreground-muted);
+}
+
+.inlineLink {
+  inline-size: fit-content;
+  color: var(--accent-primary);
+  font-size: var(--type-label-size);
+  font-weight: 800;
+}
+
+.activityRow {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  min-block-size: var(--row-min-height-compact);
+  padding: var(--density-compact-padding) 0;
+  border: 0;
+  background: transparent;
+}
+
+.managementCallout {
+  justify-items: start;
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.reportAction {
+  font-size: var(--type-metadata-size);
+}
+
+.membershipOptionsLink {
+  color: var(--foreground-muted);
+  font-size: var(--type-metadata-size);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+@media (min-width: 64rem) {
+  .overviewGrid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+    align-items: start;
+  }
+}
+
 @media (max-width: 48rem) {
   .hero,
   .detailHero {
@@ -328,6 +630,25 @@
   .page {
     padding-block-end: var(--space-6);
   }
+
+  .groupHeader,
+  .nextMatchHeader,
+  .sectionHeading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .headerMeta {
+    justify-content: start;
+  }
+
+  .nextMatch {
+    inline-size: 100%;
+  }
+
+  .nextMatch :global(.ui-button--primary) {
+    inline-size: 100%;
+  }
 }
 @media (max-width: 25rem) {
   .hero {
@@ -335,21 +656,19 @@
     flex-direction: column;
   }
   .member {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .member small {
-    grid-column: 2;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   .sectionHeading {
     align-items: stretch;
     flex-direction: column;
   }
   .matchRow {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
+    grid-template-columns: 3rem minmax(0, 1fr) auto;
+    gap: var(--space-2);
     padding-block: var(--space-3);
   }
-  .matchRow > small {
-    text-align: start;
+
+  .statsStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

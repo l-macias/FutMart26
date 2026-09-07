@@ -1,5 +1,37 @@
 # User Flows
 
+## Contrato canónico de navegación V1
+
+Estos recorridos congelan la intención entre superficies antes del rediseño
+visual. Los pasos detallados de dominio documentados debajo siguen vigentes.
+
+1. **Login → Home → Partido:** login/compliance termina en la experiencia
+   autenticada; Home abre el partido current/next en
+   `/play/matches/:matchId`.
+2. **Home → Jugar → Join:** Home sólo anticipa oportunidades; `/play` posee la
+   lista bounded y Match Detail ejecuta `Anotarme` contra authority del API.
+3. **Grupo → Partido:** Group Overview destaca el próximo partido y navega al
+   mismo Match Detail canónico.
+4. **Partido finalizado → Votación → Progresión:** sólo un jugador `PLAYED`
+   elegible recibe `Votar ahora`; luego usa el reveal propio cuando está
+   disponible. `Sin evidencia` es un resultado válido.
+5. **Rankings → Perfil público:** cada jugador permitido abre
+   `/players/:playerId`; el ranking conserva scope/contexto en la URL.
+6. **Search → Jugador → Conectar/Invitar:** `/search?q=` separa Jugadores y
+   Grupos; el perfil público expone sólo acciones autoritativas.
+7. **Notificación → Target:** dropdown, inbox y Home Attention usan el mismo
+   target del servidor y sincronizan read/unread.
+8. **Propietario/Moderador → Grupo → Gestión:** Group Overview conserva la
+   experiencia de miembro; `Administrar grupo` abre
+   `/groups/:groupId/settings` según capabilities.
+9. **Perfil → Configuración:** `/profile` conserva identidad/carrera y
+   `/profile/settings` concentra perfil, F5, cuenta, legal y riesgo.
+
+Destinos canónicos: jugador `/players/:playerId`; perfil propio `/profile`;
+configuración `/profile/settings`; grupo `/groups/:groupId`; partido
+`/play/matches/:matchId`; rankings `/rankings?scope=...`; búsqueda
+`/search?q=...`; notificaciones `/notifications`.
+
 ## Operational Admin and moderation
 
 1. The operator signs in to `apps/admin` with a normal Better Auth session.
@@ -82,6 +114,22 @@
 4. Al comenzar se bloquean roster, admisión, Guests y equipos para
    rating/stats.
 5. El partido sigue aunque no se alcance cupo objetivo.
+
+### Match Detail según lifecycle
+
+- `DRAFT` prioriza configuración y publicación.
+- `OPEN` prioriza fecha/lugar, cupo disponible, estado del actor y plantel
+  confirmado/waitlist. Reclutamiento, invitaciones, invitados, edición,
+  equipos y cancelación quedan agrupados bajo `ADMINISTRAR PARTIDO` para
+  actores autorizados.
+- `STARTED` muestra la composición deportiva bloqueada de Equipo A y Equipo B;
+  no presenta inscripción, cupo faltante, recruitment ni waitlist operativa.
+- `FINISHED` es una ficha histórica: resultado, planilla, OVR, nota cerrada,
+  goles/asistencias y contexto propio cuando el actor jugó. Voting y
+  Progression sólo aparecen según elegibilidad/lifecycle autoritativos.
+
+Match Detail no funciona como entrada a rankings territoriales. Reportar y las
+herramientas de cierre/corrección autorizada permanecen acciones secundarias.
 
 ## UF06 — Confirmar participantes post-match
 
@@ -201,9 +249,11 @@ se duplican dentro del historial longitudinal.
 ## UF16 — Notificaciones in-app
 
 1. El shell muestra el contador real de notificaciones no leídas.
-2. Al abrir el inbox, el sistema proyecta idempotentemente los hechos que ya
+2. La campana abre las cinco Notifications más recientes, leídas y no leídas;
+   `VER TODAS` navega al historial completo.
+3. Al abrir el inbox, el sistema proyecta idempotentemente los hechos que ya
    existen en el dominio.
-3. V1 informa únicamente:
+4. V1 informa únicamente:
    - Voting disponible para un Player elegible;
    - Progression Reveal disponible para el Player procesado;
    - Match cancelado para Players confirmados o en espera;
@@ -211,8 +261,10 @@ se duplican dentro del historial longitudinal.
    - award de Match obtenido;
    - solicitud o aceptación de Connection;
    - invitación dirigida a Group o Match.
-4. Cada item navega al recurso real y puede marcarse como leído.
-5. El inbox es privado, paginado y no determina el estado de Match, Voting ni
+5. Cada item navega al recurso real y se marca como leído al abrirlo.
+6. `MARCAR TODAS COMO LEÍDAS` actúa sólo sobre el actor y sincroniza header,
+   página y Home attention; las informativas permanecen en el historial.
+7. El inbox es privado, paginado y no determina el estado de Match, Voting ni
    Progression.
 
 Push, email, WhatsApp, recordatorios, preferencias, digest y eventos adicionales
@@ -226,7 +278,9 @@ de forma lazy cuando el jugador consulta su inbox o contador.
 2. Un achievement se obtiene una sola vez por Player; un award puede repetirse
    en distintos Matches.
 3. Reveal muestra únicamente las recompensas reales originadas en ese Match.
-4. Perfil muestra achievements y awards recientes del Player autenticado.
+4. Perfil muestra achievements separados de un resumen autoritativo de Awards
+   agrupados por tipo; el historial por Match se conserva sin repetirse en la
+   página principal.
 5. La reconciliación lazy completa grants históricos faltantes sin recalcular
    Voting ni Progression.
 
@@ -283,15 +337,22 @@ alcance futuro.
 
 ## UF21 — Discovery y ficha deportiva autenticada
 
-1. Un usuario autenticado busca Players por display name desde `/players` o
-   navega desde un ranking Group/Venue/City.
+1. Un usuario autenticado busca Players y Groups desde `/search?q=...` o navega
+   a Players desde un ranking Group/Venue/City. La consulta espera dos
+   caracteres, aplica debounce/cancelación y separa resultados por tipo.
 2. La ficha read-only reutiliza PlayerCard y muestra estado F5 actual, roles,
-   willingness de arquero, fortalezas autodeclaradas, resumen de goles y
-   asistencias, achievements y hasta cinco Awards recientes.
+   willingness de arquero, fortalezas autodeclaradas, resumen de partidos,
+   rating, goles y asistencias, Groups públicos, achievements y Awards
+   agrupados por tipo con su cantidad total.
 3. Un Player sin performance conserva su card inicial 60 y se identifica como
    todavía no procesado; no se fabrica historia ni ranking.
-4. La ficha propia ofrece volver al Profile privado completo. Las fichas de
+4. La ficha propia ofrece volver al Profile privado completo. `/profile`
+   resume carrera y red sin cargar Progression History; `/profile/settings`
+   separa identidad, preferencias, privacidad y seguridad. Las fichas de
    terceros no enlazan a Matches, Reveals ni Progression History.
+5. Search excluye Players y Groups PRIVATE. Un Group PUBLIC sólo enlaza a Group
+   Detail cuando el actor tiene membership activa, porque V1 no crea un Public
+   Group Profile.
 
 Perfiles anónimos/SEO, handles, privacy controls, followers, friends,
 mensajería, feeds, recomendaciones y discovery geográfico permanecen futuros.
@@ -345,39 +406,46 @@ recruitment permanecen futuros.
 
 ## UF25 — Ranking global y Discovery read models
 
-1. Un usuario autenticado abre `/rankings` y consulta el Ranking Global F5,
-   paginado y basado únicamente en el OVR actual de Players procesados.
-2. Los bloques de Players distinguen OVR actual de métricas temporales: goles,
+1. Un usuario autenticado abre `/rankings`; `GLOBAL` es el ámbito default y
+   consulta el OVR F5 actual, paginado, de Players procesados elegibles.
+2. Desde la misma superficie cambia entre `GLOBAL`, `GRUPO`, `CIUDAD` y `SEDE`.
+   Group se limita a memberships activas; City y Venue se enumeran sólo cuando
+   tienen evidencia deportiva real. La URL conserva el contexto seleccionado.
+3. `TU POSICIÓN` usa la posición autoritativa del servidor aunque el actor no
+   esté en la página actual. Si no es elegible, explica la falta de evidencia y
+   no fabrica una posición.
+4. Province y Country conservan endpoints/read models, pero no son ámbitos
+   principales de la navegación V1. Match Detail no vuelve a alojar rankings.
+5. Los bloques de Players distinguen OVR actual de métricas temporales: goles,
    asistencias y Awards en 7/30 días. Cada fila navega a la ficha deportiva.
-3. Rising muestra sólo aumentos netos positivos sustentados por al menos dos
+6. Rising muestra sólo aumentos netos positivos sustentados por al menos dos
    snapshots dentro del período; `NO_EVIDENCE` no genera progreso ficticio.
-4. Featured Groups expone nombre y actividad objetiva —partidos, Players
+7. Featured Groups expone nombre y actividad objetiva —partidos, Players
    activos distintos o goles— sin abrir el contenido privado del Group.
-5. `/players` busca Players y nombres de Groups activos. Los Groups son
+8. `/players` busca Players y nombres de Groups activos. Los Groups son
    informativos hasta que exista un Public Group Profile.
 
 El acceso anónimo, SEO, recomendaciones, temporadas, movement, public Group
 profiles y discovery de Venues permanecen futuros.
 
-## UF26 — Home Global autenticado
+## UF26 — Home personal y centro Jugar
 
-1. `/` presenta el mundo deportivo de la plataforma con búsqueda global,
-   preview del Ranking Global F5 y bloques reales de Players y Groups.
-2. El selector común de 7/30 días actualiza goles, asistencias, Awards, Rising y
-   actividad de Groups; Top OVR continúa representando el estado actual.
-3. Cada bloque consulta su read model independientemente: un fallo parcial no
-   impide buscar, navegar ni consultar las demás secciones.
-4. Players navegan a su ficha deportiva autenticada. Los nombres de Groups son
-   informativos y no abren Group Detail ni datos privados.
-5. `/play` conserva el hub personal de partidos y oportunidades; `/profile`
-   conserva la carrera privada; `/players/:id` continúa siendo la ficha
-   deportiva autenticada y limitada.
-6. El acceso directo a una ruta protegida retorna a esa ruta después del login;
-   el acceso normal sin destino explícito entra a `/play`.
+1. `/` saluda al Player y prioriza su Match `STARTED` o el próximo Match donde
+   está confirmado/en espera. Si no existe, lo orienta hacia `/play`.
+2. Home muestra hasta cinco Notifications no leídas como atención y hasta tres
+   convocatorias abiertas donde el actor todavía no participa. Los fallos de
+   esos dos bloques secundarios no esconden el contexto personal principal.
+3. Home resume OVR y posición global; Profile y Rankings conservan el detalle.
+   No muestra leaderboard, Featured/Rising, catálogo de Groups ni historial.
+4. `/play` prioriza el Match actual/próximo, lista convocatorias abiertas y
+   separa `PRÓXIMOS` de `HISTORIAL`. El Match destacado no se repite.
+5. `MIS PARTIDOS` exige participación real del actor. DRAFT no aparece como
+   partido personal y FINISHED/CANCELLED se presentan de forma acotada.
+6. Login normal continúa entrando a `/play`; `/` queda disponible como inicio
+   personal desde la navegación.
 
-Home anónimo/marketing, SEO, Public Group Profile, live matches, highlights,
-recomendaciones, seasons y rediseño SVG/fotográfico de PlayerCard permanecen
-fuera de esta integración.
+Home anónimo/marketing, recomendaciones, geolocalización, social feed y nuevas
+disciplinas permanecen fuera.
 
 ## UF27 — Seguridad y recuperación de cuenta
 
@@ -441,14 +509,17 @@ fuera de esta integración.
 
 ## UF29 — Administración operativa de Group
 
-1. Un miembro abre `/groups/:groupId/settings`; la pantalla muestra únicamente
-   las acciones habilitadas por su rol y capabilities, aunque el API vuelve a
-   autorizar cada comando.
+1. Un miembro abre `/groups/:groupId/settings`; General aparece primero y las
+   secciones Members, Invitations, Guests y Ownership se expanden sólo cuando
+   se necesitan. La pantalla muestra únicamente acciones habilitadas por rol y
+   capabilities, aunque el API vuelve a autorizar cada comando.
 2. El owner puede renombrar el Group, transferir ownership, promover/demover
    moderadores, delegar capabilities y bloquear/desbloquear miembros.
 3. Quien tiene las capabilities correspondientes puede remover miembros,
    administrar invitaciones por token o dirigidas y operar el directorio de
    Persistent Guests. Remove no equivale a Block y Unblock no reincorpora.
+   Los candidatos ya miembros, bloqueados o con invitación pending no se
+   ofrecen. Los enlaces nuevos se crean y copian dentro de Settings.
 4. Cualquier miembro activo puede salir. Si sale el owner, el dominio aplica la
    sucesión existente; el último owner archiva el Group sólo si no hay Matches
    `DRAFT`, `OPEN` o `STARTED`.
@@ -456,6 +527,23 @@ fuera de esta integración.
    y excluye el Group de Search/Featured. Nunca cancela partidos implícitamente.
 6. `/groups` separa Groups activos y archivados. Un Group archivado sigue siendo
    consultable por sus miembros, pero su configuración queda en modo lectura.
+7. Ownership y Zona de riesgo nunca compiten con nombre o privacidad. Transfer,
+   leave y archive explican la consecuencia y requieren confirmación.
+
+## Gestión de Match y Settings personales
+
+1. `ADMINISTRAR PARTIDO` es una entrada secundaria dentro de Match Detail y
+   sólo aparece con capabilities efectivas.
+2. En `DRAFT` organiza datos y convocatoria; en `OPEN`, convocatoria,
+   participantes, Guests y equipos; en `STARTED`, asistencia, resultado y
+   cierre. Un Match `FINISHED` no vuelve a ofrecer recruitment o invitaciones.
+3. Cancelar vive en Zona de riesgo y requiere confirmación; el API conserva la
+   historia y vuelve a validar lifecycle y authority.
+4. `/profile/settings` separa Perfil, Fútbol F5, Cuenta/Seguridad, Legal y Zona
+   de riesgo. Carrera, stats, Awards y Progression no viven en Settings.
+5. `/profile/account` agrupa contraseña y sesiones antes de la eliminación. La
+   eliminación exige frase, contraseña y diálogo final; un blocker de ownership
+   se presenta con copy de producto, no con códigos HTTP.
 
 Description, crest/media, restore, Public Group Profile, Guest→Player linking,
 leagues, chat y administración global permanecen fuera de esta integración.

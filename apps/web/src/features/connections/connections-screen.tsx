@@ -59,17 +59,22 @@ export function ConnectionsScreen() {
         {connections.isError && (
           <Text tone="muted">No pudimos cargar tus conexiones.</Text>
         )}
-        <ul className={styles.list}>
+        <ul className={`${styles.list} ui-list`}>
           {connections.data?.pages
             .flatMap((page) => page.items)
             .map((item) => (
-              <li key={item.player.id}>
-                <Link href={`/players/${item.player.id}`}>
-                  <strong>{item.player.displayName}</strong>
-                  <span>
+              <li className="ui-row" key={item.player.id}>
+                <Link
+                  className="ui-row__content"
+                  href={`/players/${item.player.id}`}
+                >
+                  <strong className="ui-row__primary">
+                    {item.player.displayName}
+                  </strong>
+                  <span className="ui-row__secondary">
                     {item.overall === null
-                      ? "OVR —"
-                      : `OVR ${Math.round(item.overall)}`}{" "}
+                      ? "— OVR"
+                      : `${Math.round(item.overall)} OVR`}{" "}
                     · {item.processedMatchCount} partidos
                   </span>
                 </Link>
@@ -138,6 +143,7 @@ function RequestSection({
         queryClient.invalidateQueries({
           queryKey: queryKeys.notificationUnreadCount,
         }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.personalHome }),
       ]);
     },
   });
@@ -151,14 +157,16 @@ function RequestSection({
       {query.isError && (
         <Text tone="muted">No pudimos cargar las solicitudes.</Text>
       )}
-      <ul className={styles.list}>
+      <ul className={`${styles.list} ui-list`}>
         {items.map((item) => (
-          <li key={item.player.id}>
-            <div>
+          <li className="ui-row" key={item.player.id}>
+            <div className="ui-row__content">
               <Link href={`/players/${item.player.id}`}>
-                <strong>{item.player.displayName}</strong>
+                <strong className="ui-row__primary">
+                  {item.player.displayName}
+                </strong>
               </Link>
-              <span>
+              <span className="ui-row__secondary">
                 {new Date(item.requestedAt).toLocaleDateString("es-AR")}
               </span>
             </div>

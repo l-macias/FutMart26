@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 
 import { IconButton, Text } from "@football/ui";
 
+import { NotificationDropdown } from "@/features/notifications/notification-dropdown";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import { authClient } from "@/lib/auth/auth-client";
@@ -17,7 +18,7 @@ const navigation = [
   { href: "/", label: "Inicio", mark: "01" },
   { href: "/play", label: "Jugar", mark: "02" },
   { href: "/groups", label: "Grupos", mark: "03" },
-  { href: "/rankings/global", label: "Rankings", mark: "04" },
+  { href: "/rankings", label: "Rankings", mark: "04" },
   { href: "/profile", label: "Perfil", mark: "05" },
 ] as const;
 
@@ -42,35 +43,20 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               Groups
             </Text>
             <Text as="span" tone="muted" variant="metadata">
-              Night football
+              Fútbol nocturno
             </Text>
           </span>
         </Link>
 
         <div className={styles.utilities}>
           <Link
-            aria-label="Buscar jugadores"
+            aria-label="Buscar jugadores o grupos"
             className="ui-icon-button"
-            href="/players"
+            href="/search"
           >
             <SearchIcon />
           </Link>
-          <Link
-            aria-label={
-              unread.data?.count
-                ? `Notificaciones, ${unread.data.count} sin leer`
-                : "Notificaciones"
-            }
-            className={`${styles.notificationUtility} ui-icon-button`}
-            href="/notifications"
-          >
-            <NotificationIcon />
-            {unread.data?.count ? (
-              <span aria-hidden="true" className={styles.unreadBadge}>
-                {unread.data.count > 99 ? "99+" : unread.data.count}
-              </span>
-            ) : null}
-          </Link>
+          <NotificationDropdown unreadCount={unread.data?.count ?? 0} />
           <Link
             aria-label="Abrir perfil"
             className="ui-icon-button"
@@ -120,15 +106,6 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         <main className={styles.content}>{children}</main>
       </div>
     </div>
-  );
-}
-
-function NotificationIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" viewBox="0 0 24 24">
-      <path d="M6.5 16.5h11l-1.5-2V10a4 4 0 0 0-8 0v4.5l-1.5 2Z" />
-      <path d="M10 19h4" />
-    </svg>
   );
 }
 

@@ -1,0 +1,91 @@
+name: football-production
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-runtime: &default-runtime
+  init: true
+  restart: unless-stopped
+  logging: *default-logging
+
+services:
+  api:
+    <<: *default-runtime
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/football-api:${RELEASE_TAG:?RELEASE_TAG is required}"
+    ports:
+      - "127.0.0.1:4000:4000"
+    stop_grace_period: 20s
+    environment:
+      NODE_ENV: production
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL is required}"
+      DB_POOL_MAX: "${DB_POOL_MAX:-10}"
+      DB_IDLE_TIMEOUT_MS: "${DB_IDLE_TIMEOUT_MS:-20000}"
+      DB_CONNECTION_TIMEOUT_MS: "${DB_CONNECTION_TIMEOUT_MS:-10000}"
+      SHUTDOWN_TIMEOUT_MS: "${SHUTDOWN_TIMEOUT_MS:-15000}"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}"
+      AUTH_REQUIRE_EMAIL_VERIFICATION: "true"
+      WEB_URL: "${WEB_URL:?WEB_URL is required}"
+      ADMIN_URL: "${ADMIN_URL:?ADMIN_URL is required}"
+      SUPPORT_EMAIL: "${SUPPORT_EMAIL:?SUPPORT_EMAIL is required}"
+      TRUST_PROXY: "true"
+      SMTP_HOST: "${SMTP_HOST:?SMTP_HOST is required}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_SECURE: "${SMTP_SECURE:-false}"
+      SMTP_REQUIRE_TLS: "${SMTP_REQUIRE_TLS:-true}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      MAIL_FROM: "${MAIL_FROM:?MAIL_FROM is required}"
+      OBJECT_STORAGE_ENABLED: "true"
+      OBJECT_STORAGE_ENDPOINT: "${OBJECT_STORAGE_ENDPOINT:?OBJECT_STORAGE_ENDPOINT is required}"
+      OBJECT_STORAGE_REGION: "${OBJECT_STORAGE_REGION:-us-east-1}"
+      OBJECT_STORAGE_BUCKET: "${OBJECT_STORAGE_BUCKET:?OBJECT_STORAGE_BUCKET is required}"
+      OBJECT_STORAGE_ACCESS_KEY: "${OBJECT_STORAGE_ACCESS_KEY:?OBJECT_STORAGE_ACCESS_KEY is required}"
+      OBJECT_STORAGE_SECRET_KEY: "${OBJECT_STORAGE_SECRET_KEY:?OBJECT_STORAGE_SECRET_KEY is required}"
+      OBJECT_STORAGE_FORCE_PATH_STYLE: "${OBJECT_STORAGE_FORCE_PATH_STYLE:-true}"
+      OBJECT_STORAGE_READINESS_CHECK: "true"
+      APP_VERSION: "${APP_VERSION:?APP_VERSION is required}"
+      GIT_SHA: "${GIT_SHA:?GIT_SHA is required}"
+      BUILD_TIMESTAMP: "${BUILD_TIMESTAMP:?BUILD_TIMESTAMP is required}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+
+  web:
+    <<: *default-runtime
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/football-web:${RELEASE_TAG:?RELEASE_TAG is required}"
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/auth',{redirect:'manual'}).then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  admin:
+    <<: *default-runtime
+    image: "${IMAGE_REGISTRY:?IMAGE_REGISTRY is required}/football-admin:${RELEASE_TAG:?RELEASE_TAG is required}"
+    ports:
+      - "127.0.0.1:3001:3001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001',{redirect:'manual'}).then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3

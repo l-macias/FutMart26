@@ -145,6 +145,11 @@
   padding: var(--space-5);
 }
 
+.rowSample {
+  padding-inline: var(--space-4);
+  border-block: var(--border-width-thin) solid var(--border-subtle);
+}
+
 .stateStack {
   display: grid;
   gap: var(--space-4);

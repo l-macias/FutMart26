@@ -57,6 +57,10 @@ export function createGroupRoutes(
       const { groupId } = groupIdParamsSchema.parse(request.params);
       return groups.get((await actor(request)).id, groupId);
     });
+    app.get("/groups/:groupId/overview", async (request) => {
+      const { groupId } = groupIdParamsSchema.parse(request.params);
+      return insights.overview((await actor(request)).id, groupId);
+    });
     app.patch("/groups/:groupId", async (request) => {
       const { groupId } = groupIdParamsSchema.parse(request.params);
       const body = updateGroupRequestSchema.parse(request.body);

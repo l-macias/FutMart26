@@ -15,6 +15,7 @@ import type { Database } from "@football/database";
 import type { ApiConfig } from "../../config.js";
 import { ApplicationError } from "../errors.js";
 import type { AdminService } from "./admin-service.js";
+import type { AdminErrorBuffer } from "./admin-error-buffer.js";
 import type { ReadinessService } from "../../runtime/readiness.js";
 
 export function createAdminRoutes(
@@ -23,6 +24,7 @@ export function createAdminRoutes(
   service: AdminService,
   config: ApiConfig,
   readiness: ReadinessService,
+  errors: AdminErrorBuffer,
 ): FastifyPluginAsync {
   // Fastify requires an async plugin signature for encapsulated hooks/routes.
   // eslint-disable-next-line @typescript-eslint/require-await
@@ -47,6 +49,43 @@ export function createAdminRoutes(
     app.get("/admin/search", async (request) =>
       service.search(adminSearchQuerySchema.parse(request.query)),
     );
+    app.get("/admin/overview", async () => service.overview());
+    app.get("/admin/players", async (request) => {
+      const page = listQuery(
+        request.query as { q?: string; limit?: string; offset?: string },
+      );
+      const rows = await service.players({ ...page, limit: page.limit + 1 });
+      return pageResult(rows, page.limit);
+    });
+    app.get("/admin/groups", async (request) => {
+      const page = listQuery(
+        request.query as { q?: string; limit?: string; offset?: string },
+      );
+      const rows = await service.groups({ ...page, limit: page.limit + 1 });
+      return pageResult(rows, page.limit);
+    });
+    app.get("/admin/matches", async (request) => {
+      const query = request.query as {
+        q?: string;
+        limit?: string;
+        offset?: string;
+        status?: string;
+      };
+      const statuses = ["DRAFT", "OPEN", "STARTED", "FINISHED", "CANCELLED"];
+      if (query.status && !statuses.includes(query.status))
+        throw new ApplicationError(
+          "invalid_moderation_state",
+          "Invalid match status",
+          400,
+        );
+      const page = listQuery(query);
+      const rows = await service.matches({
+        ...page,
+        limit: page.limit + 1,
+        status: query.status,
+      });
+      return pageResult(rows, page.limit);
+    });
     app.get<{ Params: { playerId: string } }>(
       "/admin/players/:playerId",
       async (request) => service.player(request.params.playerId),
@@ -258,18 +297,88 @@ export function createAdminRoutes(
         return reply.status(204).send();
       },
     );
-    app.get("/admin/audit", async () => ({
-      items: await service.auditEvents(),
-    }));
+    app.get("/admin/audit", async (request) => {
+      const query = request.query as {
+        actor?: string;
+        action?: string;
+        targetType?: string;
+        targetId?: string;
+        from?: string;
+        to?: string;
+        limit?: string;
+      };
+      const targetTypes = [
+        "ACCOUNT",
+        "PLAYER",
+        "GROUP",
+        "MATCH",
+        "REPORT",
+        "BALLOT",
+        "INVITATION",
+      ] as const;
+      if (query.targetType && !targetTypes.includes(query.targetType as never))
+        throw new ApplicationError(
+          "invalid_moderation_state",
+          "Invalid audit target type",
+          400,
+        );
+      return {
+        items: await service.auditEvents({
+          actor: query.actor,
+          action: query.action,
+          targetType: query.targetType,
+          targetId: query.targetId,
+          from: parseDateFilter(query.from, "from"),
+          to: parseDateFilter(query.to, "to"),
+          limit: boundedLimit(query.limit, 100),
+        }),
+      };
+    });
+    app.get("/admin/errors", (request) => {
+      const query = request.query as {
+        status?: string;
+        route?: string;
+        errorCode?: string;
+        from?: string;
+        to?: string;
+        limit?: string;
+      };
+      const status = query.status ? Number(query.status) : undefined;
+      if (
+        status !== undefined &&
+        (!Number.isInteger(status) || status < 400 || status > 599)
+      )
+        throw new ApplicationError(
+          "invalid_moderation_state",
+          "Invalid error status",
+          400,
+        );
+      return {
+        items: errors.list({
+          limit: boundedLimit(query.limit, 100),
+          status,
+          route: query.route,
+          errorCode: query.errorCode,
+          from: parseDateFilter(query.from, "from"),
+          to: parseDateFilter(query.to, "to"),
+        }),
+        retention: { kind: "MEMORY", capacity: 200 },
+      };
+    });
     app.get("/admin/system", async () => {
       const runtime = await readiness.check();
-      const migration = await database.execute<{
-        id: number;
-        created_at: string;
-      }>(
-        sql`select id, created_at from drizzle.__drizzle_migrations order by id desc limit 1`,
-      );
-      const latest = Array.from(migration)[0];
+      let latest: { id: number; created_at: string } | undefined;
+      try {
+        const migration = await database.execute<{
+          id: number;
+          created_at: string;
+        }>(
+          sql`select id, created_at from drizzle.__drizzle_migrations order by id desc limit 1`,
+        );
+        latest = Array.from(migration)[0];
+      } catch {
+        latest = undefined;
+      }
       return {
         environment: config.NODE_ENV,
         api: runtime.status === "ready" ? "READY" : "NOT_READY",
@@ -281,12 +390,65 @@ export function createAdminRoutes(
         storageConfigured: runtime.storage !== "disabled",
         storageStatus: runtime.storage,
         mailConfigured: runtime.mail === "configured",
+        migrationsStatus: runtime.migrations,
         emailVerificationRequired:
           process.env.AUTH_REQUIRE_EMAIL_VERIFICATION === "true" ||
           config.NODE_ENV === "production",
         appVersion: runtime.version,
         gitSha: runtime.gitSha,
+        buildTimestamp: runtime.buildTimestamp,
+        uptimeSeconds: Math.floor(process.uptime()),
       };
     });
   };
+}
+
+function listQuery(query: { q?: string; limit?: string; offset?: string }) {
+  const q = query.q?.trim();
+  if (q && q.length > 100)
+    throw new ApplicationError(
+      "invalid_moderation_state",
+      "Query is too long",
+      400,
+    );
+  const offset = Number(query.offset ?? 0);
+  if (!Number.isInteger(offset) || offset < 0 || offset > 10_000)
+    throw new ApplicationError(
+      "invalid_moderation_state",
+      "Invalid pagination offset",
+      400,
+    );
+  return {
+    q: q || undefined,
+    limit: boundedLimit(query.limit, 50),
+    offset,
+  };
+}
+
+function pageResult<T>(rows: T[], limit: number) {
+  return { items: rows.slice(0, limit), hasMore: rows.length > limit };
+}
+
+function boundedLimit(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100)
+    throw new ApplicationError(
+      "invalid_moderation_state",
+      "Invalid limit",
+      400,
+    );
+  return parsed;
+}
+
+function parseDateFilter(value: string | undefined, field: string) {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()))
+    throw new ApplicationError(
+      "invalid_moderation_state",
+      `Invalid ${field} date`,
+      400,
+    );
+  return parsed;
 }

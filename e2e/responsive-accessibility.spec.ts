@@ -25,9 +25,10 @@ test("@critical mobile shell and avatar crop remain usable at 390px", async ({
       "/play",
       "/profile",
       "/players",
-      "/rankings/global",
+      "/rankings",
       "/notifications",
       "/invitations",
+      "/profile/settings",
       "/profile/account",
     ]) {
       await page.goto(path);
@@ -42,6 +43,34 @@ test("@critical mobile shell and avatar crop remain usable at 390px", async ({
         )
         .toBeTruthy();
     }
+
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: /^Hola, / })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Necesita tu atención" }),
+    ).toBeVisible();
+    await expect(page.getByText("Ranking global")).toHaveCount(0);
+
+    await page.goto("/play");
+    await expect(
+      page.getByRole("heading", { name: "Tus partidos." }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "PRÓXIMOS" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "HISTORIAL" })).toBeVisible();
+
+    await page.goto("/rankings");
+    await expect(page.getByRole("heading", { name: "Rankings" })).toBeVisible();
+    await page.getByRole("button", { name: "SEDE" }).click();
+    await expect(page).toHaveURL(/\/rankings\?scope=venue/);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth,
+        ),
+      )
+      .toBeTruthy();
 
     await page.goto("/profile/edit");
     await expect(page.getByLabel("Sin foto")).toBeVisible();

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Button, Text } from "@football/ui";
@@ -63,6 +64,9 @@ export function FootballOnboarding({
       await refreshFootballProfileProjections(queryClient);
     },
   });
+  const keeperPreferred = preferredRoles.includes("PORTERO");
+  const totalSteps = keeperPreferred ? 2 : 3;
+  const visibleStep = step === 0 ? 1 : step === 1 ? 2 : totalSteps;
 
   function toggleRole(role: Role) {
     setPreferredRoles((current) => {
@@ -85,23 +89,30 @@ export function FootballOnboarding({
   }
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${initial ? styles.settingsPage : ""}`}>
+      {initial ? (
+        <Link className={styles.back} href="/profile/settings">
+          ← CONFIGURACIÓN
+        </Link>
+      ) : null}
       <header className={styles.header}>
         <Text tone="accent" variant="label">
-          SETUP F5 · {step + 1}/3
+          FÚTBOL F5 · {visibleStep}/{totalSteps}
         </Text>
-        <Text as="h1" variant="display-lg">
+        <Text as="h1" variant={initial ? "heading-lg" : "display-lg"}>
           {initial ? "Ajustá tu perfil F5." : `Tu fútbol, ${playerName}.`}
         </Text>
         <div aria-hidden="true" className={styles.progress}>
-          <span style={{ inlineSize: `${((step + 1) / 3) * 100}%` }} />
+          <span
+            style={{ inlineSize: `${(visibleStep / totalSteps) * 100}%` }}
+          />
         </div>
       </header>
 
       {step === 0 ? (
         <section className={styles.step}>
           <Text as="h2" variant="heading-lg">
-            ¿Dónde te gusta jugar?
+            ¿Dónde te gusta jugar en F5?
           </Text>
           <Text tone="muted">
             Elegí hasta dos. El orden marca tu prioridad.
@@ -183,14 +194,21 @@ export function FootballOnboarding({
       )}
       <footer className={styles.actions}>
         {step > 0 && (
-          <Button onClick={() => setStep((value) => value - 1)} variant="quiet">
+          <Button
+            onClick={() =>
+              setStep(step === 2 && keeperPreferred ? 0 : step - 1)
+            }
+            variant="quiet"
+          >
             Atrás
           </Button>
         )}
         {step < 2 ? (
           <Button
             disabled={step === 0 && preferredRoles.length === 0}
-            onClick={() => setStep((value) => value + 1)}
+            onClick={() =>
+              setStep(step === 0 && keeperPreferred ? 2 : step + 1)
+            }
           >
             Continuar
           </Button>
@@ -200,7 +218,7 @@ export function FootballOnboarding({
             onClick={() =>
               save.mutate({
                 preferredRoles,
-                willingToPlayGoalkeeper: willing,
+                willingToPlayGoalkeeper: keeperPreferred ? true : willing,
                 strengths: selectedStrengths,
               })
             }

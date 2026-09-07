@@ -31,6 +31,9 @@ export function createPublicPlayerRoutes(
       const query = playerSearchQuerySchema.parse(request.query);
       return profiles.search((await actor(request)).id, query);
     });
+    app.get("/me/profile", async (request) =>
+      profiles.getOwn((await actor(request)).id),
+    );
     app.get("/players/:playerId/public-profile", async (request) => {
       const { playerId } = publicPlayerParamsSchema.parse(request.params);
       return profiles.get((await actor(request)).id, playerId);

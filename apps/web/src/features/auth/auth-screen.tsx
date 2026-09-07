@@ -135,7 +135,8 @@ export function AuthScreen({ returnTo }: Readonly<{ returnTo: string }>) {
               mode === "login" ? "current-password" : "new-password"
             }
             label="Contraseña"
-            minLength={12}
+            maxLength={128}
+            minLength={8}
             name="password"
             type="password"
           />
@@ -153,7 +154,7 @@ export function AuthScreen({ returnTo }: Readonly<{ returnTo: string }>) {
           </Button>
           {mode === "login" ? (
             <Link className={styles.secondaryLink} href="/auth/forgot-password">
-              Olvidé mi contraseña
+              ¿Olvidaste tu contraseña?
             </Link>
           ) : null}
           <p className={styles.legal}>
@@ -192,6 +193,7 @@ function Field({
   name: string;
   type: string;
   autoComplete: string;
+  maxLength?: number;
   minLength?: number;
 }>) {
   return (

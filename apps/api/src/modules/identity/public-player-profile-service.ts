@@ -1,18 +1,22 @@
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import type {
+  OwnPlayerProfile,
   PlayerSearchResponse,
   PublicPlayerProfile,
 } from "@football/contracts";
 import type { Database } from "@football/database";
 import {
   accountSuspensions,
+  groupMemberships,
+  groups,
   matches,
   matchParticipants,
   matchParticipantStats,
   matchSportingResults,
   playerPerformances,
   players,
+  progressionSnapshots,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -63,53 +67,135 @@ export class PublicPlayerProfileService {
         isCurrentPlayer: player.id === actorPlayerId,
       };
 
-    const [performance, footballPreferences, rewards, [stats]] =
-      await Promise.all([
-        this.performances.getF5(targetPlayerId),
-        this.preferences.get(targetPlayerId),
-        this.rewards.listPublic(targetPlayerId),
-        this.database
-          .select({
-            goals: sql<number>`coalesce(sum(${matchParticipantStats.goals}), 0)::int`,
-            assists: sql<number>`coalesce(sum(${matchParticipantStats.assists}), 0)::int`,
-          })
-          .from(matchParticipants)
-          .innerJoin(matches, eq(matches.id, matchParticipants.matchId))
-          .innerJoin(
-            matchSportingResults,
-            and(
-              eq(matchSportingResults.matchId, matches.id),
-              eq(matchSportingResults.status, "CONFIRMED"),
-            ),
-          )
-          .leftJoin(
-            matchParticipantStats,
-            eq(matchParticipantStats.participantId, matchParticipants.id),
-          )
-          .where(
-            and(
-              eq(matchParticipants.playerId, targetPlayerId),
-              eq(matchParticipants.kind, "PLAYER"),
-              eq(matchParticipants.status, "CONFIRMED"),
-              eq(matchParticipants.attendance, "PLAYED"),
-              eq(matches.status, "FINISHED"),
-              eq(matches.discipline, "F5"),
-            ),
-          ),
-      ]);
-
+    const details = await this.details(player, false);
     return {
       visibility: "PUBLIC",
+      ...details,
+      groups: details.groups.map(({ id, name }) => ({ id, name })),
+      isCurrentPlayer: player.id === actorPlayerId,
+    };
+  }
+
+  async getOwn(actorPlayerId: string): Promise<OwnPlayerProfile> {
+    const [player] = await this.database
+      .select({
+        id: players.id,
+        displayName: players.displayName,
+        profileVisibility: players.profileVisibility,
+        accountStatus: players.accountStatus,
+        suspensionId: accountSuspensions.id,
+      })
+      .from(players)
+      .leftJoin(
+        accountSuspensions,
+        and(
+          eq(accountSuspensions.authUserId, players.authUserId),
+          sql`${accountSuspensions.reactivatedAt} is null`,
+        ),
+      )
+      .where(eq(players.id, actorPlayerId))
+      .limit(1);
+    if (!player || player.accountStatus === "ANONYMIZED" || player.suspensionId)
+      throw new ApplicationError("player_not_found", "Player not found", 404);
+    const details = await this.details(player, true);
+    return {
+      ...details,
+      player: {
+        ...details.player,
+        profileVisibility: player.profileVisibility,
+      },
+    };
+  }
+
+  private async details(
+    player: { id: string; displayName: string },
+    includePrivateGroups: boolean,
+  ) {
+    const groupConditions = [
+      eq(groupMemberships.playerId, player.id),
+      eq(groupMemberships.status, "ACTIVE"),
+      eq(groups.status, "ACTIVE"),
+    ];
+    if (!includePrivateGroups)
+      groupConditions.push(eq(groups.visibility, "PUBLIC"));
+
+    const [
+      performance,
+      footballPreferences,
+      rewards,
+      [stats],
+      [rating],
+      groupRows,
+    ] = await Promise.all([
+      this.performances.getF5(player.id),
+      this.preferences.get(player.id),
+      this.rewards.listPublic(player.id),
+      this.database
+        .select({
+          goals: sql<number>`coalesce(sum(${matchParticipantStats.goals}), 0)::int`,
+          assists: sql<number>`coalesce(sum(${matchParticipantStats.assists}), 0)::int`,
+        })
+        .from(matchParticipants)
+        .innerJoin(matches, eq(matches.id, matchParticipants.matchId))
+        .innerJoin(
+          matchSportingResults,
+          and(
+            eq(matchSportingResults.matchId, matches.id),
+            eq(matchSportingResults.status, "CONFIRMED"),
+          ),
+        )
+        .leftJoin(
+          matchParticipantStats,
+          eq(matchParticipantStats.participantId, matchParticipants.id),
+        )
+        .where(
+          and(
+            eq(matchParticipants.playerId, player.id),
+            eq(matchParticipants.kind, "PLAYER"),
+            eq(matchParticipants.status, "CONFIRMED"),
+            eq(matchParticipants.attendance, "PLAYED"),
+            eq(matches.status, "FINISHED"),
+            eq(matches.discipline, "F5"),
+          ),
+        ),
+      this.database
+        .select({
+          value: sql<
+            string | null
+          >`avg(${progressionSnapshots.aggregatedRating})`,
+        })
+        .from(progressionSnapshots)
+        .where(
+          and(
+            eq(progressionSnapshots.playerId, player.id),
+            eq(progressionSnapshots.discipline, "F5"),
+          ),
+        ),
+      this.database
+        .select({
+          id: groups.id,
+          name: groups.name,
+          visibility: groups.visibility,
+        })
+        .from(groupMemberships)
+        .innerJoin(groups, eq(groups.id, groupMemberships.groupId))
+        .where(and(...groupConditions))
+        .orderBy(asc(sql`lower(${groups.name})`), asc(groups.id))
+        .limit(6),
+    ]);
+
+    return {
       player: {
         id: player.id,
         displayName: player.displayName,
         image: (await this.media?.getPlayerImage(player.id)) ?? null,
       },
       performance: {
-        discipline: "F5",
+        discipline: "F5" as const,
         initialized: performance.initialized,
         overall: performance.overall,
         attributes: performance.attributes,
+        ratingProfile: performance.ratingProfile,
         processedMatchCount: performance.processedMatchCount,
       },
       footballProfile: footballPreferences.configured
@@ -122,15 +208,16 @@ export class PublicPlayerProfileService {
         : null,
       rewards: {
         achievements: rewards.achievements,
-        recentAwards: rewards.recentAwards,
+        awardSummary: rewards.awardSummary,
       },
+      groups: groupRows,
       summary: {
         totalGoals: stats?.goals ?? 0,
         totalAssists: stats?.assists ?? 0,
+        averageRating: rating?.value ?? null,
         achievementCount: rewards.achievementCount,
         awardCount: rewards.awardCount,
       },
-      isCurrentPlayer: player.id === actorPlayerId,
     };
   }
 

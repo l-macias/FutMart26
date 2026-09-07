@@ -6,6 +6,7 @@ export interface SmtpAuthMailConfig {
   host: string;
   port: number;
   secure: boolean;
+  requireTls: boolean;
   user?: string;
   password?: string;
   from: string;
@@ -18,6 +19,7 @@ export function createSmtpAuthMailService(
     host: config.host,
     port: config.port,
     secure: config.secure,
+    requireTLS: config.requireTls,
     ...(config.user && config.password
       ? { auth: { user: config.user, pass: config.password } }
       : {}),

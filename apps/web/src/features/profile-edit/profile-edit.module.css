@@ -9,20 +9,32 @@
 }
 
 .page {
-  max-inline-size: 48rem;
+  max-inline-size: var(--content-settings);
   margin-inline: auto;
-  gap: var(--space-7);
+  gap: var(--space-6);
+  padding-block-end: var(--space-7);
+}
+
+.back {
+  inline-size: fit-content;
+  min-block-size: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  color: var(--foreground-muted);
+  font-size: var(--type-label-size);
+  font-weight: 800;
+  letter-spacing: var(--type-tracking-label);
 }
 
 .header,
 .form {
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .avatarSection {
-  gap: var(--space-5);
-  padding-block-start: var(--space-6);
-  border-block-start: var(--border-width-thin) solid var(--border-strong);
+  gap: var(--space-4);
+  padding-block-start: var(--space-5);
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
 }
 
 .avatarSection > div:first-child {
@@ -97,8 +109,6 @@
 
 .form {
   max-inline-size: 34rem;
-  padding-inline-start: var(--space-4);
-  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
 }
 
 .field {

@@ -1,5 +1,6 @@
 export const queryKeys = {
   me: ["me"] as const,
+  ownProfile: ["me", "profile"] as const,
   compliance: ["me", "compliance"] as const,
   publicPlayerProfile: (playerId: string) =>
     ["players", playerId, "public-profile"] as const,
@@ -7,6 +8,7 @@ export const queryKeys = {
   globalSearch: (q: string) => ["search", q] as const,
   globalRanking: ["rankings", "global", "F5"] as const,
   globalRankingPreview: ["rankings", "global", "F5", "preview"] as const,
+  rankingContexts: ["rankings", "contexts", "F5"] as const,
   featuredPlayers: (period: "7d" | "30d") =>
     ["discovery", "players", "featured", period] as const,
   risingPlayers: (period: "7d" | "30d") =>
@@ -23,6 +25,7 @@ export const queryKeys = {
   footballPreferences: ["me", "football-preferences", "F5"] as const,
   groups: ["groups"] as const,
   group: (groupId: string) => ["groups", groupId] as const,
+  groupOverview: (groupId: string) => ["groups", groupId, "overview"] as const,
   groupMembers: (groupId: string, includeBlocked = false) =>
     ["groups", groupId, "members", { includeBlocked }] as const,
   groupRanking: (groupId: string) =>
@@ -40,10 +43,15 @@ export const queryKeys = {
   invitations: (groupId: string) => ["groups", groupId, "invitations"] as const,
   managedDirectedGroupInvitations: (groupId: string) =>
     ["groups", groupId, "directed-invitations"] as const,
+  groupInvitationCandidates: (groupId: string) =>
+    ["groups", groupId, "invitation-candidates"] as const,
+  playerGroupInvitationOptions: (playerId: string) =>
+    ["players", playerId, "group-invitation-options"] as const,
   invitationPreview: (token: string) => ["invitations", token] as const,
   matches: (groupId: string) => ["groups", groupId, "matches"] as const,
-  personalMatches: (upcomingLimit = 5, recentLimit = 5) =>
-    ["me", "matches", { upcomingLimit, recentLimit }] as const,
+  personalHome: ["me", "home"] as const,
+  personalMatches: (upcomingLimit = 5, historyLimit = 5) =>
+    ["me", "matches", { upcomingLimit, historyLimit }] as const,
   personalMatchesRoot: ["me", "matches"] as const,
   matchDefaults: (groupId: string) =>
     ["groups", groupId, "match-defaults"] as const,
@@ -64,6 +72,9 @@ export const queryKeys = {
   progressionHistory: ["me", "progression", "history"] as const,
   rewards: ["me", "rewards"] as const,
   notifications: ["me", "notifications"] as const,
+  notificationInbox: (unreadOnly = false) =>
+    ["me", "notifications", "inbox", { unreadOnly }] as const,
+  notificationPreview: ["me", "notifications", "preview"] as const,
   notificationUnreadCount: ["me", "notifications", "unread-count"] as const,
   venueSearch: (query: string, city?: string) =>
     ["venues", "search", query, city] as const,

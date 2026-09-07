@@ -2,22 +2,24 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState, type KeyboardEvent } from "react";
 
-import { MatchStateMark, TacticalDivider } from "@football/football-ui";
-import { Surface, Text } from "@football/ui";
+import type { PersonalMatch } from "@football/contracts";
+import { MatchStateMark } from "@football/football-ui";
+import { Text } from "@football/ui";
 
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
+import { CompactMatch, formatMatchDate } from "./compact-match";
 import styles from "./play.module.css";
 
-type Match = Awaited<
-  ReturnType<typeof api.personalMatches>
->["upcoming"][number];
-
 export function PlayScreen() {
+  const [matchView, setMatchView] = useState<"upcoming" | "history">(
+    "upcoming",
+  );
   const matches = useQuery({
-    queryKey: queryKeys.personalMatches(5, 4),
-    queryFn: () => api.personalMatches(5, 4),
+    queryKey: queryKeys.personalMatches(10, 10),
+    queryFn: () => api.personalMatches(10, 10),
   });
   const opportunities = useInfiniteQuery({
     queryKey: queryKeys.recruitmentOpportunities,
@@ -26,264 +28,240 @@ export function PlayScreen() {
     getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 
-  if (matches.isPending) {
+  if (matches.isPending)
     return (
       <div className={styles.page}>
         <p role="status">Preparando tus partidos…</p>
       </div>
     );
-  }
-
-  if (matches.isError) {
+  if (matches.isError)
     return (
       <div className={styles.page}>
         <p role="alert">No pudimos cargar tus partidos.</p>
       </div>
     );
-  }
 
-  const upcoming = matches.data.upcoming;
-  const nextMatch = upcoming[0] ?? null;
-  const laterMatches = upcoming.slice(1, 5);
-  const recentMatches = matches.data.recent;
+  const highlighted = matches.data.current ?? matches.data.upcoming[0] ?? null;
+  const upcoming = matches.data.current
+    ? matches.data.upcoming
+    : matches.data.upcoming.slice(1);
+  const selectedMatches =
+    matchView === "upcoming" ? upcoming : matches.data.history;
+
+  function navigateMatchTabs(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+
+    event.preventDefault();
+    const nextView =
+      event.key === "ArrowLeft" || event.key === "Home"
+        ? "upcoming"
+        : "history";
+    setMatchView(nextView);
+    const tabs =
+      event.currentTarget.parentElement?.querySelectorAll<HTMLElement>(
+        '[role="tab"]',
+      );
+    tabs?.[nextView === "upcoming" ? 0 : 1]?.focus();
+  }
 
   return (
     <div className={styles.page}>
       <header className={styles.intro}>
-        <Text as="span" tone="accent" variant="label">
-          Jugar
-        </Text>
-        <Text as="h1" variant="display-lg">
-          Lo que viene.
-        </Text>
-        <Text tone="muted" variant="body">
-          Tus partidos reales, en un solo lugar.
+        <div>
+          <Text as="span" tone="accent" variant="label">
+            JUGAR
+          </Text>
+          <Text as="h1" variant="display-lg">
+            Tus partidos.
+          </Text>
+        </div>
+        <Text className={styles.context} tone="muted">
+          Cuándo jugás y dónde todavía hay lugar.
         </Text>
       </header>
 
-      <>
-        <>
-          {nextMatch ? (
-            <RealNextMatch match={nextMatch} />
-          ) : (
-            <Surface
-              as="section"
-              className={styles.nextMatch}
-              elevation="raised"
-            >
-              <div className={styles.matchHeading}>
-                <Text tone="accent" variant="label">
-                  PRÓXIMO PARTIDO
-                </Text>
-                <Text as="h2" variant="heading-lg">
-                  No tenés partidos próximos.
-                </Text>
-                <Text tone="muted">
-                  Cuando un grupo publique una nueva convocatoria aparecerá acá.
-                </Text>
-              </div>
-              <div className={styles.matchActions}>
-                <Link className={styles.primaryLink} href="/groups">
-                  VER MIS GRUPOS <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-            </Surface>
-          )}
+      {highlighted ? (
+        <CompactMatch match={highlighted} />
+      ) : (
+        <section className={styles.compactEmpty}>
+          <Text as="h2" variant="heading-lg">
+            No tenés partidos todavía.
+          </Text>
+          <Text tone="muted">
+            Explorá las convocatorias abiertas o revisá tus grupos.
+          </Text>
+        </section>
+      )}
 
-          <TacticalDivider />
-
-          <section className={styles.upcoming}>
-            <Text as="h2" variant="heading-lg">
-              Partidos que buscan jugadores
+      <section className={styles.section} aria-labelledby="opportunities-title">
+        <div className={styles.sectionHeader}>
+          <div>
+            <Text tone="accent" variant="label">
+              BUSCAN JUGADORES
             </Text>
-            {opportunities.isPending && (
-              <Text tone="muted">Buscando convocatorias…</Text>
-            )}
-            {opportunities.isError && (
-              <Text tone="muted" role="alert">
-                No pudimos cargar las oportunidades.
-              </Text>
-            )}
-            <ol className={styles.upcomingList}>
-              {opportunities.data?.pages
-                .flatMap((page) => page.items)
-                .map((item, index) => (
-                  <li className={styles.upcomingRow} key={item.matchId}>
-                    <span className={styles.matchIndex}>
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <Text as="h3" variant="heading-md">
-                        <Link href={`/play/matches/${item.matchId}`}>
-                          {item.group.name}
-                        </Link>
-                      </Text>
-                      <Text tone="muted" variant="metadata">
-                        Faltan {item.openSpots} ·{" "}
-                        {item.needs
-                          .map((need) => `${need.quantity} ${need.role}`)
-                          .join(" · ") || "sin rol específico"}
-                      </Text>
-                      {item.matchesMyProfile && (
-                        <Text tone="accent" variant="label">
-                          COINCIDE CON TU PERFIL
-                        </Text>
-                      )}
-                    </div>
-                  </li>
-                ))}
-            </ol>
-            {opportunities.data?.pages[0]?.items.length === 0 && (
-              <Text tone="muted">
-                No hay partidos buscando jugadores ahora.
-              </Text>
-            )}
-            {opportunities.hasNextPage && (
-              <button
-                className={styles.primaryLink}
-                onClick={() => void opportunities.fetchNextPage()}
-                type="button"
-              >
-                CARGAR MÁS
-              </button>
-            )}
-          </section>
-
-          <TacticalDivider />
-
-          <div className={styles.secondaryZone}>
-            <MatchList
-              empty="No hay otros partidos programados."
-              matches={laterMatches}
-              title="Próximos partidos"
-            />
-            <MatchList
-              empty="Todavía no hay actividad reciente."
-              matches={recentMatches}
-              title="Actividad reciente"
-            />
+            <Text as="h2" id="opportunities-title" variant="heading-lg">
+              Partidos con lugar
+            </Text>
           </div>
-        </>
-      </>
+          <Link href="/groups">Ver mis grupos</Link>
+        </div>
+        {opportunities.isPending ? (
+          <Text tone="muted">Buscando convocatorias…</Text>
+        ) : opportunities.isError ? (
+          <Text tone="muted" role="alert">
+            No pudimos cargar las oportunidades.
+          </Text>
+        ) : opportunities.data.pages[0]?.items.length === 0 ? (
+          <Text tone="muted">No hay partidos buscando jugadores ahora.</Text>
+        ) : (
+          <ol className={`${styles.rows} ui-list`}>
+            {opportunities.data.pages
+              .flatMap((page) => page.items)
+              .map((item) => (
+                <li className="ui-row" key={item.matchId}>
+                  <Link
+                    className={styles.rowLink}
+                    href={`/play/matches/${item.matchId}`}
+                  >
+                    <span className={styles.matchDate} aria-hidden="true">
+                      {formatShortDay(new Date(item.scheduledAt))}
+                    </span>
+                    <span className="ui-row__content">
+                      <strong className="ui-row__primary">
+                        {item.group.name}
+                      </strong>
+                      <small className="ui-row__secondary">
+                        {formatMatchDate(new Date(item.scheduledAt))} ·{" "}
+                        {item.venue?.displayName ?? item.locationText}
+                      </small>
+                    </span>
+                    <span className={styles.spots}>
+                      FALTAN {item.openSpots}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+          </ol>
+        )}
+        {opportunities.hasNextPage ? (
+          <button
+            className={styles.loadMore}
+            disabled={opportunities.isFetchingNextPage}
+            onClick={() => void opportunities.fetchNextPage()}
+            type="button"
+          >
+            {opportunities.isFetchingNextPage ? "CARGANDO…" : "CARGAR MÁS"}
+          </button>
+        ) : null}
+      </section>
+
+      <section className={styles.section} aria-labelledby="my-matches-title">
+        <Text as="h2" id="my-matches-title" variant="heading-lg">
+          Mis partidos
+        </Text>
+        <div
+          className={styles.tabs}
+          aria-label="Vista de mis partidos"
+          role="tablist"
+        >
+          <button
+            aria-controls="my-matches-panel"
+            aria-selected={matchView === "upcoming"}
+            onKeyDown={navigateMatchTabs}
+            onClick={() => setMatchView("upcoming")}
+            role="tab"
+            tabIndex={matchView === "upcoming" ? 0 : -1}
+            type="button"
+          >
+            PRÓXIMOS
+          </button>
+          <button
+            aria-controls="my-matches-panel"
+            aria-selected={matchView === "history"}
+            onKeyDown={navigateMatchTabs}
+            onClick={() => setMatchView("history")}
+            role="tab"
+            tabIndex={matchView === "history" ? 0 : -1}
+            type="button"
+          >
+            HISTORIAL
+          </button>
+        </div>
+        <div id="my-matches-panel" role="tabpanel">
+          {selectedMatches.length === 0 ? (
+            <Text className={styles.inlineEmpty} tone="muted">
+              {matchView === "upcoming"
+                ? highlighted
+                  ? "No tenés otros partidos programados."
+                  : "No tenés próximos partidos."
+                : "Todavía no tenés partidos en el historial."}
+            </Text>
+          ) : (
+            <MatchRows matches={selectedMatches} />
+          )}
+        </div>
+      </section>
     </div>
   );
 }
 
-function RealNextMatch({ match }: Readonly<{ match: Match }>) {
-  const date = new Date(match.scheduledAt);
-  const location = [
-    match.venue?.displayName ?? match.locationText,
-    match.court?.displayName,
-    match.venue?.city,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
+function MatchRows({ matches }: Readonly<{ matches: PersonalMatch[] }>) {
   return (
-    <Surface as="section" className={styles.nextMatch} elevation="raised">
-      <span aria-hidden="true" className={styles.pitchStripe} />
-      <div className={styles.matchHeading}>
-        <Text as="span" tone="accent" variant="label">
-          Próximo partido
-        </Text>
-        <Text as="p" className={styles.matchTime} variant="display-lg">
-          {formatMatchDate(date)}
-        </Text>
-        <Text as="h2" variant="heading-lg">
-          {match.group.name}
-        </Text>
-        <Text tone="muted" variant="metadata">
-          F5 · {match.durationMinutes} min{location ? ` · ${location}` : ""}
-        </Text>
-      </div>
-
-      <div className={styles.registrationState}>
-        <Text as="span" variant="heading-md">
-          {match.confirmedCount} / {match.capacity}
-        </Text>
-        <MatchStateMark tone={match.status === "OPEN" ? "positive" : "warning"}>
-          {match.status === "OPEN" ? "Convocatoria" : "Borrador"}
-        </MatchStateMark>
-      </div>
-
-      <div className={styles.matchActions}>
-        <Link className={styles.primaryLink} href={`/play/matches/${match.id}`}>
-          VER PARTIDO <span aria-hidden="true">→</span>
-        </Link>
-      </div>
-    </Surface>
-  );
-}
-
-function MatchList({
-  empty,
-  matches,
-  title,
-}: Readonly<{
-  empty: string;
-  matches: Match[];
-  title: string;
-}>) {
-  return (
-    <section className={styles.upcoming}>
-      <Text as="h2" variant="heading-lg">
-        {title}
-      </Text>
-      {matches.length === 0 ? (
-        <Text tone="muted">{empty}</Text>
-      ) : (
-        <ol className={styles.upcomingList}>
-          {matches.map((match, index) => (
-            <li className={styles.upcomingRow} key={match.id}>
-              <span className={styles.matchIndex}>
-                {String(index + 1).padStart(2, "0")}
+    <ol className={`${styles.rows} ui-list`}>
+      {matches.map((match) => (
+        <li className="ui-row" key={match.id}>
+          <Link className={styles.rowLink} href={`/play/matches/${match.id}`}>
+            <span className={styles.matchDate} aria-hidden="true">
+              {formatShortDay(new Date(match.scheduledAt))}
+            </span>
+            <span className="ui-row__content">
+              <strong className="ui-row__primary">{match.group.name}</strong>
+              <small className="ui-row__secondary">
+                {formatMatchDate(new Date(match.scheduledAt))} ·{" "}
+                {match.venue?.displayName ?? match.locationText}
+                {match.participation
+                  ? ` · ${participationLabel(match.participation.status)}`
+                  : ""}
+              </small>
+            </span>
+            {match.result ? (
+              <span className={styles.score}>
+                {match.result.teamAGoals} — {match.result.teamBGoals}
               </span>
-              <div>
-                <Text as="span" tone="muted" variant="metadata">
-                  {formatMatchDate(new Date(match.scheduledAt))}
-                </Text>
-                <Text as="h3" variant="heading-md">
-                  <Link href={`/play/matches/${match.id}`}>
-                    {match.group.name}
-                  </Link>
-                </Text>
-              </div>
-              <MatchStateMark tone={toneForStatus(match.status)}>
-                {labelForStatus(match.status)}
+            ) : (
+              <MatchStateMark tone={statusTone(match.status)}>
+                {statusLabel(match.status)}
               </MatchStateMark>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ol>
   );
 }
 
-function labelForStatus(status: Match["status"]) {
-  switch (status) {
-    case "DRAFT":
-      return "Borrador";
-    case "OPEN":
-      return "Convocatoria";
-    case "STARTED":
-      return "En juego";
-    case "FINISHED":
-      return "Finalizado";
-    case "CANCELLED":
-      return "Cancelado";
-  }
-}
-
-function toneForStatus(status: Match["status"]): "positive" | "warning" {
-  return status === "DRAFT" ? "warning" : "positive";
-}
-
-function formatMatchDate(date: Date) {
+function formatShortDay(date: Date) {
   return new Intl.DateTimeFormat("es-AR", {
-    weekday: "short",
-    day: "numeric",
+    day: "2-digit",
     month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  })
+    .format(date)
+    .replace(".", "")
+    .toUpperCase();
+}
+
+function participationLabel(status: "CONFIRMED" | "WAITLISTED") {
+  return status === "CONFIRMED" ? "Estás anotado" : "Lista de espera";
+}
+
+function statusLabel(status: PersonalMatch["status"]) {
+  if (status === "OPEN") return "Convocatoria";
+  if (status === "STARTED") return "En juego";
+  if (status === "FINISHED") return "Finalizado";
+  if (status === "CANCELLED") return "Cancelado";
+  return "Borrador";
+}
+
+function statusTone(status: PersonalMatch["status"]): "positive" | "warning" {
+  return status === "CANCELLED" || status === "DRAFT" ? "warning" : "positive";
 }

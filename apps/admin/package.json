@@ -8,11 +8,12 @@
     "start": "next start --port 3001",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node scripts/check-route-integrity.mjs"
+    "test": "node scripts/check-route-integrity.mjs && node scripts/check-operational-contract.mjs"
   },
   "dependencies": {
     "@football/auth": "workspace:*",
     "@football/contracts": "workspace:*",
+    "@football/ui": "workspace:*",
     "@tanstack/react-query": "^5.85.5",
     "next": "^16.0.0",
     "react": "^19.1.1",

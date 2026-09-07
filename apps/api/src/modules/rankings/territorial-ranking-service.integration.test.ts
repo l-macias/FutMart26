@@ -64,7 +64,12 @@ void test(
     const service = new TerritorialRankingService(connection.db);
     const venueService = new VenueService(connection.db);
 
-    async function player(name: string, overall: string, processed = 1) {
+    async function player(
+      name: string,
+      overall: string,
+      processed = 1,
+      profileVisibility: "PUBLIC" | "PRIVATE" = "PUBLIC",
+    ) {
       const authUserId = randomUUID();
       const id = randomUUID();
       await connection.db.insert(authUser).values({
@@ -74,7 +79,7 @@ void test(
       });
       await connection.db
         .insert(players)
-        .values({ id, authUserId, displayName: name });
+        .values({ id, authUserId, displayName: name, profileVisibility });
       await connection.db.insert(playerPerformances).values({
         id: randomUUID(),
         playerId: id,
@@ -119,14 +124,21 @@ void test(
     const ambiguousBrazilVenue = randomUUID();
     const venueSuffix = randomUUID();
     const geographySeed = venueSuffix.replaceAll("-", "").toUpperCase();
-    const countryOne = `${String.fromCharCode(65 + (Number.parseInt(geographySeed.slice(0, 2), 16) % 26))}${String.fromCharCode(65 + (Number.parseInt(geographySeed.slice(2, 4), 16) % 26))}`;
-    const countryTwo = `${String.fromCharCode(65 + (Number.parseInt(geographySeed.slice(4, 6), 16) % 26))}${String.fromCharCode(65 + (Number.parseInt(geographySeed.slice(6, 8), 16) % 26))}`;
-    const effectiveCountryTwo =
-      countryTwo === countryOne
-        ? countryOne === "ZZ"
-          ? "YY"
-          : "ZZ"
-        : countryTwo;
+    const usedCountries = new Set(
+      (
+        await connection.client<
+          { country_code: string }[]
+        >`select distinct country_code from venues where country_code is not null`
+      ).map((row) => row.country_code),
+    );
+    const availableCountries = Array.from(
+      { length: 26 * 26 },
+      (_, index) =>
+        `${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}`,
+    ).filter((code) => !usedCountries.has(code));
+    const countryOne = availableCountries[0];
+    const effectiveCountryTwo = availableCountries[1];
+    assert.ok(countryOne && effectiveCountryTwo);
     const provinceOne = `${countryOne}-${geographySeed.slice(8, 11)}`;
     const provinceTwo = `${countryOne}-${geographySeed.slice(11, 14)}`;
     const foreignProvince = `${effectiveCountryTwo}-${geographySeed.slice(14, 17)}`;
@@ -628,6 +640,57 @@ void test(
       assert.equal(legacyVenueRanking.scope.province, null);
       assert.equal(legacyVenueRanking.scope.country, null);
     }
+    const privateOnlyPlayer = await player(
+      "Private context player",
+      "88.000000000000",
+      3,
+      "PRIVATE",
+    );
+    const privateOnlyVenue = randomUUID();
+    await connection.db.insert(venues).values({
+      id: privateOnlyVenue,
+      displayName: `Private only ${venueSuffix}`,
+      normalizedName: `private only ${venueSuffix}`,
+      city: `Private city ${venueSuffix}`,
+      normalizedCity: `private city ${venueSuffix}`,
+      createdByPlayerId: owner,
+    });
+    await finishedMatch({
+      venueId: privateOnlyVenue,
+      scheduledAt: new Date("2026-08-01T20:00:00.000Z"),
+      playerIds: [privateOnlyPlayer],
+    });
+    const contexts = await service.contexts(actor);
+    assert.equal(contexts.discipline, "F5");
+    assert.deepEqual(contexts.groups, [
+      { id: groupId, name: "Territorial Test" },
+    ]);
+    assert.equal((contexts.cities[0]?.actorMatchesPlayed ?? 0) > 0, true);
+    assert.equal(
+      contexts.cities.some(
+        (context) =>
+          context.key === encodeCityRankingKey(normalizedRosario) &&
+          context.rankedPlayerCount === 4,
+      ),
+      true,
+    );
+    assert.equal(
+      contexts.venues.some(
+        (context) =>
+          context.id === venueOne &&
+          context.actorMatchesPlayed === 2 &&
+          context.rankedPlayerCount === 4,
+      ),
+      true,
+    );
+    assert.equal(
+      contexts.venues.some((context) => context.id === canonicalCreated.id),
+      false,
+    );
+    assert.equal(
+      contexts.venues.some((context) => context.id === privateOnlyVenue),
+      false,
+    );
     await assert.rejects(
       service.list(
         actor,

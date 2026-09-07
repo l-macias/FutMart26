@@ -1,5 +1,10 @@
 # Design System
 
+La implementación visual V1 está definida en
+[`VISUAL_FOUNDATION.md`](./VISUAL_FOUNDATION.md). Este documento conserva los
+principios de sistema; la foundation contiene los tokens y reglas operativas
+vigentes para el rediseño.
+
 ## Purpose
 
 Prevent visual spaghetti and give the product a recognizable identity.

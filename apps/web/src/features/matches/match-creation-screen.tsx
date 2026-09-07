@@ -88,7 +88,13 @@ export function MatchCreationScreen({
         queryKey: queryKeys.matches(groupId),
       });
       await queryClient.invalidateQueries({
+        queryKey: queryKeys.groupOverview(groupId),
+      });
+      await queryClient.invalidateQueries({
         queryKey: queryKeys.personalMatchesRoot,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.personalHome,
       });
       if (saveDefaults)
         await queryClient.invalidateQueries({
@@ -145,7 +151,7 @@ export function MatchCreationScreen({
           ← GRUPO
         </Link>
         <Text tone="accent" variant="label">
-          DRAFT · REVISIÓN
+          BORRADOR · REVISIÓN
         </Text>
         <Text as="h1" variant="display-lg">
           Próximo partido.
@@ -157,6 +163,7 @@ export function MatchCreationScreen({
             value={new Intl.DateTimeFormat("es-AR", {
               dateStyle: "full",
               timeStyle: "short",
+              hourCycle: "h23",
             }).format(new Date(scheduledAt!))}
           />
           <Review label="DURACIÓN" value={`${duration} MIN`} />
@@ -176,8 +183,8 @@ export function MatchCreationScreen({
           />
         </section>
         <p className={styles.muted}>
-          Se guardará como Draft. Podrás revisar o editar estos datos y publicar
-          la convocatoria desde el detalle del partido.
+          Se guardará como borrador. Podrás revisar o editar estos datos y
+          publicar la convocatoria desde el detalle del partido.
         </p>
         {create.isError && (
           <p className={styles.error} role="alert">
@@ -189,7 +196,7 @@ export function MatchCreationScreen({
             Editar
           </Button>
           <Button disabled={create.isPending} onClick={() => create.mutate()}>
-            Crear Draft
+            Crear borrador
           </Button>
         </div>
       </main>
@@ -406,7 +413,7 @@ export function MatchCreationScreen({
           disabled={!scheduledAt || !locationQuery.trim() || !validCapacity}
           onClick={() => setStep("REVIEW")}
         >
-          Revisar Draft
+          Revisar borrador
         </Button>
       </div>
     </main>

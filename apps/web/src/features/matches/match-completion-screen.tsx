@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Button, Surface, Text } from "@football/ui";
+import { Badge, Button, Surface, Text } from "@football/ui";
 
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
@@ -168,13 +168,20 @@ export function MatchCompletionScreen({
   });
 
   async function invalidateClosure() {
-    await Promise.all([
+    const invalidations = [
       queryClient.invalidateQueries({ queryKey: queryKeys.match(matchId) }),
       queryClient.invalidateQueries({
         queryKey: queryKeys.finalRoster(matchId),
       }),
       queryClient.invalidateQueries({ queryKey: queryKeys.result(matchId) }),
-    ]);
+    ];
+    if (match.data?.groupId)
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.groupOverview(match.data.groupId),
+        }),
+      );
+    await Promise.all(invalidations);
   }
   const finish = useMutation({
     mutationFn: () => api.finishMatch(matchId),
@@ -588,7 +595,7 @@ function ReadOnlyClosure({
             roster.participants.filter((item) => item.attendance === "NO_SHOW")
               .length
           }{" "}
-          no-show
+          no jugaron
         </p>
       </section>
 
@@ -607,10 +614,12 @@ function ReadOnlyClosure({
                 >
                   <div>
                     <strong>{participant.displayName}</strong>
-                    {participant.kind === "GUEST" && <small>INVITADO</small>}
+                    {participant.kind === "GUEST" && (
+                      <Badge kind="role">INVITADO</Badge>
+                    )}
                   </div>
                   <span>
-                    {participant.attendance === "PLAYED" ? "JUGÓ" : "NO-SHOW"}
+                    {participant.attendance === "PLAYED" ? "JUGÓ" : "NO JUGÓ"}
                   </span>
                   {participant.attendance === "PLAYED" && (
                     <small>
@@ -659,7 +668,7 @@ function AttendanceTeam({
             {played.has(item.participantId) ? "✓" : "○"}
           </span>
           <strong>{item.displayName}</strong>
-          {item.kind === "GUEST" && <small>INVITADO</small>}
+          {item.kind === "GUEST" && <Badge kind="role">INVITADO</Badge>}
           <em>{played.has(item.participantId) ? "JUGÓ" : "AUSENTE"}</em>
         </button>
       ))}
@@ -688,7 +697,7 @@ function StatsTeam({
           <article className={styles.statRow} key={item.participantId}>
             <div>
               <strong>{item.displayName}</strong>
-              {item.kind === "GUEST" && <small>INVITADO</small>}
+              {item.kind === "GUEST" && <Badge kind="role">INVITADO</Badge>}
             </div>
             <Stepper
               label={`Goles de ${item.displayName}`}
@@ -823,7 +832,7 @@ function Review({
   );
 }
 function Progress({ step }: Readonly<{ step: Step }>) {
-  const labels = ["Asistencia", "Resultado", "Stats", "Revisar"];
+  const labels = ["Asistencia", "Resultado", "Eventos", "Revisar"];
   const active =
     step === "INTRO" || step === "ATTENDANCE"
       ? 0

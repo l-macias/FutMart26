@@ -1,5 +1,6 @@
 import sharp from "sharp";
 
+import { avatarCropRectangle } from "@football/contracts";
 import { ApplicationError } from "../errors.js";
 
 export const AVATAR_INPUT_MAX_BYTES = 8 * 1024 * 1024;
@@ -84,7 +85,7 @@ export async function processAvatar(input: {
         422,
       );
 
-    const extraction = cropRectangle(
+    const extraction = avatarCropRectangle(
       rotated.info.width,
       rotated.info.height,
       input.crop,
@@ -111,34 +112,4 @@ export async function processAvatar(input: {
       422,
     );
   }
-}
-
-function cropRectangle(
-  width: number,
-  height: number,
-  crop: { cropX: number; cropY: number; zoom: number },
-) {
-  const targetRatio = AVATAR_WIDTH / AVATAR_HEIGHT;
-  const baseWidth = Math.min(width, Math.floor(height * targetRatio));
-  const baseHeight = Math.min(height, Math.floor(baseWidth / targetRatio));
-  const cropWidth = Math.max(1, Math.floor(baseWidth / crop.zoom));
-  const cropHeight = Math.max(1, Math.floor(baseHeight / crop.zoom));
-  return {
-    left: clamp(
-      Math.round(crop.cropX * width - cropWidth / 2),
-      0,
-      width - cropWidth,
-    ),
-    top: clamp(
-      Math.round(crop.cropY * height - cropHeight / 2),
-      0,
-      height - cropHeight,
-    ),
-    width: cropWidth,
-    height: cropHeight,
-  };
-}
-
-function clamp(value: number, minimum: number, maximum: number) {
-  return Math.min(Math.max(value, minimum), maximum);
 }

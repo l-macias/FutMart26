@@ -9,7 +9,7 @@ export interface DatabasePoolOptions {
   connectTimeoutSeconds?: number;
 }
 
-export const REQUIRED_MIGRATION_TIMESTAMP = 1_788_264_495_072;
+export const REQUIRED_MIGRATION_TIMESTAMP = 1_788_371_890_300;
 
 export function createDatabase(
   databaseUrl: string,

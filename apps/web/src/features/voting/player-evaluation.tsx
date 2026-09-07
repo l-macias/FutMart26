@@ -71,7 +71,7 @@ export function PlayerEvaluation({
         <div>
           {participant.guest ? (
             <Text as="span" tone="accent" variant="metadata">
-              Guest
+              INVITADO
             </Text>
           ) : null}
           <Text as="h2" id="current-player-name" variant="display-lg">
@@ -119,7 +119,7 @@ export function PlayerEvaluation({
       ) : null}
       {rating === undefined ? (
         <Text tone="muted" variant="metadata">
-          Elegí un rating para continuar.
+          Elegí una nota para continuar.
         </Text>
       ) : null}
     </section>

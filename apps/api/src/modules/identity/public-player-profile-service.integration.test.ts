@@ -56,6 +56,7 @@ void test("Player discovery and public profile require authentication", async ()
     ),
   );
   assert.equal((await app.inject("/players/search?q=lu")).statusCode, 401);
+  assert.equal((await app.inject("/me/profile")).statusCode, 401);
   assert.equal(
     (await app.inject(`/players/${randomUUID()}/public-profile`)).statusCode,
     401,
@@ -129,12 +130,26 @@ void test(
       id: privateGroupId,
       name: "Private Group Name",
       createdByPlayerId: target.id,
+      visibility: "PRIVATE",
     });
     await connection.db.insert(groupMemberships).values({
       id: randomUUID(),
       groupId: privateGroupId,
       playerId: target.id,
       role: "OWNER",
+    });
+    const publicGroupId = randomUUID();
+    await connection.db.insert(groups).values({
+      id: publicGroupId,
+      name: "Public Football Context",
+      createdByPlayerId: actor.id,
+      visibility: "PUBLIC",
+    });
+    await connection.db.insert(groupMemberships).values({
+      id: randomUUID(),
+      groupId: publicGroupId,
+      playerId: target.id,
+      role: "MEMBER",
     });
     const guestId = randomUUID();
     await connection.db.insert(groupGuests).values({
@@ -234,7 +249,18 @@ void test(
     assert.equal(profile.summary.totalAssists, 2);
     assert.equal(profile.summary.achievementCount, 1);
     assert.equal(profile.summary.awardCount, 6);
-    assert.equal(profile.rewards.recentAwards.length, 5);
+    assert.deepEqual(profile.groups, [
+      { id: publicGroupId, name: "Public Football Context" },
+    ]);
+    assert.equal(profile.rewards.awardSummary.length, 3);
+    assert.deepEqual(
+      profile.rewards.awardSummary.map((award) => [award.type, award.count]),
+      [
+        ["TOP_RATED", 2],
+        ["TOP_SCORER", 2],
+        ["TOP_ASSIST", 2],
+      ],
+    );
     assert.equal(profile.isCurrentPlayer, false);
     const serialized = JSON.stringify(profile);
     for (const secret of [
@@ -256,9 +282,16 @@ void test(
       false,
     );
     assert.equal(
-      Object.hasOwn(profile.rewards.recentAwards[0]!, "matchId"),
+      Object.hasOwn(profile.rewards.awardSummary[0]!, "matchId"),
       false,
     );
+
+    const ownProfile = await service.getOwn(target.id);
+    assert.deepEqual(
+      ownProfile.groups.map((group) => group.id).sort(),
+      [privateGroupId, publicGroupId].sort(),
+    );
+    assert.equal(ownProfile.player.profileVisibility, "PUBLIC");
 
     const newProfile = await service.get(actor.id, newcomer.id);
     if (newProfile.visibility !== "PUBLIC")

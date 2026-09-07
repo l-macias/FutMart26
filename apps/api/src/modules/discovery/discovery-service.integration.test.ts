@@ -19,6 +19,7 @@ import { createDatabase } from "@football/database";
 import {
   authUser,
   groupGuests,
+  groupMemberships,
   groups,
   matchAwards,
   matches,
@@ -145,6 +146,13 @@ void test(
         createdByPlayerId: leader,
       },
     ]);
+    await connection.db.insert(groupMemberships).values({
+      id: randomUUID(),
+      groupId: groupA,
+      playerId: actor,
+      role: "OWNER",
+      status: "ACTIVE",
+    });
     const guestId = randomUUID();
     await connection.db.insert(groupGuests).values({
       id: guestId,
@@ -593,7 +601,19 @@ void test(
     );
     assert.ok(search.groups.some((group) => group.id === groupA));
     assert.ok(search.players.some((entry) => entry.player.id === actor));
-    assert.deepEqual(Object.keys(search.groups[0]!).sort(), ["id", "name"]);
+    assert.deepEqual(Object.keys(search.groups[0]!).sort(), [
+      "id",
+      "name",
+      "target",
+    ]);
+    assert.deepEqual(
+      search.groups.find((group) => group.id === groupA)?.target,
+      { href: `/groups/${groupA}` },
+    );
+    assert.equal(
+      search.groups.find((group) => group.id === groupB)?.target,
+      null,
+    );
 
     await connection.db
       .update(players)

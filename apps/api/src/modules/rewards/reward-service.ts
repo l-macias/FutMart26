@@ -18,7 +18,6 @@ import {
 export const HIGH_RATING_THRESHOLD = "8.000000000000";
 const RECONCILIATION_MATCH_LIMIT = 100;
 const RECENT_AWARD_LIMIT = 20;
-const PUBLIC_AWARD_LIMIT = 5;
 
 type AchievementType = typeof playerAchievements.$inferInsert.type;
 type AwardType = typeof matchAwards.$inferInsert.type;
@@ -77,7 +76,7 @@ export class RewardService {
 
   async list(actorPlayerId: string): Promise<RewardsResponse> {
     await this.reconcilePlayer(actorPlayerId);
-    const [achievements, awards] = await Promise.all([
+    const [achievements, awards, awardSummary] = await Promise.all([
       this.database
         .select()
         .from(playerAchievements)
@@ -99,18 +98,20 @@ export class RewardService {
         .where(eq(matchAwards.playerId, actorPlayerId))
         .orderBy(desc(matchAwards.awardedAt), desc(matchAwards.id))
         .limit(RECENT_AWARD_LIMIT),
+      this.listAwardSummary(actorPlayerId),
     ]);
     return {
       achievements: achievements.map(presentAchievement),
       recentAwards: awards.map(({ award, scheduledAt, groupId, groupName }) =>
         presentAward(award, scheduledAt, groupId, groupName),
       ),
+      awardSummary,
     };
   }
 
   async listPublic(playerId: string) {
     await this.reconcilePlayer(playerId);
-    const [achievements, awards, [awardTotal]] = await Promise.all([
+    const [achievements, awardSummary] = await Promise.all([
       this.database
         .select()
         .from(playerAchievements)
@@ -119,17 +120,7 @@ export class RewardService {
           desc(playerAchievements.earnedAt),
           desc(playerAchievements.id),
         ),
-      this.database
-        .select({ award: matchAwards, scheduledAt: matches.scheduledAt })
-        .from(matchAwards)
-        .innerJoin(matches, eq(matches.id, matchAwards.matchId))
-        .where(eq(matchAwards.playerId, playerId))
-        .orderBy(desc(matchAwards.awardedAt), desc(matchAwards.id))
-        .limit(PUBLIC_AWARD_LIMIT),
-      this.database
-        .select({ value: sql<number>`count(*)::int` })
-        .from(matchAwards)
-        .where(eq(matchAwards.playerId, playerId)),
+      this.listAwardSummary(playerId),
     ]);
     return {
       achievements: achievements.map((row) => {
@@ -141,15 +132,27 @@ export class RewardService {
           description: presented.description,
         };
       }),
-      recentAwards: awards.map(({ award: row, scheduledAt }) => ({
-        type: row.type,
-        awardedAt: row.awardedAt.toISOString(),
-        scheduledAt: scheduledAt.toISOString(),
-        ...awardCopy[row.type],
-      })),
+      awardSummary,
       achievementCount: achievements.length,
-      awardCount: awardTotal?.value ?? 0,
+      awardCount: awardSummary.reduce((total, item) => total + item.count, 0),
     };
+  }
+
+  private async listAwardSummary(playerId: string) {
+    const count = sql<number>`count(*)::int`;
+    const latestAwardedAt = sql<string>`max(${matchAwards.awardedAt})::text`;
+    const rows = await this.database
+      .select({ type: matchAwards.type, count, latestAwardedAt })
+      .from(matchAwards)
+      .where(eq(matchAwards.playerId, playerId))
+      .groupBy(matchAwards.type)
+      .orderBy(desc(count), asc(matchAwards.type));
+    return rows.map((row) => ({
+      type: row.type,
+      count: row.count,
+      latestAwardedAt: new Date(row.latestAwardedAt).toISOString(),
+      ...awardCopy[row.type],
+    }));
   }
 
   async reconcileActorMatch(actorPlayerId: string, matchId: string) {

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { TacticalDivider } from "@football/football-ui";
 import { Button, Text } from "@football/ui";
 
+import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import {
   authErrorMessage,
   networkAuthErrorMessage,
@@ -27,6 +28,7 @@ export function AccountSecurityScreen() {
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const sessions = useQuery({
     queryKey: accountSessionKey,
     queryFn: async () => {
@@ -109,6 +111,7 @@ export function AccountSecurityScreen() {
 
   async function deleteAccount() {
     if (deleteConfirmation !== "ELIMINAR MI CUENTA" || !deletePassword) return;
+    setDeleteDialogOpen(false);
     setPendingAction("delete");
     resetMessages();
     try {
@@ -133,11 +136,14 @@ export function AccountSecurityScreen() {
 
   return (
     <div className={styles.page}>
+      <Link className={styles.back} href="/profile/settings">
+        ← CONFIGURACIÓN
+      </Link>
       <header className={styles.header}>
         <Text as="span" tone="accent" variant="label">
           Cuenta
         </Text>
-        <Text as="h1" variant="display-lg">
+        <Text as="h1" variant="heading-lg">
           Seguridad
         </Text>
         <Text tone="muted">
@@ -159,13 +165,15 @@ export function AccountSecurityScreen() {
           <Field
             autoComplete="new-password"
             label="Nueva contraseña"
-            minLength={12}
+            maxLength={128}
+            minLength={8}
             name="newPassword"
           />
           <Field
             autoComplete="new-password"
             label="Confirmar contraseña"
-            minLength={12}
+            maxLength={128}
+            minLength={8}
             name="confirmation"
           />
           <Button disabled={pendingAction !== null} type="submit">
@@ -174,48 +182,6 @@ export function AccountSecurityScreen() {
               : "Cambiar contraseña"}
           </Button>
         </form>
-      </section>
-
-      <section className={styles.danger}>
-        <Text as="h2" variant="heading-lg">
-          Eliminar cuenta
-        </Text>
-        <Text tone="muted">
-          Se eliminan credenciales, sesiones, conexiones, invitaciones,
-          preferencias declaradas y foto. La evidencia deportiva confirmada se
-          conserva anonimizada. Si sos el único owner de un grupo con partidos
-          activos, primero debés transferir la propiedad o resolverlos.
-        </Text>
-        <Text tone="muted">
-          Leé <Link href="/privacy">Privacidad</Link> antes de continuar.
-        </Text>
-        <label className={styles.field}>
-          <span>Escribí ELIMINAR MI CUENTA</span>
-          <input
-            onChange={(event) => setDeleteConfirmation(event.target.value)}
-            value={deleteConfirmation}
-          />
-        </label>
-        <label className={styles.field}>
-          <span>Contraseña actual</span>
-          <input
-            autoComplete="current-password"
-            onChange={(event) => setDeletePassword(event.target.value)}
-            type="password"
-            value={deletePassword}
-          />
-        </label>
-        <Button
-          disabled={
-            pendingAction !== null ||
-            deleteConfirmation !== "ELIMINAR MI CUENTA" ||
-            !deletePassword
-          }
-          onClick={() => void deleteAccount()}
-          variant="secondary"
-        >
-          {pendingAction === "delete" ? "Eliminando…" : "Eliminar mi cuenta"}
-        </Button>
       </section>
 
       <TacticalDivider />
@@ -243,7 +209,12 @@ export function AccountSecurityScreen() {
             No pudimos cargar las sesiones activas.
           </p>
         ) : null}
-        <div className={styles.sessions}>
+        <div
+          aria-label="Lista de sesiones activas"
+          className={styles.sessions}
+          role="region"
+          tabIndex={0}
+        >
           {sessions.data?.map((session) => {
             const isCurrent = session.id === currentSession.data?.session.id;
             return (
@@ -273,6 +244,76 @@ export function AccountSecurityScreen() {
         </div>
       </section>
 
+      <section className={styles.danger} id="delete-account">
+        <Text tone="muted" variant="label">
+          ZONA DE RIESGO
+        </Text>
+        <Text as="h2" variant="heading-lg">
+          Eliminar cuenta
+        </Text>
+        <Text tone="muted">
+          Se eliminan credenciales, sesiones, conexiones, invitaciones,
+          preferencias declaradas y foto. La evidencia deportiva confirmada se
+          conserva anonimizada. Si sos la única persona dueña de un grupo con
+          partidos activos, primero debés transferir la propiedad o resolverlos.
+        </Text>
+        <Text tone="muted">
+          Leé <Link href="/privacy">Privacidad</Link> antes de continuar.
+        </Text>
+        <label className={styles.field}>
+          <span>Escribí ELIMINAR MI CUENTA</span>
+          <input
+            aria-describedby="delete-account-help"
+            autoComplete="off"
+            name="delete-account-confirmation"
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            value={deleteConfirmation}
+          />
+        </label>
+        <Text
+          as="span"
+          id="delete-account-help"
+          tone="muted"
+          variant="metadata"
+        >
+          Esta confirmación evita eliminar la cuenta por accidente.
+        </Text>
+        <label className={styles.field}>
+          <span>Contraseña actual</span>
+          <input
+            autoComplete="current-password"
+            onChange={(event) => setDeletePassword(event.target.value)}
+            type="password"
+            value={deletePassword}
+          />
+        </label>
+        <Button
+          disabled={
+            pendingAction !== null ||
+            deleteConfirmation !== "ELIMINAR MI CUENTA" ||
+            !deletePassword
+          }
+          onClick={() => setDeleteDialogOpen(true)}
+          variant="danger"
+        >
+          Revisar eliminación
+        </Button>
+      </section>
+
+      <ConfirmDialog
+        confirmDisabled={pendingAction !== null}
+        confirmLabel={
+          pendingAction === "delete" ? "Eliminando…" : "Eliminar cuenta"
+        }
+        eyebrow="ELIMINAR CUENTA"
+        message="Perderás el acceso inmediatamente y todas tus sesiones se cerrarán. Tu identidad quedará anonimizada donde sea necesario conservar historia deportiva."
+        onCancel={() => setDeleteDialogOpen(false)}
+        onConfirm={() => void deleteAccount()}
+        open={deleteDialogOpen}
+        tone="danger"
+        title="¿Eliminar definitivamente tu cuenta?"
+      />
+
       {feedback ? (
         <p className={styles.feedback} role="status">
           {feedback}
@@ -290,11 +331,13 @@ export function AccountSecurityScreen() {
 function Field({
   autoComplete,
   label,
+  maxLength,
   minLength,
   name,
 }: Readonly<{
   autoComplete: string;
   label: string;
+  maxLength?: number;
   minLength?: number;
   name: string;
 }>) {
@@ -304,6 +347,7 @@ function Field({
       <input
         aria-label={label}
         autoComplete={autoComplete}
+        maxLength={maxLength}
         minLength={minLength}
         name={name}
         required
@@ -326,6 +370,7 @@ function formatDate(value: Date | string) {
   return new Intl.DateTimeFormat("es-AR", {
     dateStyle: "medium",
     timeStyle: "short",
+    hourCycle: "h23",
   }).format(new Date(value));
 }
 

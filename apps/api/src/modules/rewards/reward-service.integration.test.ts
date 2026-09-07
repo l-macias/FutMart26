@@ -248,6 +248,14 @@ void test(
     );
     assert.equal(response.recentAwards.length, 3);
     assert.deepEqual(
+      response.awardSummary.map((award) => [award.type, award.count]),
+      [
+        ["TOP_RATED", 1],
+        ["TOP_SCORER", 1],
+        ["TOP_ASSIST", 1],
+      ],
+    );
+    assert.deepEqual(
       new Set(response.recentAwards.map((item) => item.type)),
       new Set(["TOP_RATED", "TOP_SCORER", "TOP_ASSIST"]),
     );
@@ -256,6 +264,7 @@ void test(
     assert.equal(tiedRewards.recentAwards.length, 3);
     assert.equal((await rewards.list(outsider.id)).achievements.length, 0);
     assert.equal((await rewards.list(outsider.id)).recentAwards.length, 0);
+    assert.equal((await rewards.list(outsider.id)).awardSummary.length, 0);
 
     const awardRows = await connection.db
       .select()

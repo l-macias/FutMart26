@@ -11,6 +11,9 @@ export function authErrorMessage(error: AuthClientError | null | undefined) {
   }
 
   switch (error.code) {
+    case "USER_ALREADY_EXISTS":
+    case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
+      return "Ya existe una cuenta con este correo. Iniciá sesión o recuperá tu contraseña.";
     case "EMAIL_NOT_VERIFIED":
       return "Verificá tu email antes de ingresar.";
     case "INVALID_TOKEN":
@@ -19,7 +22,7 @@ export function authErrorMessage(error: AuthClientError | null | undefined) {
     case "INVALID_PASSWORD":
       return "La contraseña actual no es correcta.";
     case "PASSWORD_TOO_SHORT":
-      return "La contraseña debe tener al menos 12 caracteres.";
+      return "La contraseña debe tener entre 8 y 128 caracteres.";
     case "PASSWORD_TOO_LONG":
       return "La contraseña no puede superar los 128 caracteres.";
     case "INVALID_EMAIL_OR_PASSWORD":

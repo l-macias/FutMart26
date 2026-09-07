@@ -8,8 +8,11 @@ coverage/
 .env.*
 !.env.example
 *.log
+*.dump
+*.dump.sha256
 .DS_Store
 *.txt
 playwright-report/
 test-results/
 .playwright/
+.runtime/

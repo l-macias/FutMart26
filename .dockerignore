@@ -12,3 +12,9 @@ node_modules
 coverage
 *.log
 *.dump
+.runtime
+playwright-report
+test-results
+.playwright
+.agents
+.codex

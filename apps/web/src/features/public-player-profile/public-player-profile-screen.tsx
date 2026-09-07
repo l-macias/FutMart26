@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Text } from "@football/ui";
+import { OverallDisplay } from "@football/football-ui";
+import { Badge, Text } from "@football/ui";
 
 import { PlayerCard } from "@/components/player-card/player-card";
 import { ReportControl } from "@/components/report-control/report-control";
@@ -21,7 +22,6 @@ export function PublicPlayerProfileScreen({
   const profile = useQuery({
     queryKey: queryKeys.publicPlayerProfile(playerId),
     queryFn: () => api.publicPlayerProfile(playerId),
-    retry: false,
   });
 
   if (profile.isPending)
@@ -37,19 +37,17 @@ export function PublicPlayerProfileScreen({
   if (data.visibility === "PRIVATE")
     return (
       <div className={styles.page}>
-        <Link className={styles.back} href="/players">
-          ← BUSCAR JUGADORES
+        <Link className={styles.back} href="/search">
+          ← BUSCAR
         </Link>
         <header className={styles.header}>
           <div>
-            <Text tone="accent" variant="label">
-              PERFIL PRIVADO
-            </Text>
+            <Badge kind="state">PERFIL PRIVADO</Badge>
             <Text as="h1" variant="display-lg">
               {data.player.displayName}
             </Text>
             <Text tone="muted">
-              Este jugador no participa del discovery global. Su evidencia
+              Este jugador no aparece en la búsqueda global. Su evidencia
               deportiva sigue visible sólo en contextos compartidos autorizados.
             </Text>
           </div>
@@ -66,8 +64,8 @@ export function PublicPlayerProfileScreen({
     );
   return (
     <div className={styles.page}>
-      <Link className={styles.back} href="/players">
-        ← BUSCAR JUGADORES
+      <Link className={styles.back} href="/search">
+        ← BUSCAR
       </Link>
       <header className={styles.header}>
         <div>
@@ -83,15 +81,18 @@ export function PublicPlayerProfileScreen({
               : "Todavía no tiene partidos procesados"}
           </Text>
         </div>
-        {data.isCurrentPlayer && (
-          <Link className="ui-button ui-button--secondary" href="/profile">
-            Ver mi perfil completo
-          </Link>
-        )}
-        {!data.isCurrentPlayer && <ConnectionControls playerId={playerId} />}
-        {!data.isCurrentPlayer && (
-          <ReportControl targetId={playerId} targetType="PLAYER" />
-        )}
+        <div className={styles.profileActions}>
+          {data.isCurrentPlayer ? (
+            <Link className="ui-button ui-button--secondary" href="/profile">
+              Ver mi perfil completo
+            </Link>
+          ) : (
+            <>
+              <ConnectionControls playerId={playerId} />
+              <ReportControl targetId={playerId} targetType="PLAYER" />
+            </>
+          )}
+        </div>
       </header>
 
       <div className={styles.layout}>
@@ -117,9 +118,15 @@ export function PublicPlayerProfileScreen({
 
         <main className={styles.content}>
           <section className={styles.section}>
-            <Text as="h2" variant="heading-lg">
-              Perfil futbolístico
-            </Text>
+            <div className={styles.profileSummary}>
+              <div>
+                <Text as="h2" variant="heading-lg">
+                  Perfil futbolístico
+                </Text>
+                <Text tone="muted">Identidad deportiva F5</Text>
+              </div>
+              <OverallDisplay value={Math.round(data.performance.overall)} />
+            </div>
             {data.footballProfile ? (
               <>
                 <TagList
@@ -155,11 +162,36 @@ export function PublicPlayerProfileScreen({
                 label="Partidos"
                 value={data.performance.processedMatchCount}
               />
+              <Metric
+                label="Promedio"
+                value={
+                  data.summary.averageRating === null
+                    ? "—"
+                    : Number(data.summary.averageRating).toFixed(1)
+                }
+              />
               <Metric label="Goles" value={data.summary.totalGoals} />
               <Metric label="Asistencias" value={data.summary.totalAssists} />
-              <Metric label="Logros" value={data.summary.achievementCount} />
-              <Metric label="Premios" value={data.summary.awardCount} />
             </dl>
+          </section>
+
+          <section className={styles.section}>
+            <Text as="h2" variant="heading-lg">
+              Grupos
+            </Text>
+            <ul className={styles.contextList}>
+              {data.groups.map((group) => (
+                <li key={group.id}>
+                  <Link href={`/groups/${group.id}`}>{group.name}</Link>
+                  <span aria-hidden="true">→</span>
+                </li>
+              ))}
+              {data.groups.length === 0 ? (
+                <li>
+                  <Text tone="muted">Sin grupos públicos para mostrar.</Text>
+                </li>
+              ) : null}
+            </ul>
           </section>
 
           <section className={styles.section}>
@@ -183,18 +215,19 @@ export function PublicPlayerProfileScreen({
 
           <section className={styles.section}>
             <Text as="h2" variant="heading-lg">
-              Premios recientes
+              Premios
             </Text>
             <ul className={styles.rewardList}>
-              {data.rewards.recentAwards.map((award) => (
-                <li key={`${award.awardedAt}:${award.type}`}>
-                  <strong>{award.title}</strong>
-                  <small>
-                    {new Date(award.scheduledAt).toLocaleDateString("es-AR")}
-                  </small>
+              {data.rewards.awardSummary.map((award) => (
+                <li key={award.type}>
+                  <strong>
+                    {award.title}
+                    {award.count > 1 ? ` ×${award.count}` : ""}
+                  </strong>
+                  <small>{award.description}</small>
                 </li>
               ))}
-              {data.rewards.recentAwards.length === 0 && (
+              {data.rewards.awardSummary.length === 0 && (
                 <li>
                   <Text tone="muted">Todavía no recibió premios.</Text>
                 </li>
@@ -305,6 +338,7 @@ function ConnectionControls({ playerId }: Readonly<{ playerId: string }>) {
           >
             Eliminar conexión
           </button>
+          <InvitePlayerToGroupControl playerId={playerId} />
         </>
       )}
       {mutation.isError && (
@@ -323,6 +357,81 @@ function ConnectionControls({ playerId }: Readonly<{ playerId: string }>) {
         open={confirmRemove}
         title="¿Eliminar esta conexión?"
       />
+    </div>
+  );
+}
+
+function InvitePlayerToGroupControl({
+  playerId,
+}: Readonly<{ playerId: string }>) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const options = useQuery({
+    queryKey: queryKeys.playerGroupInvitationOptions(playerId),
+    queryFn: () => api.playerGroupInvitationOptions(playerId),
+    enabled: open,
+  });
+  const invite = useMutation({
+    mutationFn: (groupId: string) =>
+      api.inviteConnectionToGroup(groupId, playerId),
+    onSuccess: async () => {
+      setFeedback("Invitación enviada.");
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.playerGroupInvitationOptions(playerId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.directedInvitations,
+        }),
+      ]);
+    },
+  });
+  return (
+    <div className={styles.groupInviteControl}>
+      <button
+        className="ui-button ui-button--secondary"
+        onClick={() => setOpen((value) => !value)}
+        type="button"
+      >
+        Invitar a grupo
+      </button>
+      {open ? (
+        <div className={styles.groupInviteOptions}>
+          {options.isPending ? (
+            <Text tone="muted">Cargando grupos…</Text>
+          ) : null}
+          {options.isError ? (
+            <Text tone="muted" role="alert">
+              No pudimos cargar tus grupos disponibles.
+            </Text>
+          ) : null}
+          {options.data?.items.map((item) => (
+            <button
+              disabled={invite.isPending || item.state === "PENDING"}
+              key={item.group.id}
+              onClick={() => invite.mutate(item.group.id)}
+              type="button"
+            >
+              <strong>{item.group.name}</strong>
+              <span>
+                {item.state === "PENDING" ? "INVITACIÓN PENDIENTE" : "INVITAR"}
+              </span>
+            </button>
+          ))}
+          {options.data?.items.length === 0 ? (
+            <Text tone="muted">
+              No tenés grupos activos disponibles para invitarlo.
+            </Text>
+          ) : null}
+          {feedback ? <Text tone="accent">{feedback}</Text> : null}
+          {invite.isError ? (
+            <Text tone="muted" role="alert">
+              No pudimos enviar la invitación.
+            </Text>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -353,7 +462,10 @@ function TagList({
   );
 }
 
-function Metric({ label, value }: Readonly<{ label: string; value: number }>) {
+function Metric({
+  label,
+  value,
+}: Readonly<{ label: string; value: number | string }>) {
   return (
     <div>
       <dt>{label}</dt>

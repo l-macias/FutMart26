@@ -167,5 +167,22 @@ void test(
         (event) => event.reason.length >= 5 && event.requestId.length > 0,
       ),
     );
+    const playerResults = await service.players({
+      q: `${userId}@example.test`,
+      limit: 1,
+    });
+    assert.equal(playerResults.length, 1);
+    assert.equal(playerResults[0]?.id, target!.id);
+    const overview = await service.overview();
+    assert.equal(typeof overview.suspendedAccountCount, "number");
+    assert.ok(overview.recentAudit.length <= 6);
+    const filteredAudit = await service.auditEvents({
+      actor: `${adminId}@example.test`,
+      action: "SUSPENDED",
+      targetType: "ACCOUNT",
+      limit: 10,
+    });
+    assert.equal(filteredAudit.length, 1);
+    assert.equal(filteredAudit[0]?.actorEmail, `${adminId}@example.test`);
   },
 );

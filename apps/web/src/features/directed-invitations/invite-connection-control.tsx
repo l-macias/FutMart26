@@ -26,8 +26,14 @@ export function InviteConnectionControl({
   const [message, setMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const connections = useQuery({
-    queryKey: [...queryKeys.connections, "invite-selector"],
-    queryFn: () => api.connections(undefined, 50),
+    queryKey:
+      kind === "group"
+        ? queryKeys.groupInvitationCandidates(destinationId)
+        : [...queryKeys.connections, "invite-selector"],
+    queryFn: async () =>
+      kind === "group"
+        ? { items: await api.groupInvitationCandidates(destinationId) }
+        : api.connections(undefined, 50),
     enabled: open,
   });
   const invite = useMutation({
@@ -47,6 +53,10 @@ export function InviteConnectionControl({
       await queryClient.invalidateQueries({
         queryKey: queryKeys.directedInvitations,
       });
+      if (kind === "group")
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.groupInvitationCandidates(destinationId),
+        });
     },
   });
   return (
@@ -90,8 +100,8 @@ export function InviteConnectionControl({
               <strong>{item.player.displayName}</strong>
               <span>
                 {item.overall === null
-                  ? "OVR —"
-                  : `OVR ${Math.round(item.overall)}`}
+                  ? "— OVR"
+                  : `${Math.round(item.overall)} OVR`}
               </span>
             </button>
           ))}
@@ -101,8 +111,8 @@ export function InviteConnectionControl({
           {message && <Text tone="accent">{message}</Text>}
           {invite.isError && (
             <Text tone="muted" role="alert">
-              No se pudo enviar: revisá membership, estado o invitación
-              existente.
+              No se pudo enviar: revisá si ya es miembro o si existe una
+              invitación pendiente.
             </Text>
           )}
         </div>

@@ -98,6 +98,7 @@ void test(
     const activeMember = await createPlayer("Directed active");
     const blocked = await createPlayer("Directed blocked");
     const outsider = await createPlayer("Directed outsider");
+    const availableCandidate = await createPlayer("Directed candidate");
     const groupId = randomUUID();
     await connection.db.insert(groups).values({
       id: groupId,
@@ -111,6 +112,30 @@ void test(
     await connect(owner.id, rejoining.id);
     await connect(owner.id, activeMember.id);
     await connect(owner.id, blocked.id);
+    await connect(owner.id, availableCandidate.id);
+
+    assert.deepEqual(
+      new Set(
+        (await groupInvitations.listDirectedCandidates(owner.id, groupId)).map(
+          (item) => item.player.id,
+        ),
+      ),
+      new Set([availableCandidate.id, rejoining.id]),
+    );
+    assert.deepEqual(
+      await groupInvitations.listGroupOptionsForPlayer(
+        owner.id,
+        availableCandidate.id,
+      ),
+      {
+        items: [
+          {
+            group: { id: groupId, name: "Directed Group" },
+            state: "AVAILABLE",
+          },
+        ],
+      },
+    );
 
     await assert.rejects(
       () => groupInvitations.createDirected(owner.id, groupId, owner.id),
@@ -210,6 +235,12 @@ void test(
         ),
       );
     assert.equal(activeMemberships[0]!.count, 1);
+    assert.equal(
+      (await groupInvitations.listDirectedCandidates(owner.id, groupId)).some(
+        (item) => item.player.id === rejoining.id,
+      ),
+      false,
+    );
 
     const rejectTarget = await createPlayer("Directed reject");
     await connect(owner.id, rejectTarget.id);

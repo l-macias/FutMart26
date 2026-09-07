@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import {
+  avatarCropRectangle,
   playerDisplayNameSchema,
   type PrivatePlayer,
 } from "@football/contracts";
@@ -66,11 +67,14 @@ function ProfileEditForm({ player }: Readonly<{ player: PrivatePlayer }>) {
 
   return (
     <main className={styles.page}>
+      <Link className={styles.back} href="/profile/settings">
+        ← CONFIGURACIÓN
+      </Link>
       <header className={styles.header}>
         <Text as="span" tone="accent" variant="label">
           Perfil privado
         </Text>
-        <Text as="h1" variant="display-lg">
+        <Text as="h1" variant="heading-lg">
           Editar identidad
         </Text>
         <Text tone="muted">
@@ -115,8 +119,11 @@ function ProfileEditForm({ player }: Readonly<{ player: PrivatePlayer }>) {
           <Button disabled={update.isPending} type="submit">
             {update.isPending ? "Guardando…" : "Guardar perfil"}
           </Button>
-          <Link className="ui-button ui-button--secondary" href="/profile">
-            Volver al perfil
+          <Link
+            className="ui-button ui-button--secondary"
+            href="/profile/settings"
+          >
+            Volver a configuración
           </Link>
         </div>
       </form>
@@ -141,6 +148,8 @@ function PrivacyEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
         queryClient.invalidateQueries({ queryKey: ["rankings"] }),
         queryClient.invalidateQueries({ queryKey: ["discovery"] }),
         queryClient.invalidateQueries({ queryKey: ["search"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.personalHome }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.publicPlayerProfile(player.id),
         }),
@@ -166,13 +175,14 @@ function PrivacyEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
         <Button
           disabled={privacy.isPending || player.profileVisibility === "PUBLIC"}
           onClick={() => privacy.mutate({ profileVisibility: "PUBLIC" })}
+          variant="management"
         >
           Público
         </Button>
         <Button
           disabled={privacy.isPending || player.profileVisibility === "PRIVATE"}
           onClick={() => privacy.mutate({ profileVisibility: "PRIVATE" })}
-          variant="secondary"
+          variant="management"
         >
           Privado
         </Button>
@@ -191,6 +201,10 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
   const [cropX, setCropX] = useState(0.5);
   const [cropY, setCropY] = useState(0.5);
   const [zoom, setZoom] = useState(1);
+  const [imageSize, setImageSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -240,6 +254,7 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
     setCropX(0.5);
     setCropY(0.5);
     setZoom(1);
+    setImageSize(null);
     setPreviewUrl(URL.createObjectURL(selected));
   }
 
@@ -277,14 +292,17 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
             // This is a local preview or the authenticated media endpoint.
             <img
               alt="Vista previa del encuadre"
+              onLoad={(event) => {
+                if (previewUrl)
+                  setImageSize({
+                    width: event.currentTarget.naturalWidth,
+                    height: event.currentTarget.naturalHeight,
+                  });
+              }}
               src={visibleUrl}
               style={
-                previewUrl
-                  ? {
-                      objectPosition: `${cropX * 100}% ${cropY * 100}%`,
-                      transform: `scale(${zoom})`,
-                      transformOrigin: `${cropX * 100}% ${cropY * 100}%`,
-                    }
+                previewUrl && imageSize
+                  ? avatarPreviewStyle(imageSize, { cropX, cropY, zoom })
                   : undefined
               }
             />
@@ -385,6 +403,22 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
       />
     </section>
   );
+}
+
+function avatarPreviewStyle(
+  image: { width: number; height: number },
+  crop: { cropX: number; cropY: number; zoom: number },
+) {
+  const rectangle = avatarCropRectangle(image.width, image.height, crop);
+  return {
+    position: "absolute" as const,
+    inlineSize: `${(image.width / rectangle.width) * 100}%`,
+    blockSize: `${(image.height / rectangle.height) * 100}%`,
+    maxInlineSize: "none",
+    insetInlineStart: `${(-rectangle.left / rectangle.width) * 100}%`,
+    insetBlockStart: `${(-rectangle.top / rectangle.height) * 100}%`,
+    objectFit: "fill" as const,
+  };
 }
 
 function RangeControl({

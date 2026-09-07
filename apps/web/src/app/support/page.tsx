@@ -24,10 +24,7 @@ export default function SupportPage() {
             Escribinos a <a href={`mailto:${email}`}>{email}</a>.
           </p>
         ) : (
-          <p>
-            El canal de soporte todavía no está configurado en este entorno. En
-            producción, la aplicación requiere <code>SUPPORT_EMAIL</code>.
-          </p>
+          <p>El canal de soporte todavía no está disponible en este entorno.</p>
         )}
       </section>
       <section>

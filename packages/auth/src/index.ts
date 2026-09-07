@@ -99,7 +99,7 @@ export function createAuth(options: CreateAuthOptions) {
       enabled: true,
       autoSignIn: !requireEmailVerification,
       requireEmailVerification,
-      minPasswordLength: 12,
+      minPasswordLength: 8,
       maxPasswordLength: 128,
       resetPasswordTokenExpiresIn:
         environment.AUTH_PASSWORD_RESET_TOKEN_TTL_SECONDS ?? 3_600,

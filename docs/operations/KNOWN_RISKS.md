@@ -1,25 +1,23 @@
 # Known release risks
 
-Snapshot for the `v0.1.0-rc.1` rehearsal candidate on 2026-09-01.
+Snapshot del closure local del 2026-09-07. Ver evidencia completa en
+`RELEASE_EVIDENCE.md`.
 
-| Severity | Risk | Impact | Mitigation | Launch decision |
+| Severidad | Clase | Riesgo | Mitigación requerida | Decisión |
 | --- | --- | --- | --- | --- |
-| P1 | The complete release source exists only in a large uncommitted worktree; local base `b4bff7b` differs from remote `main` (`e3b5435`). | The artifact cannot be reproduced, reviewed, tagged or matched to a real CI run. | Commit the intended source, review the diff, push one SHA, rerun CI and build immutable artifacts from that SHA. | Block beta. |
-| P1 | No real/staging SMTP credentials or sender identity are configured. | New accounts cannot reliably verify email and password recovery cannot be proven. The failure rehearsal returned a normal signup response but logged the delivery failure, leaving the user waiting for mail. | Configure provider credentials, domain/sender authentication and alerts; complete verification and reset smokes. | Block beta. |
-| P1 | No real/staging private MinIO/S3 bucket is configured. | Avatar upload/delivery/delete and production storage readiness are unproven; `prod:check` correctly fails the real HeadBucket probe. | Provision a private bucket, scoped credentials and HTTPS endpoint; run the complete avatar lifecycle smoke. | Block beta. |
-| P1 | Media has no tested off-host snapshot/versioning/mirror. | A host or volume loss can leave restored DB media references without objects. | Enable provider versioning/snapshot or scheduled `mc mirror` to a second failure domain and perform a recovery drill aligned with a DB backup. | Block beta while avatars are launch scope. |
-| P1 | Current source has no real CI run and cannot be represented by the remote branch. | Local success may not reproduce on the Linux CI runner or clean remote checkout. | Push the immutable candidate and require green validate + E2E jobs. | Block beta. |
-| P1 | Docker is unavailable on this host and no image build evidence exists for the current source. | Container entrypoints, copied artifacts and runtime ownership remain structurally reviewed but unexecuted. | Build all three image targets in CI or a Docker-capable staging host and smoke them. | Block containerized beta deploy. |
-| P1 | Terms/Privacy text has not received professional legal review. | Technical consent can work while wording, retention or jurisdiction obligations remain inadequate. | Obtain external legal review and version any required wording changes before invitations. | External launch sign-off required. |
-| P1 | Authenticated human end-to-end sign-off with real SMTP/storage on a mobile device is incomplete. | Automation may miss device/browser interaction or external-service integration failures in the actual launch environment. | Run the release checklist on staging at 390 px/physical mobile and 1440 px after SMTP/MinIO are configured. | Block final beta approval. |
-| P2 | V1 permits exactly one API instance because auth/upload/report limiters are in memory. | No API replica failover; a restart clears temporary counters. | Enforce one instance operationally. Add a shared limiter only before horizontal scaling. | Accepted for a small beta under ADR-017. |
-| P2 | Browser automation is Chromium-only; Edge/Firefox/Safari release smokes are outstanding. | Browser-specific layout or API incompatibilities may escape current tests. | Run short deployed smokes in Edge and Firefox/Safari; fix only demonstrated P0/P1 issues before release. | Must be recorded; can be waived only explicitly for closed beta. |
-| P2 | Performance rehearsal covers rollback-only 1k Players / 100 Groups / 1k Matches, not the preferred 5k/500/10k pass. | Higher-volume plan changes are not measured, although current queries remain bounded and fast locally. | Repeat the measurement script with a larger dedicated fixture in a future capacity rehearsal; monitor production latency. | Acceptable for initial beta volume. |
-| P2 | PostgreSQL backups are proven locally but no scheduled encrypted off-host retention job is configured. | The manual procedure works, but missed schedules or host loss could remove recovery points. | Configure daily/weekly/monthly retention outside the app host and alert on failures. | Must be configured before storing real beta data. |
-| P3 | Local Playwright output contains benign `NO_COLOR`/`FORCE_COLOR` warnings. | No product or test correctness impact. | Clean up runner environment when convenient. | Backlog. |
+| P1 | CODE/RELEASE | El RC local aún no fue publicado y no existe CI del SHA exacto. | Push explícitamente autorizado, CI verde y conservación de URL/timestamp. | Block release. |
+| P1 | CI/INFRA | Docker/gh no están disponibles en el host; los targets y el nuevo job `container-build` no tienen ejecución real del RC. | CI verde y build/start/SIGTERM de las tres imágenes en host Docker. | Block release. |
+| P1 | INFRA | SMTP real, sender aprobado y delivery verification/reset no fueron configurados ni probados. | Configurar provider/TLS y completar ambos flows con cuenta controlada. | Block release. |
+| P1 | DATA SAFETY | El host no tiene `pg_dump`/`pg_restore`; no hay dump/restore actual de `0023`, bucket off-host, scheduler ni retention verificados. | Instalar clientes compatibles, crear dump+checksum, subir off-host y restaurar desde esa copia. | Block release. |
+| P1 | DATA SAFETY | Media privada funciona por adapter, pero no hay provider externo/versioning o mirror ni restore drill real. | Provisionar storage en otra failure domain y recuperar una key de avatar de prueba. | Block release. |
+| P1 | NETWORK | Dominios, TLS, redirect, Certbot renewal, trusted proxy, cookies y CORS no se observaron en infraestructura real. | Desplegar template, `nginx -t`, `certbot renew --dry-run` y smoke HTTPS. | Block release. |
+| P1 | OPERATIONAL | No existe production/container smoke ni QA autenticado en dispositivos físicos con mail/storage reales. | Ejecutar checklist en Android Chrome, iPhone Safari o waiver explícito y desktop browsers. | Block release. |
+| P1 | EXTERNAL | Terms/Privacy/retención/soporte no tienen revisión legal profesional acreditada. | Aprobación externa y versionado de cualquier corrección requerida. | Block release. |
+| P2 | ARCHITECTURE | Auth/upload/report limits y Errors son process-local; reiniciar borra counters/buffer y no hay replica failover. | Mantener exactamente una API según ADR-017; externalizar sólo antes de escalar. | Aceptable V1 si se cumple topology. |
+| P2 | OPERATIONS | Los logs locales están rotados en Compose, pero no hay alerta real de disk/backup/container. | Conectar signal mínima del host/provider antes de datos reales. | Debe cerrarse con infra. |
+| P3 | TEST TOOLING | Playwright/Next emite warnings benignos `NO_COLOR`/`FORCE_COLOR`. | Backlog; no afecta producto ni assertions. | No bloquea. |
 
-No P0 data-integrity or authorization defect remained after the rehearsal. One
-P0 operational defect was found and fixed: the Windows backup process could
-wait indefinitely before connecting. The backup script now passes explicit
-libpq connection variables and closes stdin; a real dump and restore succeeded
-after the fix.
+El closure corrigió dos defects del tooling: el smoke de migrations ya no puede
+borrar una DB preexistente y el runner E2E ya no reutiliza un bundle compilado
+para otro origin. La repetición final local fue 10/10. No se detectó un P0 de
+dominio nuevo, pero los P1 operacionales sostienen **NO-GO**.

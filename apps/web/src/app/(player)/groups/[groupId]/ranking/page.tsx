@@ -1,7 +1,8 @@
-import { GroupRankingScreen } from "@/features/group-ranking/group-ranking-screen";
+import { redirect } from "next/navigation";
 
 export default async function GroupRankingPage({
   params,
 }: Readonly<{ params: Promise<{ groupId: string }> }>) {
-  return <GroupRankingScreen groupId={(await params).groupId} />;
+  const { groupId } = await params;
+  redirect(`/rankings?scope=group&groupId=${encodeURIComponent(groupId)}`);
 }

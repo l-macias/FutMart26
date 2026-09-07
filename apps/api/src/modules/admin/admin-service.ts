@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { Database } from "@football/database";
 import {
@@ -138,6 +138,155 @@ export class AdminService {
     };
   }
 
+  async overview() {
+    const [openReports, suspendedAccounts, recentAudit] = await Promise.all([
+      this.database
+        .select({ count: sql<number>`count(*)::int` })
+        .from(abuseReports)
+        .where(eq(abuseReports.status, "OPEN")),
+      this.database
+        .select({ count: sql<number>`count(*)::int` })
+        .from(accountSuspensions)
+        .where(isNull(accountSuspensions.reactivatedAt)),
+      this.auditEvents({ limit: 6 }),
+    ]);
+    return {
+      openReportCount: openReports[0]?.count ?? 0,
+      suspendedAccountCount: suspendedAccounts[0]?.count ?? 0,
+      recentAudit,
+    };
+  }
+
+  async players(input: { q?: string; limit: number; offset?: number }) {
+    const q = input.q?.trim();
+    const rows = await this.database
+      .select({
+        id: players.id,
+        displayName: players.displayName,
+        email: authUser.email,
+        accountStatus: players.accountStatus,
+        suspended: sql<boolean>`${accountSuspensions.id} is not null`,
+        createdAt: players.createdAt,
+      })
+      .from(players)
+      .leftJoin(authUser, eq(authUser.id, players.authUserId))
+      .leftJoin(
+        accountSuspensions,
+        and(
+          eq(accountSuspensions.authUserId, players.authUserId),
+          isNull(accountSuspensions.reactivatedAt),
+        ),
+      )
+      .where(
+        q
+          ? or(
+              ilike(players.displayName, `%${escapeLike(q)}%`),
+              ilike(authUser.email, `${escapeLike(q)}%`),
+              ...(isUuid(q) ? [eq(players.id, q)] : []),
+            )
+          : undefined,
+      )
+      .orderBy(players.displayName, players.id)
+      .limit(input.limit)
+      .offset(input.offset ?? 0);
+    return rows.map((row) => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  async groups(input: { q?: string; limit: number; offset?: number }) {
+    const q = input.q?.trim();
+    const rows = await this.database
+      .select({
+        id: groups.id,
+        name: groups.name,
+        status: groups.status,
+        visibility: groups.visibility,
+        ownerName: players.displayName,
+        memberCount: sql<number>`(select count(*)::int from ${groupMemberships} gm where gm.group_id = ${groups.id} and gm.status = 'ACTIVE')`,
+        createdAt: groups.createdAt,
+      })
+      .from(groups)
+      .leftJoin(
+        groupMemberships,
+        and(
+          eq(groupMemberships.groupId, groups.id),
+          eq(groupMemberships.status, "ACTIVE"),
+          eq(groupMemberships.role, "OWNER"),
+        ),
+      )
+      .leftJoin(players, eq(players.id, groupMemberships.playerId))
+      .where(
+        q
+          ? or(
+              ilike(groups.name, `%${escapeLike(q)}%`),
+              ...(isUuid(q) ? [eq(groups.id, q)] : []),
+            )
+          : undefined,
+      )
+      .orderBy(groups.name, groups.id)
+      .limit(input.limit)
+      .offset(input.offset ?? 0);
+    return rows.map((row) => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  async matches(input: {
+    q?: string;
+    status?: string;
+    limit: number;
+    offset?: number;
+  }) {
+    const q = input.q?.trim();
+    const rows = await this.database
+      .select({
+        id: matches.id,
+        groupId: matches.groupId,
+        groupName: groups.name,
+        status: matches.status,
+        scheduledAt: matches.scheduledAt,
+        locationText: matches.locationText,
+        capacity: matches.capacity,
+        confirmedCount: sql<number>`(select count(*)::int from ${matchParticipants} mp where mp.match_id = ${matches.id} and mp.status = 'CONFIRMED')`,
+        scoreA: matchSportingResults.teamAGoals,
+        scoreB: matchSportingResults.teamBGoals,
+      })
+      .from(matches)
+      .innerJoin(groups, eq(groups.id, matches.groupId))
+      .leftJoin(
+        matchSportingResults,
+        eq(matchSportingResults.matchId, matches.id),
+      )
+      .where(
+        and(
+          input.status
+            ? eq(
+                matches.status,
+                input.status as
+                  "DRAFT" | "OPEN" | "STARTED" | "FINISHED" | "CANCELLED",
+              )
+            : undefined,
+          q
+            ? or(
+                ilike(groups.name, `%${escapeLike(q)}%`),
+                ilike(matches.locationText, `%${escapeLike(q)}%`),
+                ...(isUuid(q) ? [eq(matches.id, q)] : []),
+              )
+            : undefined,
+        ),
+      )
+      .orderBy(desc(matches.scheduledAt), desc(matches.id))
+      .limit(input.limit)
+      .offset(input.offset ?? 0);
+    return rows.map((row) => ({
+      ...row,
+      scheduledAt: row.scheduledAt.toISOString(),
+    }));
+  }
+
   async player(playerId: string) {
     const [row] = await this.database
       .select({
@@ -150,6 +299,7 @@ export class AdminService {
         authUserId: players.authUserId,
         email: authUser.email,
         emailVerified: authUser.emailVerified,
+        createdAt: players.createdAt,
         suspensionId: accountSuspensions.id,
         suspensionReason: accountSuspensions.reason,
         suspendedAt: accountSuspensions.suspendedAt,
@@ -195,6 +345,7 @@ export class AdminService {
     ]);
     return {
       ...row,
+      createdAt: row.createdAt.toISOString(),
       suspended: Boolean(row.suspensionId),
       suspendedAt: row.suspendedAt?.toISOString() ?? null,
       groups: groupsSummary,
@@ -225,16 +376,107 @@ export class AdminService {
       .where(eq(groups.id, groupId))
       .limit(1);
     if (!row) this.notFound();
-    const [counts] = await this.database
-      .select({
-        members: sql<number>`count(distinct ${groupMemberships.id}) filter (where ${groupMemberships.status} = 'ACTIVE')::int`,
-        activeMatches: sql<number>`count(distinct ${matches.id}) filter (where ${matches.status} in ('DRAFT','OPEN','STARTED'))::int`,
-      })
-      .from(groups)
-      .leftJoin(groupMemberships, eq(groupMemberships.groupId, groups.id))
-      .leftJoin(matches, eq(matches.groupId, groups.id))
-      .where(eq(groups.id, groupId));
-    return { ...row, ...(counts ?? { members: 0, activeMatches: 0 }) };
+    const [
+      counts,
+      members,
+      recentMatches,
+      tokenInvitations,
+      directedInvitations,
+    ] = await Promise.all([
+      this.database
+        .select({
+          members: sql<number>`count(distinct ${groupMemberships.id}) filter (where ${groupMemberships.status} = 'ACTIVE')::int`,
+          activeMatches: sql<number>`count(distinct ${matches.id}) filter (where ${matches.status} in ('DRAFT','OPEN','STARTED'))::int`,
+        })
+        .from(groups)
+        .leftJoin(groupMemberships, eq(groupMemberships.groupId, groups.id))
+        .leftJoin(matches, eq(matches.groupId, groups.id))
+        .where(eq(groups.id, groupId)),
+      this.database
+        .select({
+          id: players.id,
+          displayName: players.displayName,
+          role: groupMemberships.role,
+        })
+        .from(groupMemberships)
+        .innerJoin(players, eq(players.id, groupMemberships.playerId))
+        .where(
+          and(
+            eq(groupMemberships.groupId, groupId),
+            eq(groupMemberships.status, "ACTIVE"),
+          ),
+        )
+        .orderBy(groupMemberships.role, players.displayName)
+        .limit(50),
+      this.database
+        .select({
+          id: matches.id,
+          status: matches.status,
+          scheduledAt: matches.scheduledAt,
+          locationText: matches.locationText,
+        })
+        .from(matches)
+        .where(eq(matches.groupId, groupId))
+        .orderBy(desc(matches.scheduledAt))
+        .limit(12),
+      this.database
+        .select({
+          id: groupInvitations.id,
+          type: groupInvitations.type,
+          expiresAt: groupInvitations.expiresAt,
+          useCount: groupInvitations.useCount,
+        })
+        .from(groupInvitations)
+        .where(
+          and(
+            eq(groupInvitations.groupId, groupId),
+            isNull(groupInvitations.revokedAt),
+          ),
+        )
+        .orderBy(desc(groupInvitations.createdAt))
+        .limit(20),
+      this.database
+        .select({
+          id: groupConnectionInvitations.id,
+          invitedPlayerName: players.displayName,
+          expiresAt: groupConnectionInvitations.expiresAt,
+        })
+        .from(groupConnectionInvitations)
+        .innerJoin(
+          players,
+          eq(players.id, groupConnectionInvitations.invitedPlayerId),
+        )
+        .where(
+          and(
+            eq(groupConnectionInvitations.groupId, groupId),
+            eq(groupConnectionInvitations.status, "PENDING"),
+          ),
+        )
+        .orderBy(desc(groupConnectionInvitations.createdAt))
+        .limit(20),
+    ]);
+    return {
+      ...row,
+      memberCount: counts[0]?.members ?? 0,
+      activeMatches: counts[0]?.activeMatches ?? 0,
+      members,
+      recentMatches: recentMatches.map((item) => ({
+        ...item,
+        scheduledAt: item.scheduledAt.toISOString(),
+      })),
+      invitations: [
+        ...tokenInvitations.map((item) => ({
+          ...item,
+          kind: "GROUP_TOKEN" as const,
+          expiresAt: item.expiresAt?.toISOString() ?? null,
+        })),
+        ...directedInvitations.map((item) => ({
+          ...item,
+          kind: "GROUP_DIRECTED" as const,
+          expiresAt: item.expiresAt.toISOString(),
+        })),
+      ],
+    };
   }
 
   async match(matchId: string) {
@@ -250,44 +492,77 @@ export class AdminService {
       .where(eq(matches.id, matchId))
       .limit(1);
     if (!row) this.notFound();
-    const [snapshots, participants, teams, result] = await Promise.all([
-      this.database
-        .select({ id: progressionSnapshots.id })
-        .from(progressionSnapshots)
-        .where(eq(progressionSnapshots.matchId, matchId))
-        .limit(1),
-      this.database
-        .select({
-          id: matchParticipants.id,
-          kind: matchParticipants.kind,
-          playerId: matchParticipants.playerId,
-          displayName: players.displayName,
-          guestDisplayName: matchParticipants.guestDisplayName,
-          status: matchParticipants.status,
-          attendance: matchParticipants.attendance,
-        })
-        .from(matchParticipants)
-        .leftJoin(players, eq(players.id, matchParticipants.playerId))
-        .where(eq(matchParticipants.matchId, matchId))
-        .orderBy(matchParticipants.admissionOrder)
-        .limit(100),
-      this.database
-        .select({
-          participantId: matchTeamAssignments.participantId,
-          side: matchTeamAssignments.side,
-          source: matchTeamAssignments.source,
-        })
-        .from(matchTeamAssignments)
-        .where(eq(matchTeamAssignments.matchId, matchId))
-        .limit(100),
-      this.database
-        .select()
-        .from(matchSportingResults)
-        .where(eq(matchSportingResults.matchId, matchId))
-        .limit(1),
-    ]);
+    const [snapshots, participants, teams, result, ballots, invitations] =
+      await Promise.all([
+        this.database
+          .select({ id: progressionSnapshots.id })
+          .from(progressionSnapshots)
+          .where(eq(progressionSnapshots.matchId, matchId))
+          .limit(1),
+        this.database
+          .select({
+            id: matchParticipants.id,
+            kind: matchParticipants.kind,
+            playerId: matchParticipants.playerId,
+            displayName: players.displayName,
+            guestDisplayName: matchParticipants.guestDisplayName,
+            status: matchParticipants.status,
+            attendance: matchParticipants.attendance,
+          })
+          .from(matchParticipants)
+          .leftJoin(players, eq(players.id, matchParticipants.playerId))
+          .where(eq(matchParticipants.matchId, matchId))
+          .orderBy(matchParticipants.admissionOrder)
+          .limit(100),
+        this.database
+          .select({
+            participantId: matchTeamAssignments.participantId,
+            side: matchTeamAssignments.side,
+            source: matchTeamAssignments.source,
+          })
+          .from(matchTeamAssignments)
+          .where(eq(matchTeamAssignments.matchId, matchId))
+          .limit(100),
+        this.database
+          .select()
+          .from(matchSportingResults)
+          .where(eq(matchSportingResults.matchId, matchId))
+          .limit(1),
+        this.database
+          .select({ id: votingBallots.id, status: votingBallots.status })
+          .from(votingBallots)
+          .innerJoin(
+            votingSessions,
+            eq(votingSessions.id, votingBallots.sessionId),
+          )
+          .where(
+            and(
+              eq(votingSessions.matchId, matchId),
+              eq(votingBallots.status, "VALID"),
+            ),
+          )
+          .limit(50),
+        this.database
+          .select({
+            id: matchPlayerInvitations.id,
+            invitedPlayerName: players.displayName,
+          })
+          .from(matchPlayerInvitations)
+          .innerJoin(
+            players,
+            eq(players.id, matchPlayerInvitations.invitedPlayerId),
+          )
+          .where(
+            and(
+              eq(matchPlayerInvitations.matchId, matchId),
+              eq(matchPlayerInvitations.status, "PENDING"),
+            ),
+          )
+          .limit(50),
+      ]);
     return {
       ...row.match,
+      nextAdmissionOrder: row.match.nextAdmissionOrder.toString(),
       scheduledAt: row.match.scheduledAt.toISOString(),
       groupName: row.groupName,
       closureEditable: row.match.status === "FINISHED" && !row.votingSessionId,
@@ -295,6 +570,8 @@ export class AdminService {
       participants,
       teams,
       result: result[0] ?? null,
+      ballots: snapshots.length > 0 ? [] : ballots,
+      invitations,
     };
   }
 
@@ -747,15 +1024,64 @@ export class AdminService {
     );
   }
 
-  async auditEvents() {
+  async auditEvents(
+    input: {
+      limit?: number;
+      actor?: string;
+      action?: string;
+      targetType?: string;
+      targetId?: string;
+      from?: Date;
+      to?: Date;
+    } = {},
+  ) {
     const rows = await this.database
-      .select()
+      .select({ event: adminAuditEvents, actorEmail: authUser.email })
       .from(adminAuditEvents)
+      .leftJoin(authUser, eq(authUser.id, adminAuditEvents.actorAuthUserId))
+      .where(
+        and(
+          input.actor
+            ? or(
+                ilike(authUser.email, `%${escapeLike(input.actor)}%`),
+                ilike(
+                  adminAuditEvents.actorAuthUserId,
+                  `%${escapeLike(input.actor)}%`,
+                ),
+              )
+            : undefined,
+          input.action
+            ? sql`${adminAuditEvents.action}::text ilike ${`%${escapeLike(input.action)}%`}`
+            : undefined,
+          input.targetType
+            ? eq(
+                adminAuditEvents.targetType,
+                input.targetType as
+                  | "ACCOUNT"
+                  | "PLAYER"
+                  | "GROUP"
+                  | "MATCH"
+                  | "REPORT"
+                  | "BALLOT"
+                  | "INVITATION",
+              )
+            : undefined,
+          input.targetId
+            ? ilike(
+                adminAuditEvents.targetId,
+                `%${escapeLike(input.targetId)}%`,
+              )
+            : undefined,
+          input.from ? gte(adminAuditEvents.createdAt, input.from) : undefined,
+          input.to ? lte(adminAuditEvents.createdAt, input.to) : undefined,
+        ),
+      )
       .orderBy(desc(adminAuditEvents.createdAt), desc(adminAuditEvents.id))
-      .limit(200);
-    return rows.map((row) => ({
-      ...row,
-      createdAt: row.createdAt.toISOString(),
+      .limit(input.limit ?? 100);
+    return rows.map(({ event, actorEmail }) => ({
+      ...event,
+      actorEmail,
+      createdAt: event.createdAt.toISOString(),
     }));
   }
 
@@ -813,6 +1139,10 @@ export class AdminService {
 
 function escapeLike(value: string) {
   return value.replace(/[\\%_]/g, "\\$&");
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f-]{36}$/i.test(value);
 }
 
 function presentReport(

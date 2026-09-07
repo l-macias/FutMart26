@@ -21,6 +21,9 @@ export async function refreshPlayerIdentityProjections(
     ["discovery"],
     ["me", "connections"],
     ["me", "directed-invitations"],
+    queryKeys.ownProfile,
+    queryKeys.ownProfile,
+    queryKeys.personalHome,
   ]);
 }
 
@@ -33,10 +36,15 @@ export async function refreshFootballProfileProjections(
     ["me", "connections"],
     ["me", "directed-invitations"],
     ["me", "recruitment"],
+    queryKeys.ownProfile,
+    queryKeys.ownProfile,
   ]);
 }
 
-function invalidate(queryClient: QueryClient, keys: readonly unknown[][]) {
+function invalidate(
+  queryClient: QueryClient,
+  keys: readonly (readonly unknown[])[],
+) {
   return Promise.all(
     keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
   );

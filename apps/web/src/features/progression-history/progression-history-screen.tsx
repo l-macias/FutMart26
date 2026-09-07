@@ -204,13 +204,13 @@ function OverallChart({
       </svg>
       <div className={styles.chartLegend}>
         <span>
-          {formatShortDate(chronological[0]!.context.scheduledAt)} · OVR{" "}
-          {formatOverall(points[0]!.value)}
+          {formatShortDate(chronological[0]!.context.scheduledAt)} ·{" "}
+          {formatOverall(points[0]!.value)} OVR
         </span>
         {chronological.length > 1 ? (
           <span>
-            {formatShortDate(chronological.at(-1)!.context.scheduledAt)} · OVR{" "}
-            {formatOverall(points.at(-1)!.value)}
+            {formatShortDate(chronological.at(-1)!.context.scheduledAt)} ·{" "}
+            {formatOverall(points.at(-1)!.value)} OVR
           </span>
         ) : null}
       </div>
@@ -274,7 +274,7 @@ function HistoryItem({ item }: Readonly<{ item: ProgressionHistoryEntry }>) {
           </Text>
         ) : (
           <Text tone="muted" variant="metadata">
-            Rating {Number(item.snapshot.aggregatedRating).toFixed(1)} ·{" "}
+            Nota {Number(item.snapshot.aggregatedRating).toFixed(1)} ·{" "}
             {item.snapshot.receivedEvaluationCount} de{" "}
             {item.snapshot.eligibleEvaluationCount} evaluaciones ·{" "}
             {Math.round(Number(item.snapshot.participationRatio) * 100)}%

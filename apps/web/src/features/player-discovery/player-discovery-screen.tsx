@@ -2,53 +2,89 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Button, Text } from "@football/ui";
 
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
+import { queryPolicy } from "@/lib/api/query-policy";
 
 import styles from "./player-discovery.module.css";
 
-export function PlayerDiscoveryScreen() {
-  const [input, setInput] = useState("");
-  const [query, setQuery] = useState("");
+const SEARCH_DELAY_MS = 300;
+
+export function PlayerDiscoveryScreen({
+  initialQuery = "",
+}: {
+  initialQuery?: string;
+}) {
+  const normalizedInitialQuery = initialQuery.trim().slice(0, 100);
+  const [input, setInput] = useState(normalizedInitialQuery);
+  const [query, setQuery] = useState(
+    normalizedInitialQuery.length >= 2 ? normalizedInitialQuery : "",
+  );
+  const router = useRouter();
   const search = useQuery({
+    ...queryPolicy.volatile,
     queryKey: queryKeys.globalSearch(query),
     queryFn: ({ signal }) => api.globalSearch(query, 5, signal),
     enabled: query.length >= 2,
   });
 
+  useEffect(() => {
+    const normalized = input.trim();
+    if (normalized.length < 2) {
+      setQuery("");
+      router.replace("/search", { scroll: false });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setQuery(normalized);
+      router.replace(`/search?q=${encodeURIComponent(normalized)}`, {
+        scroll: false,
+      });
+    }, SEARCH_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [input, router]);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setQuery(input.trim());
+    const normalized = input.trim();
+    if (normalized.length < 2) return;
+    setQuery(normalized);
+    router.replace(`/search?q=${encodeURIComponent(normalized)}`, {
+      scroll: false,
+    });
   }
+
+  const hasResults = Boolean(
+    search.data &&
+    (search.data.players.length > 0 || search.data.groups.length > 0),
+  );
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Text as="span" tone="accent" variant="label">
-          DISCOVERY F5
-        </Text>
         <Text as="h1" variant="display-lg">
-          Buscar jugadores y grupos
+          Buscar
         </Text>
-        <Text tone="muted">
-          Encontrá identidades deportivas. Los datos privados siguen protegidos.
-        </Text>
+        <Text tone="muted">Encontrá jugadores o grupos por nombre.</Text>
       </header>
 
-      <form className={styles.search} onSubmit={submit}>
-        <label htmlFor="player-search">Nombre deportivo</label>
+      <form className={styles.search} onSubmit={submit} role="search">
+        <label htmlFor="global-search">Jugadores o grupos</label>
         <div>
           <input
+            aria-describedby="search-hint"
             autoComplete="off"
-            id="player-search"
+            autoFocus
+            id="global-search"
+            maxLength={100}
             minLength={2}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="Ej. Lucas o La Banda"
-            required
+            placeholder="Ej. Lucas o Los del Parque"
             type="search"
             value={input}
           />
@@ -56,40 +92,76 @@ export function PlayerDiscoveryScreen() {
             Buscar
           </Button>
         </div>
+        <Text as="span" id="search-hint" tone="muted" variant="metadata">
+          Escribí al menos 2 caracteres.
+        </Text>
       </form>
 
-      {search.isFetching && <p role="status">Buscando jugadores…</p>}
-      {search.isError && (
+      {query.length < 2 ? (
+        <div className={styles.compactState}>
+          <Text tone="muted">Buscá jugadores o grupos.</Text>
+        </div>
+      ) : null}
+      {search.isFetching ? (
+        <div
+          aria-label="Buscando…"
+          className={styles.loadingRows}
+          role="status"
+        >
+          <span />
+          <span />
+        </div>
+      ) : null}
+      {search.isError ? (
         <p className={styles.error} role="alert">
-          No pudimos completar la búsqueda.
+          No pudimos completar la búsqueda. Revisá tu conexión e intentá
+          nuevamente.
         </p>
-      )}
-      {search.data &&
-        search.data.players.length === 0 &&
-        search.data.groups.length === 0 && (
-          <section className={styles.empty}>
-            <Text as="h2" variant="heading-lg">
-              Sin coincidencias
-            </Text>
-            <Text tone="muted">Probá con otro nombre.</Text>
-          </section>
-        )}
-      {search.data && search.data.players.length > 0 && (
-        <section>
+      ) : null}
+      {search.data && !hasResults ? (
+        <section className={styles.empty}>
           <Text as="h2" variant="heading-lg">
-            Jugadores
+            Sin coincidencias
           </Text>
-          <ul className={styles.results} aria-label="Jugadores encontrados">
+          <Text tone="muted">
+            No encontramos jugadores o grupos para “{query}”.
+          </Text>
+        </section>
+      ) : null}
+
+      {search.data?.players.length ? (
+        <section
+          className={styles.resultSection}
+          aria-labelledby="players-results"
+        >
+          <div className={styles.sectionHeading}>
+            <Text as="h2" id="players-results" variant="heading-lg">
+              Jugadores
+            </Text>
+            <Text tone="muted" variant="metadata">
+              {search.data.players.length} resultados
+            </Text>
+          </div>
+          <ul
+            className={`${styles.results} ui-list`}
+            aria-label="Jugadores encontrados"
+          >
             {search.data.players.map((item) => (
-              <li key={item.player.id}>
-                <Link href={`/players/${item.player.id}`}>
-                  <span>
+              <li className="ui-row" key={item.player.id}>
+                <Link
+                  className={styles.resultLink}
+                  href={`/players/${item.player.id}`}
+                >
+                  <span aria-hidden="true" className={styles.avatarFallback}>
+                    {item.player.displayName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="ui-row__content">
                     <strong>{item.player.displayName}</strong>
                     <small>
                       {item.performance.processedMatchCount} partidos procesados
                     </small>
                   </span>
-                  <span className={styles.ovr}>
+                  <span className={`${styles.ovr} ui-row__metric`}>
                     {item.performance.overall === null
                       ? "—"
                       : Math.round(item.performance.overall)}
@@ -100,26 +172,54 @@ export function PlayerDiscoveryScreen() {
             ))}
           </ul>
         </section>
-      )}
-      {search.data && search.data.groups.length > 0 && (
-        <section>
-          <Text as="h2" variant="heading-lg">
-            Grupos
-          </Text>
-          <ul className={styles.results} aria-label="Grupos encontrados">
+      ) : null}
+
+      {search.data?.groups.length ? (
+        <section
+          className={styles.resultSection}
+          aria-labelledby="groups-results"
+        >
+          <div className={styles.sectionHeading}>
+            <Text as="h2" id="groups-results" variant="heading-lg">
+              Grupos
+            </Text>
+            <Text tone="muted" variant="metadata">
+              {search.data.groups.length} resultados
+            </Text>
+          </div>
+          <ul
+            className={`${styles.results} ui-list`}
+            aria-label="Grupos encontrados"
+          >
             {search.data.groups.map((group) => (
-              <li key={group.id}>
-                <div>
-                  <span>
-                    <strong>{group.name}</strong>
-                    <small>Grupo privado · vista pública próximamente</small>
-                  </span>
-                </div>
+              <li className="ui-row" key={group.id}>
+                {group.target ? (
+                  <Link className={styles.resultLink} href={group.target.href}>
+                    <span aria-hidden="true" className={styles.groupMark}>
+                      F5
+                    </span>
+                    <span className="ui-row__content">
+                      <strong>{group.name}</strong>
+                      <small>Grupo público · Sos miembro</small>
+                    </span>
+                    <span aria-hidden="true">→</span>
+                  </Link>
+                ) : (
+                  <div className={styles.resultLink}>
+                    <span aria-hidden="true" className={styles.groupMark}>
+                      F5
+                    </span>
+                    <span className="ui-row__content">
+                      <strong>{group.name}</strong>
+                      <small>Grupo público</small>
+                    </span>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         </section>
-      )}
+      ) : null}
     </div>
   );
 }

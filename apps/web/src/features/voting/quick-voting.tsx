@@ -43,7 +43,7 @@ function SelectionGroup({
               onClick={() => onToggle(participant.id, category)}
               type="button"
             >
-              {participant.guest ? <span>Guest</span> : null}
+              {participant.guest ? <span>INVITADO</span> : null}
               {participant.name}
               {isSelected ? <strong>Seleccionado</strong> : null}
             </button>
@@ -136,7 +136,7 @@ export function QuickRating({
         </Text>
       </div>
       <fieldset className={styles.ratingGroup}>
-        <legend>Rating</legend>
+        <legend>Nota</legend>
         <div className={styles.ratingScale}>
           {Array.from({ length: 10 }, (_, ratingIndex) => ratingIndex + 1).map(
             (value) => {

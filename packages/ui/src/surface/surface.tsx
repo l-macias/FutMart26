@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 
 export interface SurfaceProps extends HTMLAttributes<HTMLElement> {
   as?: "article" | "aside" | "div" | "section";
-  elevation?: "base" | "raised";
+  elevation?: "base" | "raised" | "feature" | "overlay";
 }
 
 export function Surface({

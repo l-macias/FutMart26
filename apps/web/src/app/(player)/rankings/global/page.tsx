@@ -1,5 +1,5 @@
-import { GlobalRankingScreen } from "@/features/global-ranking/global-ranking-screen";
+import { redirect } from "next/navigation";
 
 export default function GlobalRankingPage() {
-  return <GlobalRankingScreen />;
+  redirect("/rankings?scope=global");
 }

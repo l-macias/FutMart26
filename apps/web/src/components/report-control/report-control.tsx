@@ -22,9 +22,14 @@ export function ReportControl({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<Reason>("HARASSMENT");
   const [comment, setComment] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
   const report = useMutation({
     mutationFn: api.createReport,
-    onSuccess: () => setOpen(false),
+    onSuccess: () => {
+      setOpen(false);
+      setComment("");
+      setFeedback("Reporte enviado. Gracias. Nuestro equipo podrá revisarlo.");
+    },
   });
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -38,7 +43,13 @@ export function ReportControl({
   }
   return (
     <div className={styles.wrapper}>
-      <Button onClick={() => setOpen((value) => !value)} variant="quiet">
+      <Button
+        onClick={() => {
+          setFeedback(null);
+          setOpen((value) => !value);
+        }}
+        variant="quiet"
+      >
         Reportar
       </Button>
       {open ? (
@@ -72,7 +83,6 @@ export function ReportControl({
               {report.error.message}
             </p>
           ) : null}
-          {report.isSuccess ? <p role="status">Reporte recibido.</p> : null}
           <div className={styles.actions}>
             <Button disabled={report.isPending} type="submit">
               {report.isPending ? "Enviando…" : "Enviar reporte"}
@@ -87,6 +97,7 @@ export function ReportControl({
           </div>
         </form>
       ) : null}
+      {feedback ? <p role="status">{feedback}</p> : null}
     </div>
   );
 }

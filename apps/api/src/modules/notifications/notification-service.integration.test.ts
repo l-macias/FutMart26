@@ -10,6 +10,7 @@ import { notificationListQuerySchema } from "@football/contracts";
 import { createDatabase } from "@football/database";
 import {
   authUser,
+  groupMemberships,
   matchParticipants,
   matchSportingResults,
   matches,
@@ -340,6 +341,35 @@ void test(
     );
     assert.deepEqual(repeatedRead, firstRead);
     assert.equal((await service.unreadCount(owner.id)).count, 2);
+    const attention = await service.list(owner.id, {
+      limit: 5,
+      unreadOnly: true,
+    });
+    assert.equal(attention.items.length, 2);
+    assert.ok(attention.items.every((item) => item.readAt === null));
+    assert.ok(
+      attention.items.every((item) => item.id !== progressionNotification.id),
+    );
+    const actionableAttention = await service.list(owner.id, {
+      limit: 5,
+      unreadOnly: true,
+      types: ["VOTING_AVAILABLE"],
+    });
+    assert.ok(actionableAttention.items.length > 0);
+    assert.ok(
+      actionableAttention.items.every(
+        (item) => item.type === "VOTING_AVAILABLE",
+      ),
+    );
+
+    const markAll = await service.markAllRead(owner.id);
+    assert.equal(markAll.updatedCount, 2);
+    assert.equal((await service.unreadCount(owner.id)).count, 0);
+    assert.equal((await service.unreadCount(other.id)).count, 1);
+    const readHistory = await service.list(owner.id, { limit: 20 });
+    assert.equal(readHistory.items.length, 3);
+    assert.ok(readHistory.items.every((item) => item.readAt !== null));
+    assert.deepEqual(await service.markAllRead(owner.id), { updatedCount: 0 });
 
     const [stored] = await connection.db
       .select()
@@ -376,6 +406,33 @@ void test(
       catalog.find((row) => row.name === "notifications_recipient_unread_idx")!
         .definition,
       /read_at IS NULL/i,
+    );
+
+    await connection.db.insert(groupMemberships).values({
+      id: randomUUID(),
+      groupId: group.id,
+      playerId: other.id,
+      role: "MEMBER",
+      status: "ACTIVE",
+    });
+    await groups.changeModerator(owner.id, group.id, other.id, "MODERATOR");
+    await service.reconcile(other.id);
+    await service.reconcile(other.id);
+    let roleNotifications = (
+      await service.list(other.id, { limit: 20 })
+    ).items.filter((item) => item.type.startsWith("GROUP_MODERATOR_"));
+    assert.deepEqual(
+      roleNotifications.map((item) => item.type),
+      ["GROUP_MODERATOR_GRANTED"],
+    );
+    assert.equal(roleNotifications[0]?.target.href, `/groups/${group.id}`);
+    await groups.changeModerator(owner.id, group.id, other.id, "MEMBER");
+    roleNotifications = (
+      await service.list(other.id, { limit: 20 })
+    ).items.filter((item) => item.type.startsWith("GROUP_MODERATOR_"));
+    assert.deepEqual(
+      new Set(roleNotifications.map((item) => item.type)),
+      new Set(["GROUP_MODERATOR_GRANTED", "GROUP_MODERATOR_REMOVED"]),
     );
 
     console.log(

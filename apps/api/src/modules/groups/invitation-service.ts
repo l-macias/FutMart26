@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "@football/database";
 import {
@@ -10,6 +11,7 @@ import {
   groups,
   players,
   playerConnections,
+  playerPerformances,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -260,6 +262,160 @@ export class InvitationService {
       },
       invitedByPlayerId: row.invitation.invitedByPlayerId,
     }));
+  }
+
+  async listDirectedCandidates(actorPlayerId: string, groupId: string) {
+    await this.requireManager(actorPlayerId, groupId);
+    const otherPlayers = alias(players, "group_invitation_candidates");
+    const performance = alias(
+      playerPerformances,
+      "group_invitation_candidate_performance",
+    );
+    const otherPlayerId = sql<string>`case when ${playerConnections.playerLowId} = ${actorPlayerId} then ${playerConnections.playerHighId} else ${playerConnections.playerLowId} end`;
+    const connections = await this.database
+      .select({
+        id: otherPlayers.id,
+        displayName: otherPlayers.displayName,
+        overall: performance.internalOvr,
+        processedMatchCount: performance.processedMatchCount,
+      })
+      .from(playerConnections)
+      .innerJoin(otherPlayers, eq(otherPlayers.id, otherPlayerId))
+      .leftJoin(
+        performance,
+        and(
+          eq(performance.playerId, otherPlayers.id),
+          eq(performance.discipline, "F5"),
+        ),
+      )
+      .where(
+        and(
+          eq(playerConnections.status, "ACCEPTED"),
+          or(
+            eq(playerConnections.playerLowId, actorPlayerId),
+            eq(playerConnections.playerHighId, actorPlayerId),
+          ),
+        ),
+      )
+      .orderBy(asc(otherPlayers.displayName), asc(otherPlayers.id))
+      .limit(100);
+    const ids = connections.map((row) => row.id);
+    if (ids.length === 0) return [];
+    const [memberships, pending] = await Promise.all([
+      this.database
+        .select({
+          playerId: groupMemberships.playerId,
+          status: groupMemberships.status,
+        })
+        .from(groupMemberships)
+        .where(
+          and(
+            eq(groupMemberships.groupId, groupId),
+            inArray(groupMemberships.playerId, ids),
+          ),
+        ),
+      this.database
+        .select({ playerId: groupConnectionInvitations.invitedPlayerId })
+        .from(groupConnectionInvitations)
+        .where(
+          and(
+            eq(groupConnectionInvitations.groupId, groupId),
+            inArray(groupConnectionInvitations.invitedPlayerId, ids),
+            eq(groupConnectionInvitations.status, "PENDING"),
+            sql`${groupConnectionInvitations.expiresAt} > now()`,
+          ),
+        ),
+    ]);
+    const unavailable = new Set(
+      memberships
+        .filter((row) => row.status === "ACTIVE" || row.status === "BLOCKED")
+        .map((row) => row.playerId),
+    );
+    for (const row of pending) unavailable.add(row.playerId);
+    return connections
+      .filter((row) => !unavailable.has(row.id))
+      .slice(0, 50)
+      .map((row) => ({
+        player: { id: row.id, displayName: row.displayName },
+        overall: row.overall === null ? null : Number(row.overall),
+        processedMatchCount: row.processedMatchCount ?? 0,
+      }));
+  }
+
+  async listGroupOptionsForPlayer(
+    actorPlayerId: string,
+    invitedPlayerId: string,
+  ) {
+    if (actorPlayerId === invitedPlayerId) return { items: [] };
+    await this.requireConnection(actorPlayerId, invitedPlayerId);
+    const actorGroups = await this.database
+      .select({
+        id: groups.id,
+        name: groups.name,
+        role: groupMemberships.role,
+        capabilities: groupMemberships.capabilities,
+      })
+      .from(groupMemberships)
+      .innerJoin(groups, eq(groups.id, groupMemberships.groupId))
+      .where(
+        and(
+          eq(groupMemberships.playerId, actorPlayerId),
+          eq(groupMemberships.status, "ACTIVE"),
+          eq(groups.status, "ACTIVE"),
+        ),
+      )
+      .orderBy(asc(groups.name), asc(groups.id))
+      .limit(100);
+    const manageable = actorGroups.filter((group) =>
+      hasGroupCapability(
+        group.role,
+        group.capabilities,
+        "GROUP_MANAGE_INVITATIONS",
+      ),
+    );
+    const ids = manageable.map((group) => group.id);
+    if (ids.length === 0) return { items: [] };
+    const [memberships, pending] = await Promise.all([
+      this.database
+        .select({
+          groupId: groupMemberships.groupId,
+          status: groupMemberships.status,
+        })
+        .from(groupMemberships)
+        .where(
+          and(
+            inArray(groupMemberships.groupId, ids),
+            eq(groupMemberships.playerId, invitedPlayerId),
+          ),
+        ),
+      this.database
+        .select({ groupId: groupConnectionInvitations.groupId })
+        .from(groupConnectionInvitations)
+        .where(
+          and(
+            inArray(groupConnectionInvitations.groupId, ids),
+            eq(groupConnectionInvitations.invitedPlayerId, invitedPlayerId),
+            eq(groupConnectionInvitations.status, "PENDING"),
+            sql`${groupConnectionInvitations.expiresAt} > now()`,
+          ),
+        ),
+    ]);
+    const excluded = new Set(
+      memberships
+        .filter((row) => row.status === "ACTIVE" || row.status === "BLOCKED")
+        .map((row) => row.groupId),
+    );
+    const pendingIds = new Set(pending.map((row) => row.groupId));
+    return {
+      items: manageable
+        .filter((group) => !excluded.has(group.id))
+        .map((group) => ({
+          group: { id: group.id, name: group.name },
+          state: pendingIds.has(group.id)
+            ? ("PENDING" as const)
+            : ("AVAILABLE" as const),
+        })),
+    };
   }
 
   async acceptDirected(actorPlayerId: string, invitationId: string) {

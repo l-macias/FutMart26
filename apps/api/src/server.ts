@@ -43,6 +43,7 @@ const mailService =
         host: config.SMTP_HOST,
         port: config.SMTP_PORT,
         secure: config.SMTP_SECURE,
+        requireTls: config.SMTP_REQUIRE_TLS,
         user: config.SMTP_USER,
         password: config.SMTP_PASSWORD,
         from: config.MAIL_FROM,

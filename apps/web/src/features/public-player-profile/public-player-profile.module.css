@@ -3,18 +3,23 @@
 .cardArea,
 .content,
 .section,
-.rewardList,
-.rewardList li {
+.profileSummary > div,
+.rewardList li,
+.groupInviteControl,
+.groupInviteOptions {
   display: grid;
   min-inline-size: 0;
 }
 
 .page {
-  gap: var(--space-6);
+  gap: var(--space-5);
   padding-block-end: var(--space-7);
 }
 
 .back {
+  justify-self: start;
+  min-block-size: var(--touch-target-min);
+  align-content: center;
   color: var(--foreground-muted);
   font: 700 var(--type-label-size) / 1
     var(--font-interface, var(--font-interface-fallback));
@@ -23,54 +28,77 @@
 }
 
 .header {
-  gap: var(--space-4);
-  align-items: end;
-  padding-block: var(--space-4);
-  border-block: var(--border-width-thin) solid var(--border-subtle);
+  gap: var(--space-3);
+  padding-block-end: var(--space-4);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
 }
 
-.header > div,
-.section {
+.header > div:first-child,
+.section,
+.profileSummary > div {
   display: grid;
+  gap: var(--space-2);
+}
+
+.profileActions,
+.connectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
 }
 
 .layout {
   display: grid;
   min-inline-size: 0;
-  gap: var(--space-7);
+  gap: var(--space-6);
 }
 
 .cardArea {
   justify-items: center;
+  align-content: start;
   gap: var(--space-3);
   text-align: center;
 }
 
+.cardArea > figure {
+  inline-size: min(100%, 17.5rem);
+}
+
 .content {
   align-content: start;
-  gap: var(--space-6);
+  gap: var(--space-5);
 }
 
 .section {
-  padding-block-end: var(--space-5);
+  padding-block-end: var(--space-4);
   border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.profileSummary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-  padding: 0;
+  padding: var(--space-3) 0;
   margin: 0;
+  border-block: var(--border-width-thin) solid var(--border-subtle);
 }
 
 .metrics > div {
   display: grid;
+  min-inline-size: 0;
   gap: var(--space-1);
-  padding: var(--space-3);
-  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
-  background: var(--background-surface);
+  padding: var(--space-2) var(--space-3);
+}
+
+.metrics > div:nth-child(2n) {
+  border-inline-start: var(--border-width-thin) solid var(--border-subtle);
 }
 
 .metrics dt,
@@ -86,61 +114,137 @@
   margin: 0;
   font: 900 var(--type-heading-lg-size) / 1
     var(--font-display, var(--font-display-fallback));
+  font-variant-numeric: tabular-nums;
 }
 
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-4);
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
 .tags li {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width-thin) solid var(--border-strong);
-  color: var(--foreground-primary);
-  font: 700 var(--type-label-size) / 1
-    var(--font-interface, var(--font-interface-fallback));
+  position: relative;
+  padding-inline-start: var(--space-3);
+  font-weight: 700;
 }
 
+.tags li::before {
+  position: absolute;
+  inset-block-start: 0.55em;
+  inset-inline-start: 0;
+  inline-size: var(--space-1);
+  block-size: var(--space-1);
+  border-radius: var(--radius-round);
+  background: var(--accent-primary);
+  content: "";
+}
+
+.contextList,
 .rewardList {
-  gap: var(--space-2);
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
+.contextList li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--row-min-height-compact);
+  padding: var(--space-3) 0;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.contextList a {
+  min-inline-size: 0;
+  color: inherit;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.contextList span {
+  color: var(--foreground-muted);
+}
+
 .rewardList li {
   gap: var(--space-1);
-  padding: var(--space-3);
-  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
-  background: var(--background-surface);
+  padding: var(--space-3) 0;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
 }
 
 .state {
-  padding: var(--space-6);
+  padding: var(--space-5) 0;
   border-block: var(--border-width-thin) solid var(--border-subtle);
 }
 
-.connectionActions {
-  display: flex;
-  flex-wrap: wrap;
+.groupInviteControl,
+.groupInviteOptions {
   gap: var(--space-2);
-  align-items: center;
+}
+
+.groupInviteOptions {
+  min-inline-size: min(22rem, 100%);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-overlay);
+}
+
+.groupInviteOptions > button {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-block-size: var(--row-min-height-compact);
+  padding: var(--space-3);
+  border: 0;
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+  color: inherit;
+  background: transparent;
+  text-align: start;
 }
 
 @media (min-width: 48rem) {
   .header {
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
   }
 
-  .layout {
-    grid-template-columns: minmax(17rem, 24rem) minmax(0, 1fr);
+  .cardArea > figure {
+    inline-size: min(100%, 20rem);
   }
 
   .metrics {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .metrics > div:nth-child(2n) {
+    border-inline-start: 0;
+  }
+
+  .metrics > div:not(:first-child) {
+    border-inline-start: var(--border-width-thin) solid var(--border-subtle);
+  }
+}
+
+@media (min-width: 80rem) {
+  .layout {
+    grid-template-columns: minmax(18rem, 0.72fr) minmax(0, 1.28fr);
+    align-items: start;
+  }
+
+  .cardArea {
+    position: sticky;
+    inset-block-start: calc(var(--touch-target-min) + var(--space-6));
+  }
+
+  .cardArea > figure {
+    inline-size: min(100%, 22rem);
   }
 }

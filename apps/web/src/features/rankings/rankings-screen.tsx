@@ -1,0 +1,368 @@
+"use client";
+
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import type {
+  GlobalRankingResponse,
+  GroupRankingResponse,
+  RankingContextsResponse,
+  TerritorialRankingResponse,
+} from "@football/contracts";
+import { Button, Text } from "@football/ui";
+
+import { api } from "@/lib/api/resources";
+import { queryKeys } from "@/lib/api/query-keys";
+
+import { rankingHref, type RankingScope } from "./rankings-navigation";
+import styles from "./rankings.module.css";
+
+type Props = {
+  scope: RankingScope;
+  groupId?: string;
+  cityKey?: string;
+  venueId?: string;
+};
+type RankingItem = GlobalRankingResponse["items"][number];
+type RankingPage = {
+  items: RankingItem[];
+  me: GlobalRankingResponse["me"];
+  nextCursor: string | null;
+};
+
+const scopeLabels: Record<RankingScope, string> = {
+  global: "GLOBAL",
+  group: "GRUPO",
+  city: "CIUDAD",
+  venue: "SEDE",
+};
+
+export function RankingsScreen(props: Readonly<Props>) {
+  const router = useRouter();
+  const contexts = useQuery({
+    queryKey: queryKeys.rankingContexts,
+    queryFn: api.rankingContexts,
+  });
+  const selected = selectContext(props, contexts.data);
+
+  function selectScope(scope: RankingScope) {
+    router.push(rankingHref(scope, defaultContext(scope, contexts.data)));
+  }
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <Text tone="accent" variant="label">
+          COMPETENCIA F5
+        </Text>
+        <Text as="h1" variant="display-lg">
+          Rankings
+        </Text>
+      </header>
+
+      <nav aria-label="Ámbito del ranking" className={styles.scopes}>
+        {(Object.keys(scopeLabels) as RankingScope[]).map((scope) => (
+          <button
+            aria-current={props.scope === scope ? "page" : undefined}
+            className={styles.scopeButton}
+            key={scope}
+            onClick={() => selectScope(scope)}
+            type="button"
+          >
+            {scopeLabels[scope]}
+          </button>
+        ))}
+      </nav>
+
+      {props.scope !== "global" && (
+        <ContextSelector
+          contexts={contexts}
+          onChange={(value) => {
+            if (props.scope === "group")
+              router.push(rankingHref("group", { groupId: value }));
+            if (props.scope === "city")
+              router.push(rankingHref("city", { cityKey: value }));
+            if (props.scope === "venue")
+              router.push(rankingHref("venue", { venueId: value }));
+          }}
+          scope={props.scope}
+          value={selected?.id}
+        />
+      )}
+
+      {props.scope === "global" ? (
+        <GlobalRanking />
+      ) : contexts.isPending ? (
+        <State text="Buscando tus contextos competitivos…" />
+      ) : contexts.isError ? (
+        <State alert text="No pudimos cargar los ámbitos disponibles." />
+      ) : !selected ? (
+        <ScopeEmpty scope={props.scope} />
+      ) : props.scope === "group" ? (
+        <GroupRanking groupId={selected.id} />
+      ) : props.scope === "city" ? (
+        <CityRanking cityKey={selected.id} />
+      ) : (
+        <VenueRanking venueId={selected.id} />
+      )}
+    </div>
+  );
+}
+
+function ContextSelector({
+  contexts,
+  onChange,
+  scope,
+  value,
+}: Readonly<{
+  contexts: ReturnType<typeof useQuery<RankingContextsResponse>>;
+  onChange: (value: string) => void;
+  scope: Exclude<RankingScope, "global">;
+  value?: string;
+}>) {
+  if (!contexts.data) return null;
+  const options = contextOptions(scope, contexts.data);
+  if (options.length === 0) return null;
+  return (
+    <label className={styles.context}>
+      <span>{scopeLabels[scope]}</span>
+      <select
+        aria-label={`Seleccionar ${scopeLabels[scope].toLocaleLowerCase("es-AR")}`}
+        onChange={(event) => onChange(event.target.value)}
+        value={value ?? options[0]!.id}
+      >
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function GlobalRanking() {
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.globalRanking,
+    queryFn: ({ pageParam }) => api.globalRanking(pageParam ?? undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+  return (
+    <RankingResult query={query} empty="Todavía no hay jugadores rankeados." />
+  );
+}
+
+function GroupRanking({ groupId }: Readonly<{ groupId: string }>) {
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.groupRanking(groupId),
+    queryFn: ({ pageParam }) =>
+      api.groupRanking(groupId, pageParam ?? undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map(adaptGroupPage),
+    }),
+  });
+  return (
+    <RankingResult
+      query={query}
+      empty="No pertenecés a ningún grupo con ranking disponible."
+    />
+  );
+}
+
+function CityRanking({ cityKey }: Readonly<{ cityKey: string }>) {
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.cityRanking(cityKey),
+    queryFn: ({ pageParam }) =>
+      api.cityRanking(cityKey, pageParam ?? undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map(adaptTerritorialPage),
+    }),
+  });
+  return (
+    <RankingResult
+      query={query}
+      empty="No hay suficiente actividad registrada en esta ciudad."
+    />
+  );
+}
+
+function VenueRanking({ venueId }: Readonly<{ venueId: string }>) {
+  const query = useInfiniteQuery({
+    queryKey: queryKeys.venueRanking(venueId),
+    queryFn: ({ pageParam }) =>
+      api.venueRanking(venueId, pageParam ?? undefined),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => ({
+      ...data,
+      pages: data.pages.map(adaptTerritorialPage),
+    }),
+  });
+  return (
+    <RankingResult
+      query={query}
+      empty="Todavía no hay ranking disponible para esta sede."
+    />
+  );
+}
+
+type RankingQuery = ReturnType<typeof useInfiniteQuery<RankingPage>>;
+
+function RankingResult({
+  query,
+  empty,
+}: Readonly<{ query: RankingQuery; empty: string }>) {
+  if (query.isPending) return <State text="Armando el ranking F5…" />;
+  if (query.isError)
+    return <State alert text="No pudimos cargar este ranking." />;
+  const first = query.data.pages[0]!;
+  const items = [
+    ...new Map(
+      query.data.pages
+        .flatMap((page) => page.items)
+        .map((item) => [item.player.id, item]),
+    ).values(),
+  ];
+  return (
+    <div className={styles.rankingLayout}>
+      <section className={styles.positionCard} aria-labelledby="my-rank-title">
+        <span id="my-rank-title">TU POSICIÓN</span>
+        {first.me.ranked ? (
+          <strong>
+            #{first.me.position}{" "}
+            <small>· {formatOvr(first.me.overall)} OVR</small>
+          </strong>
+        ) : (
+          <p>
+            Aún no tenés evidencia suficiente para aparecer en este ranking.
+          </p>
+        )}
+      </section>
+      <section aria-labelledby="ranking-list-title" className={styles.ranking}>
+        <div className={styles.listHeading}>
+          <Text as="h2" id="ranking-list-title" variant="heading-lg">
+            Clasificación
+          </Text>
+          <span>OVR</span>
+        </div>
+        {items.length === 0 ? (
+          <p className={styles.empty}>{empty}</p>
+        ) : (
+          <ol className={`${styles.list} ui-list`}>
+            {items.map((item) => (
+              <li
+                className={`${styles.row} ui-row ${item.position <= 3 ? styles.top : ""} ${item.isCurrentPlayer ? styles.current : ""}`}
+                key={item.player.id}
+              >
+                <Link
+                  aria-current={item.isCurrentPlayer ? "true" : undefined}
+                  href={
+                    item.isCurrentPlayer
+                      ? "/profile"
+                      : `/players/${item.player.id}`
+                  }
+                >
+                  <span className={styles.rank}>#{item.position}</span>
+                  <strong>{item.player.displayName}</strong>
+                  {item.isCurrentPlayer && <small>VOS</small>}
+                  <b aria-label={`${formatOvr(item.performance.overall)} OVR`}>
+                    {formatOvr(item.performance.overall)}
+                  </b>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+        {query.hasNextPage && (
+          <Button
+            disabled={query.isFetchingNextPage}
+            onClick={() => void query.fetchNextPage()}
+            variant="secondary"
+          >
+            {query.isFetchingNextPage ? "Cargando…" : "Cargar más"}
+          </Button>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function adaptGroupPage(page: GroupRankingResponse): RankingPage {
+  return { items: page.items, me: page.me, nextCursor: page.nextCursor };
+}
+
+function adaptTerritorialPage(page: TerritorialRankingResponse): RankingPage {
+  return { items: page.items, me: page.me, nextCursor: page.nextCursor };
+}
+
+function contextOptions(
+  scope: Exclude<RankingScope, "global">,
+  contexts: RankingContextsResponse,
+) {
+  if (scope === "group")
+    return contexts.groups.map((group) => ({
+      id: group.id,
+      label: group.name,
+    }));
+  if (scope === "city")
+    return contexts.cities.map((city) => ({ id: city.key, label: city.name }));
+  return contexts.venues.map((venue) => ({
+    id: venue.id,
+    label: `${venue.name} · ${venue.city}`,
+  }));
+}
+
+function selectContext(props: Props, contexts?: RankingContextsResponse) {
+  if (!contexts || props.scope === "global") return undefined;
+  const options = contextOptions(props.scope, contexts);
+  const requested =
+    props.scope === "group"
+      ? props.groupId
+      : props.scope === "city"
+        ? props.cityKey
+        : props.venueId;
+  return options.find((option) => option.id === requested) ?? options[0];
+}
+
+function defaultContext(
+  scope: RankingScope,
+  contexts?: RankingContextsResponse,
+) {
+  if (!contexts || scope === "global") return undefined;
+  if (scope === "group") return { groupId: contexts.groups[0]?.id };
+  if (scope === "city") return { cityKey: contexts.cities[0]?.key };
+  return { venueId: contexts.venues[0]?.id };
+}
+
+function ScopeEmpty({ scope }: Readonly<{ scope: RankingScope }>) {
+  const messages: Record<RankingScope, string> = {
+    global: "Todavía no hay jugadores rankeados.",
+    group: "No pertenecés a ningún grupo con ranking disponible.",
+    city: "No hay suficiente actividad registrada en una ciudad disponible.",
+    venue: "Todavía no hay una sede con ranking disponible.",
+  };
+  return <State text={messages[scope]} />;
+}
+
+function State({
+  text,
+  alert = false,
+}: Readonly<{ text: string; alert?: boolean }>) {
+  return (
+    <div className={styles.state}>
+      <p role={alert ? "alert" : "status"}>{text}</p>
+    </div>
+  );
+}
+
+function formatOvr(value: string) {
+  return Math.round(Number(value));
+}

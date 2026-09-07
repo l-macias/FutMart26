@@ -48,6 +48,25 @@ export function createDirectedInvitationRoutes(
       const { groupId } = groupIdParamsSchema.parse(request.params);
       return groups.listDirectedForGroup((await actor(request)).id, groupId);
     });
+    app.get(
+      "/groups/:groupId/connection-invitation-candidates",
+      async (request) => {
+        const { groupId } = groupIdParamsSchema.parse(request.params);
+        return groups.listDirectedCandidates(
+          (await actor(request)).id,
+          groupId,
+        );
+      },
+    );
+    app.get("/players/:playerId/group-invitation-options", async (request) => {
+      const { playerId } = directedInvitationRequestSchema.parse(
+        request.params,
+      );
+      return groups.listGroupOptionsForPlayer(
+        (await actor(request)).id,
+        playerId,
+      );
+    });
     app.delete(
       "/groups/:groupId/connection-invitations/:invitationId",
       async (request, reply) => {

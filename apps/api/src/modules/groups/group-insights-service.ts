@@ -1,10 +1,23 @@
 import { Buffer } from "node:buffer";
 
-import { and, avg, count, eq, max, min, sql, sum } from "drizzle-orm";
+import {
+  and,
+  asc,
+  avg,
+  count,
+  desc,
+  eq,
+  inArray,
+  max,
+  min,
+  sql,
+  sum,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import type {
   GroupActivityResponse,
+  GroupOverviewResponse,
   GroupStatsResponse,
 } from "@football/contracts";
 import type { Database } from "@football/database";
@@ -12,14 +25,20 @@ import {
   groupMemberships,
   groups,
   matchAwards,
+  matchParticipants,
   matches,
   matchSportingResults,
   playerAchievements,
   playerPerformances,
+  players,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
-import { hasGroupCapability } from "./capabilities.js";
+import {
+  groupCapabilities,
+  hasGroupCapability,
+  type GroupCapability,
+} from "./capabilities.js";
 
 const cursorSchema = z
   .object({
@@ -75,6 +94,147 @@ const awardTitles: Record<AwardType, string> = {
 
 export class GroupInsightsService {
   constructor(private readonly database: Database) {}
+
+  async overview(
+    actorPlayerId: string,
+    groupId: string,
+  ): Promise<GroupOverviewResponse> {
+    const membership = await this.requireRead(actorPlayerId, groupId);
+    const capabilities = groupCapabilities(
+      membership.role,
+      membership.capabilities,
+    );
+    const canManageGroup = managementCapabilities.some((capability) =>
+      capabilities.includes(capability),
+    );
+    const canCreateMatch =
+      membership.groupStatus === "ACTIVE" &&
+      capabilities.includes("MATCH_MANAGE");
+
+    const matchProjection = {
+      id: matches.id,
+      status: matches.status,
+      scheduledAt: matches.scheduledAt,
+      locationText: matches.locationText,
+      capacity: matches.capacity,
+      confirmedCount: sql<number>`(
+        select count(*)::int from ${matchParticipants} confirmed
+        where confirmed.match_id = ${matches.id}
+          and confirmed.status = 'CONFIRMED'
+      )`,
+      waitlistCount: sql<number>`(
+        select count(*)::int from ${matchParticipants} waitlisted
+        where waitlisted.match_id = ${matches.id}
+          and waitlisted.status = 'WAITLISTED'
+      )`,
+      participationStatus: sql<"CONFIRMED" | "WAITLISTED" | null>`(
+        select own_participation.status from ${matchParticipants} own_participation
+        where own_participation.match_id = ${matches.id}
+          and own_participation.player_id = ${actorPlayerId}
+          and own_participation.status in ('CONFIRMED', 'WAITLISTED')
+        order by own_participation.joined_at desc
+        limit 1
+      )`,
+      resultStatus: matchSportingResults.status,
+      teamAGoals: matchSportingResults.teamAGoals,
+      teamBGoals: matchSportingResults.teamBGoals,
+    };
+    const selectMatches = () =>
+      this.database
+        .select(matchProjection)
+        .from(matches)
+        .leftJoin(
+          matchSportingResults,
+          eq(matchSportingResults.matchId, matches.id),
+        );
+
+    const [memberCountRows, rosterRows, activeRows, draftRows, historyRows] =
+      await Promise.all([
+        this.database
+          .select({ value: count() })
+          .from(groupMemberships)
+          .where(
+            and(
+              eq(groupMemberships.groupId, groupId),
+              eq(groupMemberships.status, "ACTIVE"),
+            ),
+          ),
+        this.database
+          .select({
+            id: groupMemberships.id,
+            role: groupMemberships.role,
+            capabilities: groupMemberships.capabilities,
+            status: groupMemberships.status,
+            joinedAt: groupMemberships.joinedAt,
+            playerId: players.id,
+            displayName: players.displayName,
+          })
+          .from(groupMemberships)
+          .innerJoin(players, eq(players.id, groupMemberships.playerId))
+          .where(
+            and(
+              eq(groupMemberships.groupId, groupId),
+              eq(groupMemberships.status, "ACTIVE"),
+            ),
+          )
+          .orderBy(asc(groupMemberships.joinedAt), asc(groupMemberships.id))
+          .limit(6),
+        selectMatches()
+          .where(
+            and(
+              eq(matches.groupId, groupId),
+              inArray(matches.status, ["OPEN", "STARTED"]),
+            ),
+          )
+          .orderBy(asc(matches.scheduledAt), asc(matches.id))
+          .limit(7),
+        canCreateMatch
+          ? selectMatches()
+              .where(
+                and(eq(matches.groupId, groupId), eq(matches.status, "DRAFT")),
+              )
+              .orderBy(asc(matches.scheduledAt), asc(matches.id))
+              .limit(6)
+          : Promise.resolve([]),
+        selectMatches()
+          .where(
+            and(
+              eq(matches.groupId, groupId),
+              inArray(matches.status, ["FINISHED", "CANCELLED"]),
+            ),
+          )
+          .orderBy(desc(matches.scheduledAt), desc(matches.id))
+          .limit(5),
+      ]);
+
+    const [nextRow, ...remainingActiveRows] = activeRows;
+    return {
+      group: {
+        id: groupId,
+        name: membership.groupName,
+        status: membership.groupStatus,
+        visibility: membership.groupVisibility,
+        role: membership.role,
+        capabilities,
+      },
+      memberCount: Number(memberCountRows[0]?.value ?? 0),
+      rosterPreview: rosterRows.map((row) => ({
+        id: row.id,
+        role: row.role,
+        capabilities: groupCapabilities(row.role, row.capabilities),
+        status: row.status,
+        joinedAt: row.joinedAt.toISOString(),
+        player: { id: row.playerId, displayName: row.displayName },
+      })),
+      nextMatch: nextRow ? overviewMatch(nextRow) : null,
+      upcomingMatches: [...remainingActiveRows, ...draftRows]
+        .slice(0, 6)
+        .map(overviewMatch),
+      historyMatches: historyRows.map(overviewMatch),
+      canManageGroup: membership.groupStatus === "ACTIVE" && canManageGroup,
+      canCreateMatch,
+    };
+  }
 
   async activity(
     actorPlayerId: string,
@@ -271,6 +431,9 @@ export class GroupInsightsService {
       .select({
         role: groupMemberships.role,
         capabilities: groupMemberships.capabilities,
+        groupName: groups.name,
+        groupStatus: groups.status,
+        groupVisibility: groups.visibility,
       })
       .from(groupMemberships)
       .innerJoin(groups, eq(groups.id, groupMemberships.groupId))
@@ -291,7 +454,50 @@ export class GroupInsightsService {
       )
     )
       throw new ApplicationError("forbidden", "Forbidden", 403);
+    return membership;
   }
+}
+
+const managementCapabilities = [
+  "GROUP_MANAGE_MEMBERS",
+  "GROUP_MANAGE_MODERATORS",
+  "GROUP_TRANSFER_OWNERSHIP",
+  "GROUP_ARCHIVE",
+  "GROUP_MANAGE_INVITATIONS",
+  "GROUP_MANAGE_GUEST_POLICY",
+  "GROUP_MANAGE_GUESTS",
+  "MATCH_MANAGE",
+] as const satisfies readonly GroupCapability[];
+
+function overviewMatch(row: {
+  id: string;
+  status: "DRAFT" | "OPEN" | "STARTED" | "FINISHED" | "CANCELLED";
+  scheduledAt: Date;
+  locationText: string;
+  capacity: number;
+  confirmedCount: number;
+  waitlistCount: number;
+  participationStatus: "CONFIRMED" | "WAITLISTED" | null;
+  resultStatus: "DRAFT" | "CONFIRMED" | "NOT_PLAYED" | null;
+  teamAGoals: number | null;
+  teamBGoals: number | null;
+}): GroupOverviewResponse["historyMatches"][number] {
+  return {
+    id: row.id,
+    status: row.status,
+    scheduledAt: row.scheduledAt.toISOString(),
+    locationText: row.locationText,
+    capacity: row.capacity,
+    confirmedCount: Number(row.confirmedCount),
+    waitlistCount: Number(row.waitlistCount),
+    participationStatus: row.participationStatus,
+    result:
+      row.resultStatus === "CONFIRMED" &&
+      row.teamAGoals !== null &&
+      row.teamBGoals !== null
+        ? { teamAGoals: row.teamAGoals, teamBGoals: row.teamBGoals }
+        : null,
+  };
 }
 
 function activityEvent(

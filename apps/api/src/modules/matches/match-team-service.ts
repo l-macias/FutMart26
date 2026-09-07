@@ -12,6 +12,8 @@ import {
   playerFootballPreferences,
   playerPerformances,
   players,
+  progressionSnapshots,
+  votingSessions,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -229,6 +231,8 @@ export class MatchTeamService {
         preferredRoles: playerFootballPreferences.preferredRoles,
         willingToPlayGoalkeeper:
           playerFootballPreferences.willingToPlayGoalkeeper,
+        aggregatedRating: progressionSnapshots.aggregatedRating,
+        votingStatus: votingSessions.status,
       })
       .from(matchTeamAssignments)
       .innerJoin(
@@ -249,6 +253,18 @@ export class MatchTeamService {
           eq(playerFootballPreferences.playerId, matchParticipants.playerId),
           eq(playerFootballPreferences.discipline, "F5"),
         ),
+      )
+      .leftJoin(
+        progressionSnapshots,
+        and(
+          eq(progressionSnapshots.matchId, matchParticipants.matchId),
+          eq(progressionSnapshots.playerId, matchParticipants.playerId),
+          eq(progressionSnapshots.discipline, "F5"),
+        ),
+      )
+      .leftJoin(
+        votingSessions,
+        eq(votingSessions.matchId, matchParticipants.matchId),
       )
       .where(eq(matchTeamAssignments.matchId, matchId))
       .orderBy(
@@ -271,6 +287,10 @@ export class MatchTeamService {
             row.kind === "PLAYER" ? (row.preferredRoles ?? []) : [],
           willingToPlayGoalkeeper:
             row.kind === "PLAYER" && (row.willingToPlayGoalkeeper ?? false),
+          rating:
+            row.kind === "PLAYER" && row.votingStatus === "CLOSED"
+              ? row.aggregatedRating
+              : null,
         }));
       const averageOvr =
         participants.length === 0

@@ -1,4 +1,4 @@
-import { asc, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import type {
   DiscoveryPeriod,
@@ -10,6 +10,7 @@ import type {
 import type { Database } from "@football/database";
 import {
   accountSuspensions,
+  groupMemberships,
   groups,
   matches,
   matchAwards,
@@ -242,15 +243,33 @@ export class DiscoveryService {
     const [playerResults, groupRows] = await Promise.all([
       this.playerProfiles.search(actorPlayerId, input),
       this.database
-        .select({ id: groups.id, name: groups.name })
+        .select({
+          id: groups.id,
+          name: groups.name,
+          membershipId: groupMemberships.id,
+        })
         .from(groups)
+        .leftJoin(
+          groupMemberships,
+          and(
+            eq(groupMemberships.groupId, groups.id),
+            eq(groupMemberships.playerId, actorPlayerId),
+            eq(groupMemberships.status, "ACTIVE"),
+          ),
+        )
         .where(
           sql`${groups.status} = 'ACTIVE' and ${groups.visibility} = 'PUBLIC' and ${groups.name} ilike ${`%${escaped}%`} escape '\\'`,
         )
         .orderBy(asc(sql`lower(${groups.name})`), asc(groups.id))
         .limit(input.limit),
     ]);
-    return { players: playerResults.items, groups: groupRows };
+    return {
+      players: playerResults.items,
+      groups: groupRows.map(({ membershipId, ...group }) => ({
+        ...group,
+        target: membershipId ? { href: `/groups/${group.id}` } : null,
+      })),
+    };
   }
 
   private statLeaders(

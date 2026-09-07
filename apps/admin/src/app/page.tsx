@@ -2,23 +2,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
-import type {
-  AdminSearchResponse,
-  AdminSystemStatus,
-} from "@football/contracts";
+import type { AdminAuditEvent, AdminSystemStatus } from "@football/contracts";
 import { adminApi } from "../lib/api";
-import { DirectActionForm } from "../components/direct-action-form";
+import { auditActionLabel } from "../lib/admin-copy";
+
+interface Overview {
+  openReportCount: number;
+  suspendedAccountCount: number;
+  recentAudit: AdminAuditEvent[];
+}
 
 export default function AdminHomePage() {
-  const [query, setQuery] = useState("");
-  const search = useQuery({
-    queryKey: ["admin", "search", query],
-    queryFn: () =>
-      adminApi<AdminSearchResponse>(
-        `/admin/search?q=${encodeURIComponent(query)}&limit=20`,
-      ),
-    enabled: query.trim().length > 0,
+  const overview = useQuery({
+    queryKey: ["admin", "overview"],
+    queryFn: () => adminApi<Overview>("/admin/overview"),
   });
   const system = useQuery({
     queryKey: ["admin", "system"],
@@ -26,91 +23,132 @@ export default function AdminHomePage() {
   });
   return (
     <main>
-      <h1>Operaciones</h1>
-      <p>
-        Lookup y estado técnico mínimo. Ninguna acción salta invariantes
-        deportivas.
-      </p>
-      <section>
-        <h2>Buscar</h2>
-        <input
-          aria-label="Buscar"
-          placeholder="Player, email, Group o UUID de Match"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        {search.isError ? <p className="error">No se pudo buscar.</p> : null}
-        {search.data ? (
-          <div className="results">
-            <Result
-              title="Players"
-              items={search.data.players.map((item) => ({
-                href: `/players/${item.id}`,
-                label: `${item.displayName}${item.email ? ` · ${item.email}` : ""}${item.suspended ? " · SUSPENDIDO" : ""}`,
-              }))}
-            />
-            <Result
-              title="Groups"
-              items={search.data.groups.map((item) => ({
-                href: `/groups/${item.id}`,
-                label: `${item.name} · ${item.status}`,
-              }))}
-            />
-            <Result
-              title="Matches"
-              items={search.data.matches.map((item) => ({
-                href: `/matches/${item.id}`,
-                label: `${item.groupName} · ${item.status} · ${item.scheduledAt}`,
-              }))}
+      <header className="page-header">
+        <span className="eyebrow">OPERACIONES</span>
+        <h1>Resumen</h1>
+        <p className="muted">Estado actual y trabajo que requiere atención.</p>
+      </header>
+      <section className="section-stack" aria-labelledby="system-status">
+        <div className="toolbar">
+          <h2 id="system-status">Estado del sistema</h2>
+          <Link className="button-link button-quiet" href="/system">
+            Ver sistema
+          </Link>
+        </div>
+        {system.isPending ? <p className="muted">Verificando checks…</p> : null}
+        {system.isError ? (
+          <p className="error">No pudimos verificar el sistema.</p>
+        ) : null}
+        {system.data ? (
+          <div className="metric-grid">
+            <StatusMetric label="API" value={system.data.api} />
+            <StatusMetric label="Base de datos" value={system.data.database} />
+            <StatusMetric label="Storage" value={system.data.storageStatus} />
+            <StatusMetric
+              label="Mail"
+              value={
+                system.data.mailConfigured ? "CONFIGURED" : "NOT_CONFIGURED"
+              }
             />
           </div>
         ) : null}
       </section>
-      <section>
-        <h2>Sistema</h2>
-        {system.data ? (
-          <dl>
-            <dt>API / DB</dt>
-            <dd>
-              {system.data.api} / {system.data.database}
-            </dd>
-            <dt>Entorno</dt>
-            <dd>{system.data.environment}</dd>
-            <dt>Migration</dt>
-            <dd>{system.data.migration.id ?? "sin dato"}</dd>
-            <dt>Storage / Mail</dt>
-            <dd>
-              {system.data.storageConfigured ? "configurado" : "no configurado"}{" "}
-              / {system.data.mailConfigured ? "configurado" : "no configurado"}
-            </dd>
-          </dl>
-        ) : (
-          <p>Cargando…</p>
-        )}
+      <section className="section-stack" aria-labelledby="attention">
+        <h2 id="attention">Requiere atención</h2>
+        {overview.isPending ? (
+          <p className="muted">Cargando operación…</p>
+        ) : null}
+        {overview.isError ? (
+          <p className="error">No pudimos cargar el resumen.</p>
+        ) : null}
+        {overview.data ? (
+          <div className="metric-grid">
+            <Link className="metric" href="/reports">
+              <span className="metadata">Reportes abiertos</span>
+              <strong>{overview.data.openReportCount}</strong>
+            </Link>
+            <Link className="metric" href="/players">
+              <span className="metadata">Cuentas suspendidas</span>
+              <strong>{overview.data.suspendedAccountCount}</strong>
+            </Link>
+          </div>
+        ) : null}
       </section>
-      <DirectActionForm />
+      <section className="section-stack" aria-labelledby="recent-audit">
+        <div className="toolbar">
+          <h2 id="recent-audit">Auditoría reciente</h2>
+          <Link className="button-link button-quiet" href="/audit">
+            Ver auditoría
+          </Link>
+        </div>
+        {overview.data?.recentAudit.length ? (
+          <ul className="compact-list">
+            {overview.data.recentAudit.map((event) => (
+              <li key={event.id}>
+                <span>
+                  {auditActionLabel(event.action)}
+                  <small className="muted">
+                    {" "}
+                    · {event.actorEmail ?? "operador"}
+                  </small>
+                </span>
+                <time className="metadata" dateTime={event.createdAt}>
+                  {formatDate(event.createdAt)}
+                </time>
+              </li>
+            ))}
+          </ul>
+        ) : overview.data ? (
+          <p className="empty">Todavía no hay actividad administrativa.</p>
+        ) : null}
+      </section>
+      <nav aria-label="Accesos operativos" className="actions">
+        <Link className="button-link" href="/reports">
+          Ver reportes
+        </Link>
+        <Link className="button-link" href="/errors">
+          Ver errores
+        </Link>
+        <Link className="button-link" href="/audit">
+          Ver auditoría
+        </Link>
+      </nav>
     </main>
   );
 }
 
-function Result({
-  title,
-  items,
-}: Readonly<{ title: string; items: Array<{ href: string; label: string }> }>) {
+function StatusMetric({
+  label,
+  value,
+}: Readonly<{ label: string; value: string }>) {
+  const okay = [
+    "READY",
+    "ready",
+    "configured",
+    "CONFIGURED",
+    "disabled",
+  ].includes(value);
   return (
-    <section>
-      <h3>{title}</h3>
-      {items.length ? (
-        <ul>
-          {items.map((item) => (
-            <li key={item.href}>
-              <Link href={item.href}>{item.label}</Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>Sin resultados.</p>
-      )}
-    </section>
+    <div className="metric">
+      <span className="metadata">{label}</span>
+      <span className="status" data-tone={okay ? "success" : "warning"}>
+        {statusLabel(value)}
+      </span>
+    </div>
   );
+}
+
+function statusLabel(value: string) {
+  if (["READY", "ready"].includes(value)) return "OK";
+  if (["configured", "CONFIGURED"].includes(value)) return "CONFIGURADO";
+  if (["disabled", "NOT_CONFIGURED"].includes(value)) return "NO CONFIGURADO";
+  return "DEGRADADO";
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    dateStyle: "short",
+    timeStyle: "short",
+    hourCycle: "h23",
+  }).format(new Date(value));
 }

@@ -205,6 +205,22 @@ void test(
     });
     assert.deepEqual(updatedPreferences.preferredRoles, ["MEDIO", "PORTERO"]);
     assert.equal(updatedPreferences.willingToPlayGoalkeeper, true);
+    assert.equal(
+      footballPreferencesRequestSchema.parse({
+        preferredRoles: ["PORTERO"],
+        willingToPlayGoalkeeper: false,
+        strengths: [],
+      }).willingToPlayGoalkeeper,
+      true,
+    );
+    assert.equal(
+      footballPreferencesRequestSchema.parse({
+        preferredRoles: ["MEDIO"],
+        willingToPlayGoalkeeper: false,
+        strengths: [],
+      }).willingToPlayGoalkeeper,
+      false,
+    );
     assert.throws(() =>
       footballPreferencesRequestSchema.parse({
         preferredRoles: ["MEDIO"],

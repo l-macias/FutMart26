@@ -10,6 +10,8 @@ import type { Database } from "@football/database";
 import {
   groups,
   groupConnectionInvitations,
+  groupMemberships,
+  groupRoleChanges,
   matchAwards,
   matchParticipants,
   matchSportingResults,
@@ -47,7 +49,12 @@ export class NotificationService {
 
   async list(
     actorPlayerId: string,
-    input: { limit: number; cursor?: string },
+    input: {
+      limit: number;
+      cursor?: string;
+      unreadOnly?: boolean;
+      types?: readonly (typeof notifications.$inferSelect.type)[];
+    },
   ): Promise<NotificationListResponse> {
     await this.reconcile(actorPlayerId);
     const cursor = input.cursor ? decodeCursor(input.cursor) : undefined;
@@ -79,6 +86,10 @@ export class NotificationService {
       .where(
         and(
           eq(notifications.recipientPlayerId, actorPlayerId),
+          input.unreadOnly ? isNull(notifications.readAt) : undefined,
+          input.types && input.types.length > 0
+            ? inArray(notifications.type, [...input.types])
+            : undefined,
           cursorCondition,
         ),
       )
@@ -148,6 +159,20 @@ export class NotificationService {
     return { readAt: existing.readAt!.toISOString() };
   }
 
+  async markAllRead(actorPlayerId: string) {
+    const updated = await this.database
+      .update(notifications)
+      .set({ readAt: this.clock() })
+      .where(
+        and(
+          eq(notifications.recipientPlayerId, actorPlayerId),
+          isNull(notifications.readAt),
+        ),
+      )
+      .returning({ id: notifications.id });
+    return { updatedCount: updated.length };
+  }
+
   async reconcile(actorPlayerId: string) {
     const [
       voting,
@@ -158,6 +183,7 @@ export class NotificationService {
       connections,
       groupInvites,
       matchInvites,
+      roleChanges,
     ] = await Promise.all([
       this.votingCandidates(actorPlayerId),
       this.progressionCandidates(actorPlayerId),
@@ -167,6 +193,7 @@ export class NotificationService {
       this.connectionCandidates(actorPlayerId),
       this.groupInvitationCandidates(actorPlayerId),
       this.matchInvitationCandidates(actorPlayerId),
+      this.groupRoleChangeCandidates(actorPlayerId),
     ]);
     const now = this.clock();
     const rows: NotificationInsert[] = [];
@@ -281,6 +308,19 @@ export class NotificationService {
           { matchId: invitation.matchId },
         ),
       );
+    for (const change of roleChanges)
+      rows.push({
+        id: randomUUID(),
+        recipientPlayerId: actorPlayerId,
+        type:
+          change.nextRole === "MODERATOR"
+            ? "GROUP_MODERATOR_GRANTED"
+            : "GROUP_MODERATOR_REMOVED",
+        groupId: change.groupId,
+        relatedPlayerId: change.changedByPlayerId,
+        deduplicationKey: `group-role:${change.id}:${actorPlayerId}`,
+        createdAt: change.changedAt,
+      });
 
     if (rows.length > 0)
       await this.database
@@ -483,6 +523,39 @@ export class NotificationService {
       .orderBy(desc(matchPlayerInvitations.createdAt))
       .limit(RECONCILIATION_LIMIT);
   }
+
+  private groupRoleChangeCandidates(actorPlayerId: string) {
+    return this.database
+      .select({
+        id: groupRoleChanges.id,
+        groupId: groupRoleChanges.groupId,
+        changedByPlayerId: groupRoleChanges.changedByPlayerId,
+        nextRole: groupRoleChanges.nextRole,
+        changedAt: groupRoleChanges.changedAt,
+      })
+      .from(groupRoleChanges)
+      .innerJoin(
+        groupMemberships,
+        eq(groupMemberships.id, groupRoleChanges.membershipId),
+      )
+      .where(
+        and(
+          eq(groupMemberships.playerId, actorPlayerId),
+          or(
+            and(
+              eq(groupRoleChanges.previousRole, "MEMBER"),
+              eq(groupRoleChanges.nextRole, "MODERATOR"),
+            ),
+            and(
+              eq(groupRoleChanges.previousRole, "MODERATOR"),
+              eq(groupRoleChanges.nextRole, "MEMBER"),
+            ),
+          ),
+        ),
+      )
+      .orderBy(desc(groupRoleChanges.changedAt))
+      .limit(RECONCILIATION_LIMIT);
+  }
 }
 
 function notificationRow(
@@ -589,6 +662,16 @@ function present(
       body: `${relatedPlayerName ?? "Un jugador"} te invitó a jugar con ${groupName ?? "su grupo"}.`,
       path: null,
     },
+    GROUP_MODERATOR_GRANTED: {
+      title: "Ahora sos moderador",
+      body: `${groupName ?? "Tu grupo"} · Ya podés usar los permisos que te delegaron.`,
+      path: null,
+    },
+    GROUP_MODERATOR_REMOVED: {
+      title: "Tu rol cambió",
+      body: `${groupName ?? "Tu grupo"} · Volviste a ser miembro del grupo.`,
+      path: null,
+    },
   }[notification.type];
   return {
     id: notification.id,
@@ -606,9 +689,12 @@ function present(
             : notification.type === "GROUP_INVITATION_RECEIVED" ||
                 notification.type === "MATCH_INVITATION_RECEIVED"
               ? "/invitations"
-              : notification.type === "ACHIEVEMENT_EARNED"
-                ? "/profile"
-                : `/play/matches/${notification.matchId}${copy.path ? `/${copy.path}` : ""}`,
+              : notification.type === "GROUP_MODERATOR_GRANTED" ||
+                  notification.type === "GROUP_MODERATOR_REMOVED"
+                ? `/groups/${notification.groupId}`
+                : notification.type === "ACHIEVEMENT_EARNED"
+                  ? "/profile"
+                  : `/play/matches/${notification.matchId}${copy.path ? `/${copy.path}` : ""}`,
     },
   };
 }

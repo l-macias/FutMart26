@@ -18,6 +18,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+::selection {
+  background: var(--accent-primary);
+  color: var(--background-canvas);
+}
+
 .app-state-page {
   min-block-size: 100dvh;
   max-inline-size: 48rem;
@@ -39,6 +44,15 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+select {
+  touch-action: manipulation;
+}
+
+textarea {
+  resize: vertical;
 }
 
 svg {

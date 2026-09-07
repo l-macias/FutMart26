@@ -142,7 +142,10 @@ export class MatchCompletionService {
     return {
       confirmedAt: match.rosterConfirmedAt?.toISOString() ?? null,
       ...closure,
-      participants: rows.map((row) => this.rosterView(row)),
+      participants: rows.map((row) => ({
+        ...this.rosterView(row),
+        isCurrentActor: row.playerId === actorPlayerId,
+      })),
     };
   }
 

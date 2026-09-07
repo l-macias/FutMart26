@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import test from "node:test";
 
+import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDatabase } from "@football/database";
 import {
@@ -10,6 +11,7 @@ import {
   groupMemberships,
   groups,
   matchAwards,
+  matchParticipants,
   matches,
   matchSportingResults,
   playerAchievements,
@@ -336,6 +338,160 @@ void test(
       insights.activity(outsider, groupId, { limit: 20 }),
       hasCode("forbidden"),
     );
+    await connection.client.end();
+  },
+);
+
+void test(
+  "Group Overview is bounded, role-aware and does not duplicate its featured match",
+  { skip: !safeUrl },
+  async () => {
+    const connection = createDatabase(safeUrl!);
+    await migrate(connection.db, {
+      migrationsFolder: path.resolve(
+        process.cwd(),
+        "../../packages/database/drizzle",
+      ),
+    });
+    const insights = new GroupInsightsService(connection.db);
+    const seededPlayers: string[] = [];
+    for (let index = 0; index < 9; index += 1) {
+      const authUserId = randomUUID();
+      const playerId = randomUUID();
+      await connection.db.insert(authUser).values({
+        id: authUserId,
+        email: `${authUserId}@overview.test`,
+        name: `Player ${index}`,
+      });
+      await connection.db.insert(players).values({
+        id: playerId,
+        authUserId,
+        displayName: `Player ${index}`,
+      });
+      seededPlayers.push(playerId);
+    }
+    const actor = seededPlayers[0];
+    const outsider = seededPlayers.at(-1);
+    const groupId = randomUUID();
+    await connection.db.insert(groups).values({
+      id: groupId,
+      name: "Overview test",
+      createdByPlayerId: actor!,
+      visibility: "PRIVATE",
+    });
+    await connection.db.insert(groupMemberships).values(
+      seededPlayers.slice(0, 8).map((playerId, index) => ({
+        id: randomUUID(),
+        groupId,
+        playerId,
+        role: index === 0 ? ("OWNER" as const) : ("MEMBER" as const),
+        joinedAt: new Date(
+          `2034-01-${String(index + 1).padStart(2, "0")}T10:00:00.000Z`,
+        ),
+      })),
+    );
+
+    async function overviewMatch(
+      status: "DRAFT" | "OPEN" | "FINISHED" | "CANCELLED",
+      scheduledAt: Date,
+      score?: [number, number],
+    ) {
+      const matchId = randomUUID();
+      await connection.db.insert(matches).values({
+        id: matchId,
+        groupId,
+        discipline: "F5",
+        status,
+        scheduledAt,
+        durationMinutes: 60,
+        capacity: 12,
+        locationText: "Complejo bounded",
+        createdByPlayerId: actor!,
+        ...(status === "CANCELLED"
+          ? { cancelledAt: scheduledAt, cancelledByPlayerId: actor! }
+          : {}),
+      });
+      if (score) {
+        await connection.db.insert(matchSportingResults).values({
+          id: randomUUID(),
+          matchId,
+          status: "CONFIRMED",
+          teamAGoals: score[0],
+          teamBGoals: score[1],
+          updatedByPlayerId: actor!,
+          confirmedAt: scheduledAt,
+          confirmedByPlayerId: actor!,
+        });
+      }
+      return matchId;
+    }
+
+    const firstOpen = await overviewMatch(
+      "OPEN",
+      new Date("2035-01-01T20:00:00.000Z"),
+    );
+    const secondOpen = await overviewMatch(
+      "OPEN",
+      new Date("2035-01-02T20:00:00.000Z"),
+    );
+    const draft = await overviewMatch(
+      "DRAFT",
+      new Date("2035-01-03T20:00:00.000Z"),
+    );
+    await connection.db.insert(matchParticipants).values({
+      id: randomUUID(),
+      matchId: firstOpen,
+      kind: "PLAYER",
+      playerId: actor!,
+      status: "CONFIRMED",
+      admissionOrder: 1n,
+      confirmedAt: new Date("2034-12-01T20:00:00.000Z"),
+    });
+    for (let index = 0; index < 7; index += 1) {
+      await overviewMatch(
+        "FINISHED",
+        new Date(`2033-02-${String(index + 1).padStart(2, "0")}T20:00:00.000Z`),
+        [index, index + 1],
+      );
+    }
+
+    const result = await insights.overview(actor!, groupId);
+    assert.equal(result.group.visibility, "PRIVATE");
+    assert.equal(result.memberCount, 8);
+    assert.equal(result.rosterPreview.length, 6);
+    assert.equal(result.nextMatch?.id, firstOpen);
+    assert.equal(result.nextMatch?.participationStatus, "CONFIRMED");
+    assert.deepEqual(
+      result.upcomingMatches.map((match) => match.id),
+      [secondOpen, draft],
+    );
+    assert.equal(result.historyMatches.length, 5);
+    assert.equal(
+      result.historyMatches.every((match) => match.result),
+      true,
+    );
+    assert.equal(result.canManageGroup, true);
+    assert.equal(result.canCreateMatch, true);
+    const memberResult = await insights.overview(seededPlayers[1]!, groupId);
+    assert.equal(memberResult.group.visibility, "PRIVATE");
+    assert.equal(memberResult.canManageGroup, false);
+    assert.equal(memberResult.canCreateMatch, false);
+    assert.deepEqual(
+      memberResult.upcomingMatches.map((match) => match.id),
+      [secondOpen],
+    );
+    await assert.rejects(
+      insights.overview(outsider!, groupId),
+      hasCode("forbidden"),
+    );
+
+    await connection.db
+      .update(groups)
+      .set({ status: "ARCHIVED" })
+      .where(eq(groups.id, groupId));
+    const archived = await insights.overview(actor!, groupId);
+    assert.equal(archived.canManageGroup, false);
+    assert.equal(archived.canCreateMatch, false);
     await connection.client.end();
   },
 );

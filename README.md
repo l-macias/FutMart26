@@ -43,7 +43,7 @@ privado y debe existir previamente. En development puede dejarse
 de avatar responde como no disponible. Tests usan storage in-memory.
 
 Producción usa SMTP genérico (`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
-`SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`) y exige storage habilitado. Ningún
+`SMTP_REQUIRE_TLS`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`) y exige storage habilitado. Ningún
 secret se incluye en la imagen; todos llegan por runtime environment/secrets.
 
 Para aplicar migrations desde PowerShell cargando el `.env` raíz:
@@ -73,8 +73,8 @@ pnpm prod:check
 pnpm start
 ```
 
-`/health` indica liveness sin consultar DB; `/ready` exige PostgreSQL y migration
-0022 compatible. La topología launch usa **una sola instancia API** porque los
+`/health` indica liveness sin consultar DB; `/readiness` (y el alias `/ready`)
+exige PostgreSQL y migration 0023 compatible. La topología launch usa **una sola instancia API** porque los
 rate limits siguen siendo in-memory. El runbook de backup, restore, deploy y
 rollback está en `docs/operations/PRODUCTION_RUNBOOK.md`.
 
@@ -118,8 +118,8 @@ La preparación segura, fixtures y artifacts se documentan en
 
 ## Rutas Player principales
 
-- `/`: Home Global autenticado.
-- `/play`: dashboard personal.
+- `/`: Home personal autenticado (Match inmediato, atención y previews).
+- `/play`: centro personal de partidos y convocatorias.
 - `/groups` y `/groups/:groupId`: Groups privados.
 - `/groups/:groupId/matches/new`: creación de Match.
 - `/play/matches/:matchId`: Match Detail.

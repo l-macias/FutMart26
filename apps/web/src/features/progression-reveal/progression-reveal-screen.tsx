@@ -48,6 +48,8 @@ export function ProgressionRevealScreen({
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: queryKeys.performance }),
           queryClient.invalidateQueries({ queryKey: queryKeys.rewards }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.ownProfile }),
+          queryClient.invalidateQueries({ queryKey: queryKeys.personalHome }),
           queryClient.invalidateQueries({
             queryKey: queryKeys.notificationUnreadCount,
           }),
@@ -161,7 +163,7 @@ function AvailableReveal({
                   {Number(snapshot.aggregatedRating).toFixed(1)}
                 </Text>
                 <Text tone="muted" variant="metadata">
-                  Rating del partido · {snapshot.receivedEvaluationCount} de{" "}
+                  Nota del partido · {snapshot.receivedEvaluationCount} de{" "}
                   {snapshot.eligibleEvaluationCount} evaluaciones
                 </Text>
               </div>
@@ -426,5 +428,6 @@ function formatDate(value: string) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 }

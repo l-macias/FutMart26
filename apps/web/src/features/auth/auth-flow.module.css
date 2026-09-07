@@ -2,7 +2,7 @@
   display: grid;
   min-block-size: 100dvh;
   place-items: center;
-  padding: var(--space-5);
+  padding: var(--page-gutter);
 }
 .panel {
   display: grid;

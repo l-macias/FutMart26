@@ -20,7 +20,7 @@ const interfaceFont = Manrope({
 
 export const metadata: Metadata = {
   title: "F5 Groups",
-  description: "F5 Groups player application",
+  description: "Aplicación de jugadores F5 Groups",
 };
 
 export default function RootLayout({

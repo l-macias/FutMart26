@@ -162,6 +162,13 @@
       "when": 1788264495072,
       "tag": "0022_eminent_mongoose",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788371890300,
+      "tag": "0023_perpetual_gateway",
+      "breakpoints": true
     }
   ]
 }

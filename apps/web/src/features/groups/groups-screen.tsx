@@ -101,7 +101,7 @@ export function GroupsScreen() {
                 </span>
                 <span>
                   <strong>{group.name}</strong>
-                  <small>{group.role}</small>
+                  <small>{roleLabel(group.role)}</small>
                 </span>
                 <span aria-hidden="true">→</span>
               </Link>
@@ -126,7 +126,7 @@ export function GroupsScreen() {
                   </span>
                   <span>
                     <strong>{group.name}</strong>
-                    <small>{group.role} · ARCHIVED</small>
+                    <small>{roleLabel(group.role)} · ARCHIVADO</small>
                   </span>
                   <span aria-hidden="true">→</span>
                 </Link>
@@ -137,6 +137,12 @@ export function GroupsScreen() {
       )}
     </div>
   );
+}
+
+function roleLabel(role: "OWNER" | "MODERATOR" | "MEMBER") {
+  if (role === "OWNER") return "PROPIETARIO";
+  if (role === "MODERATOR") return "MODERADOR";
+  return "MIEMBRO";
 }
 
 function Status({

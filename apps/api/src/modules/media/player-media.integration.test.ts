@@ -10,7 +10,11 @@ import sharp from "sharp";
 import { ZodError } from "zod";
 
 import type { FootballAuth } from "@football/auth";
-import { playerImageSchema, playerWithImageSchema } from "@football/contracts";
+import {
+  avatarCropRectangle,
+  playerImageSchema,
+  playerWithImageSchema,
+} from "@football/contracts";
 import { createDatabase } from "@football/database";
 import { authUser, mediaAssets, players } from "@football/database/schema";
 
@@ -111,6 +115,25 @@ void test("avatar processing validates real raster content and emits one sanitiz
       crop: { cropX: 0.5, cropY: 0.5, zoom: 1 },
     }),
     "media_too_large",
+  );
+});
+
+void test("avatar crop geometry is stable for landscape and portrait sources", () => {
+  assert.deepEqual(
+    avatarCropRectangle(1600, 900, {
+      cropX: 0.75,
+      cropY: 0.25,
+      zoom: 2,
+    }),
+    { left: 1020, top: 0, width: 360, height: 450 },
+  );
+  assert.deepEqual(
+    avatarCropRectangle(900, 1600, {
+      cropX: 0.2,
+      cropY: 0.8,
+      zoom: 1.5,
+    }),
+    { left: 0, top: 850, width: 600, height: 750 },
   );
 });
 

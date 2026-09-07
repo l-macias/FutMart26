@@ -39,6 +39,9 @@ export function createNotificationRoutes(
       const { notificationId } = notificationParamsSchema.parse(request.params);
       return notifications.markRead((await actor(request)).id, notificationId);
     });
+    app.post("/me/notifications/read-all", async (request) =>
+      notifications.markAllRead((await actor(request)).id),
+    );
     return Promise.resolve();
   };
 }

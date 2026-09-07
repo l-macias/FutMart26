@@ -1,9 +1,9 @@
 .page {
   display: grid;
-  gap: var(--space-6);
-  max-inline-size: 48rem;
+  gap: var(--section-gap);
+  max-inline-size: var(--content-reading);
   margin-inline: auto;
-  padding: var(--space-7) var(--space-5);
+  padding: var(--space-7) var(--page-gutter);
   color: var(--foreground-primary);
 }
 .page header,
@@ -12,16 +12,17 @@
   gap: var(--space-3);
 }
 .page section {
-  padding-inline-start: var(--space-4);
-  border-inline-start: var(--border-width-strong) solid var(--border-subtle);
+  padding-block-start: var(--space-4);
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
 }
 .page h2,
 .page p {
   margin: 0;
 }
-.page a {
-  color: var(--accent-primary);
+.page h2 {
+  font: 700 var(--type-heading-lg-size) / var(--type-leading-heading)
+    var(--font-display, var(--font-display-fallback));
 }
-.page code {
+.page a {
   color: var(--accent-primary);
 }

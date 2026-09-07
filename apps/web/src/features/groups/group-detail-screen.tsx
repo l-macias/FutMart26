@@ -1,300 +1,476 @@
 "use client";
 
-import {
-  useInfiniteQuery,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { Button, Text } from "@football/ui";
+import type { GroupOverviewResponse } from "@football/contracts";
+import { Badge, Text } from "@football/ui";
+import { ReportControl } from "@/components/report-control/report-control";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
-import { ReportControl } from "@/components/report-control/report-control";
 import styles from "./groups.module.css";
-import { InviteConnectionControl } from "@/features/directed-invitations/invite-connection-control";
+
+type MatchPreview = GroupOverviewResponse["historyMatches"][number];
 
 export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
-  const group = useQuery({
-    queryKey: queryKeys.group(groupId),
-    queryFn: () => api.group(groupId),
+  const [showFullRoster, setShowFullRoster] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState("");
+  const [matchView, setMatchView] = useState<"upcoming" | "history">(
+    "upcoming",
+  );
+  const overview = useQuery({
+    queryKey: queryKeys.groupOverview(groupId),
+    queryFn: () => api.groupOverview(groupId),
   });
   const members = useQuery({
     queryKey: queryKeys.groupMembers(groupId),
     queryFn: () => api.members(groupId),
-  });
-  const matches = useQuery({
-    queryKey: queryKeys.matches(groupId),
-    queryFn: () => api.matches(groupId),
+    enabled: showFullRoster && overview.isSuccess,
   });
   const stats = useQuery({
     queryKey: queryKeys.groupStats(groupId),
     queryFn: () => api.groupStats(groupId),
+    enabled: overview.isSuccess,
   });
   const ranking = useQuery({
     queryKey: queryKeys.groupRanking(groupId),
     queryFn: () => api.groupRanking(groupId, undefined, 3),
+    enabled: overview.isSuccess,
   });
-  const activity = useInfiniteQuery({
+  const activity = useQuery({
     queryKey: queryKeys.groupActivity(groupId),
-    queryFn: ({ pageParam }) =>
-      api.groupActivity(groupId, pageParam ?? undefined, 8),
-    initialPageParam: null as string | null,
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    queryFn: () => api.groupActivity(groupId, undefined, 4),
+    enabled: overview.isSuccess,
   });
-  if (group.isPending)
+
+  if (overview.isPending)
     return (
       <div className={styles.page}>
         <p role="status">Cargando grupo…</p>
       </div>
     );
-  if (group.isError)
+  if (overview.isError)
     return (
       <div className={styles.page}>
         <p className={styles.error} role="alert">
-          {group.error.message}
+          {overview.error.message}
         </p>
       </div>
     );
+
+  const { group } = overview.data;
+  const visibleMembers = members.data?.filter((membership) =>
+    membership.player.displayName
+      .toLocaleLowerCase("es")
+      .includes(rosterSearch.trim().toLocaleLowerCase("es")),
+  );
+  const selectedMatches =
+    matchView === "upcoming"
+      ? overview.data.upcomingMatches
+      : overview.data.historyMatches;
+
   return (
     <div className={styles.page}>
       <Link className={styles.back} href="/groups">
         ← GRUPOS
       </Link>
-      <header className={styles.detailHero}>
+      <header
+        className={`${styles.groupHeader} ${group.status === "ARCHIVED" ? styles.groupHeaderArchived : ""}`}
+      >
         <div>
           <Text tone="accent" variant="label">
-            {group.data.role} · {members.data?.length ?? "—"} MIEMBROS
+            {overview.data.memberCount} JUGADORES
           </Text>
-          <Text as="h1" variant="display-lg">
-            {group.data.name}
+          <Text as="h1" className={styles.groupTitle} variant="display-lg">
+            {group.name}
           </Text>
-          <Link
-            className="ui-button ui-button--secondary"
-            href={`/groups/${groupId}/settings`}
-          >
-            {group.data.role === "MEMBER"
-              ? "Opciones del grupo"
-              : "Configurar grupo"}
-          </Link>
         </div>
-        <span className={styles.crest}>G</span>
+        <div className={styles.headerMeta} aria-label="Estado del grupo">
+          {group.visibility === "PRIVATE" ? (
+            <Badge kind="state">PRIVADO</Badge>
+          ) : (
+            <span>PÚBLICO</span>
+          )}
+          {group.role !== "MEMBER" && (
+            <Badge kind="role">{roleLabel(group.role)}</Badge>
+          )}
+          {group.status === "ARCHIVED" && (
+            <Badge className={styles.archivedBadge} kind="state">
+              ARCHIVADO
+            </Badge>
+          )}
+        </div>
       </header>
-      <ReportControl targetId={groupId} targetType="GROUP" />
-      <section className={styles.matchesSection}>
-        <div className={styles.sectionHeading}>
-          <div>
-            <Text tone="accent" variant="label">
-              PRÓXIMAS CONVOCATORIAS
-            </Text>
-            <Text as="h2" variant="heading-lg">
-              Partidos
-            </Text>
-          </div>
-          {group.data.status === "ACTIVE" &&
-            group.data.capabilities.includes("MATCH_MANAGE") && (
-              <Link
-                className="ui-button ui-button--primary"
-                href={`/groups/${groupId}/matches/new`}
-              >
-                Crear próximo partido
-              </Link>
-            )}
-        </div>
-        {matches.isPending ? (
-          <p className={styles.status} role="status">
-            Actualizando partidos…
-          </p>
-        ) : matches.isError ? (
-          <p className={styles.error} role="alert">
-            No pudimos cargar los partidos. El grupo sigue disponible.
-          </p>
-        ) : matches.data.length === 0 ? (
-          <p className={styles.status}>
-            Todavía no hay partidos. Podés preparar un Draft sin publicarlo.
-          </p>
-        ) : (
-          <div className={styles.matchList}>
-            {matches.data.map((match) => (
-              <Link
-                className={styles.matchRow}
-                href={`/play/matches/${match.id}`}
-                key={match.id}
-              >
-                <span>
-                  {new Intl.DateTimeFormat("es-AR", {
-                    weekday: "short",
-                    day: "2-digit",
-                    month: "short",
-                  }).format(new Date(match.scheduledAt))}
-                </span>
-                <strong>
-                  {new Intl.DateTimeFormat("es-AR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(match.scheduledAt))}{" "}
-                  · {match.locationText}
-                </strong>
-                <small>
-                  {match.status} · {match.confirmedCount}/{match.capacity}
-                </small>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-      <section
-        className={styles.clubSummary}
-        aria-labelledby="group-stats-title"
+
+      {group.status === "ARCHIVED" && (
+        <p className={styles.archivedNotice} role="status">
+          Este grupo está archivado. Su historia sigue disponible en modo de
+          consulta.
+        </p>
+      )}
+
+      <div
+        className={`${styles.overviewGrid} ${group.status === "ARCHIVED" ? styles.overviewGridArchived : ""}`}
       >
-        <div className={styles.sectionHeading}>
-          <div>
-            <Text tone="accent" variant="label">
-              PULSO DEL GRUPO
-            </Text>
-            <Text as="h2" id="group-stats-title" variant="heading-lg">
-              Números del club
-            </Text>
-          </div>
-          <Link
-            className="ui-button ui-button--secondary"
-            href={`/groups/${groupId}/ranking`}
+        <main className={styles.overviewMain}>
+          <NextMatch
+            canCreate={overview.data.canCreateMatch}
+            groupId={groupId}
+            match={overview.data.nextMatch}
+          />
+
+          <section
+            className={styles.rosterSection}
+            aria-labelledby="roster-title"
           >
-            Ranking completo
-          </Link>
-        </div>
-        {stats.isPending ? (
-          <p role="status">Actualizando estadísticas…</p>
-        ) : stats.isError ? (
-          <p className={styles.error} role="alert">
-            Las estadísticas no están disponibles ahora.
-          </p>
-        ) : (
-          <div className={styles.statsStrip}>
-            <Stat
-              label="Partidos jugados"
-              value={stats.data.matches.totalFinished}
-            />
-            <Stat label="Goles" value={stats.data.goals.total} />
-            <Stat
-              label="OVR promedio"
-              value={formatDecimal(stats.data.performance.averageOvr)}
-            />
-            <Stat
-              label="Rankeados"
-              value={stats.data.participation.rankedPlayerCount}
-            />
-          </div>
-        )}
-        <div className={styles.topThree}>
-          <Text as="h3" variant="heading-md">
-            Top 3 F5
-          </Text>
-          {ranking.isPending ? (
-            <Text tone="muted">Actualizando ranking…</Text>
-          ) : ranking.isError ? (
-            <Text tone="muted" role="alert">
-              El ranking no está disponible ahora.
-            </Text>
-          ) : ranking.data.items.length === 0 ? (
-            <Text tone="muted">Todavía no hay Players rankeados.</Text>
-          ) : (
-            ranking.data.items.map((item) => (
-              <div className={styles.rankPreview} key={item.player.id}>
-                <strong>#{item.position}</strong>
-                <span>{item.player.displayName}</span>
-                <b>{Math.round(Number(item.performance.overall))} OVR</b>
+            <div className={styles.sectionHeading}>
+              <div>
+                <Text tone="accent" variant="label">
+                  PLANTEL · {overview.data.memberCount}
+                </Text>
+                <Text as="h2" id="roster-title" variant="heading-lg">
+                  Jugadores del grupo
+                </Text>
               </div>
-            ))
-          )}
-        </div>
-      </section>
-      <section className={styles.activitySection}>
-        <Text tone="accent" variant="label">
-          ACTIVIDAD RECIENTE
-        </Text>
-        <Text as="h2" variant="heading-lg">
-          Lo último
-        </Text>
-        {activity.isPending ? (
-          <p className={styles.status} role="status">
-            Actualizando actividad…
-          </p>
-        ) : activity.isError ? (
-          <p className={styles.error} role="alert">
-            La actividad reciente no está disponible ahora.
-          </p>
-        ) : activity.data.pages[0]?.items.length === 0 ? (
-          <p className={styles.status}>Todavía no hay actividad deportiva.</p>
-        ) : (
-          <div className={styles.activityList}>
-            {uniqueActivity(
-              activity.data.pages.flatMap((page) => page.items),
-            ).map((event) => (
-              <Link
-                className={styles.activityRow}
-                href={event.target.href}
-                key={event.stableId}
-              >
-                <time>{formatDate(event.occurredAt)}</time>
-                <strong>{event.title}</strong>
-                <small>{event.body}</small>
-              </Link>
-            ))}
-          </div>
-        )}
-        {activity.hasNextPage && !activity.isError && (
-          <Button
-            disabled={activity.isFetchingNextPage}
-            onClick={() => void activity.fetchNextPage()}
-            variant="secondary"
-          >
-            {activity.isFetchingNextPage ? "Cargando…" : "Cargar más"}
-          </Button>
-        )}
-      </section>
-      <div className={styles.detailGrid}>
-        <section>
-          <Text as="h2" variant="heading-lg">
-            Plantel
-          </Text>
-          {members.isPending ? (
-            <p role="status">Actualizando plantel…</p>
-          ) : members.isError ? (
-            <p className={styles.error} role="alert">
-              No pudimos cargar el plantel.
-            </p>
-          ) : (
-            <div className={styles.memberList}>
-              {members.data.map((membership, index) => (
-                <article className={styles.member} key={membership.id}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <strong>{membership.player.displayName}</strong>
-                  <small>{membership.role}</small>
-                </article>
-              ))}
+              {overview.data.memberCount >
+                overview.data.rosterPreview.length && (
+                <button
+                  className="ui-button ui-button--secondary"
+                  onClick={() => setShowFullRoster((value) => !value)}
+                  type="button"
+                >
+                  {showFullRoster ? "Cerrar plantel" : "Ver plantel completo"}
+                </button>
+              )}
             </div>
+            {showFullRoster ? (
+              <>
+                <label className={styles.rosterSearch}>
+                  <span>BUSCAR EN EL PLANTEL</span>
+                  <input
+                    onChange={(event) => setRosterSearch(event.target.value)}
+                    placeholder="Nombre del jugador"
+                    type="search"
+                    value={rosterSearch}
+                  />
+                </label>
+                {members.isPending ? (
+                  <p role="status">Actualizando plantel…</p>
+                ) : members.isError ? (
+                  <p className={styles.error} role="alert">
+                    No pudimos cargar el plantel completo.
+                  </p>
+                ) : visibleMembers?.length === 0 ? (
+                  <p className={styles.status}>No hay coincidencias.</p>
+                ) : (
+                  <Roster members={visibleMembers ?? []} />
+                )}
+              </>
+            ) : (
+              <Roster members={overview.data.rosterPreview} />
+            )}
+          </section>
+
+          <section
+            className={styles.matchesSection}
+            aria-labelledby="matches-title"
+          >
+            <div className={styles.sectionHeading}>
+              <div>
+                <Text tone="accent" variant="label">
+                  PARTIDOS
+                </Text>
+                <Text as="h2" id="matches-title" variant="heading-lg">
+                  Calendario del grupo
+                </Text>
+              </div>
+              <div className={styles.matchTabs} aria-label="Vista de partidos">
+                <button
+                  aria-pressed={matchView === "upcoming"}
+                  onClick={() => setMatchView("upcoming")}
+                  type="button"
+                >
+                  PRÓXIMOS
+                </button>
+                <button
+                  aria-pressed={matchView === "history"}
+                  onClick={() => setMatchView("history")}
+                  type="button"
+                >
+                  HISTORIAL
+                </button>
+              </div>
+            </div>
+            {selectedMatches.length === 0 ? (
+              <p className={styles.status}>
+                {matchView === "upcoming"
+                  ? overview.data.nextMatch
+                    ? "No hay otros partidos próximos."
+                    : "No hay próximos partidos."
+                  : "Todavía no hay partidos en el historial."}
+              </p>
+            ) : (
+              <div className={styles.matchList}>
+                {selectedMatches.map((match) => (
+                  <MatchRow key={match.id} match={match} />
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+
+        <aside className={styles.overviewAside}>
+          <section className={styles.compactSection}>
+            <div className={styles.sectionHeading}>
+              <div>
+                <Text tone="accent" variant="label">
+                  TOP DEL GRUPO
+                </Text>
+                <Text as="h2" variant="heading-md">
+                  F5
+                </Text>
+              </div>
+            </div>
+            {ranking.isPending ? (
+              <p className={styles.status} role="status">
+                Actualizando ranking…
+              </p>
+            ) : ranking.isError ? (
+              <p className={styles.error} role="alert">
+                El ranking no está disponible ahora.
+              </p>
+            ) : ranking.data.items.length === 0 ? (
+              <p className={styles.status}>
+                Todavía no hay jugadores rankeados.
+              </p>
+            ) : (
+              <div className={`${styles.topThree} ui-list`}>
+                {ranking.data.items.map((item) => (
+                  <Link
+                    className={`${styles.rankPreview} ui-row`}
+                    href={`/players/${item.player.id}`}
+                    key={item.player.id}
+                  >
+                    <strong>#{item.position}</strong>
+                    <span>{item.player.displayName}</span>
+                    <b
+                      aria-label={`${Math.round(Number(item.performance.overall))} OVR`}
+                    >
+                      {Math.round(Number(item.performance.overall))}
+                    </b>
+                  </Link>
+                ))}
+              </div>
+            )}
+            <Link
+              className={styles.inlineLink}
+              href={`/rankings?scope=group&groupId=${groupId}`}
+            >
+              VER RANKING COMPLETO →
+            </Link>
+          </section>
+
+          <section className={styles.compactSection}>
+            <Text tone="accent" variant="label">
+              NÚMEROS DEL GRUPO
+            </Text>
+            {stats.isPending ? (
+              <p className={styles.status} role="status">
+                Actualizando números…
+              </p>
+            ) : stats.isError ? (
+              <p className={styles.error} role="alert">
+                Los números no están disponibles ahora.
+              </p>
+            ) : (
+              <div className={styles.statsStrip}>
+                <Stat label="Jugadores" value={overview.data.memberCount} />
+                <Stat
+                  label="Partidos"
+                  value={stats.data.matches.totalFinished}
+                />
+                <Stat
+                  label="OVR promedio"
+                  value={formatDecimal(stats.data.performance.averageOvr)}
+                />
+              </div>
+            )}
+          </section>
+
+          <section className={styles.compactSection}>
+            <Text tone="accent" variant="label">
+              ACTIVIDAD RECIENTE
+            </Text>
+            {activity.isPending ? (
+              <p className={styles.status} role="status">
+                Actualizando actividad…
+              </p>
+            ) : activity.isError ? (
+              <p className={styles.error} role="alert">
+                La actividad no está disponible ahora.
+              </p>
+            ) : activity.data.items.length === 0 ? (
+              <p className={styles.status}>
+                Todavía no hay actividad deportiva.
+              </p>
+            ) : (
+              <div className={`${styles.activityList} ui-list`}>
+                {activity.data.items.map((event) => (
+                  <Link
+                    className={`${styles.activityRow} ui-row`}
+                    href={event.target.href}
+                    key={event.stableId}
+                  >
+                    <time>{formatDate(event.occurredAt)}</time>
+                    <span>{event.title}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {overview.data.canManageGroup && (
+            <section className={styles.managementCallout}>
+              <Text tone="accent" variant="label">
+                ORGANIZACIÓN
+              </Text>
+              <Text tone="muted">
+                Invitaciones, roles, permisos e identidad viven en un espacio
+                separado.
+              </Text>
+              <Link
+                className="ui-button ui-button--management"
+                href={`/groups/${groupId}/settings`}
+              >
+                Administrar grupo
+              </Link>
+            </section>
           )}
-        </section>
-        {group.data.status === "ACTIVE" &&
-        group.data.capabilities.includes("GROUP_MANAGE_INVITATIONS") ? (
-          <div>
-            <InviteConnectionControl destinationId={groupId} kind="group" />
-            <InvitationManager groupId={groupId} />
+
+          {!overview.data.canManageGroup && group.status === "ACTIVE" && (
+            <Link
+              className={styles.membershipOptionsLink}
+              href={`/groups/${groupId}/settings`}
+            >
+              Opciones de membresía
+            </Link>
+          )}
+
+          <div className={styles.reportAction}>
+            <ReportControl targetId={groupId} targetType="GROUP" />
           </div>
-        ) : (
-          <aside className={styles.secondary}>
-            <Text as="h2" variant="heading-md">
-              Invitaciones
-            </Text>
-            <Text tone="muted">
-              Solo quienes administran el grupo pueden crear enlaces.
-            </Text>
-          </aside>
-        )}
+        </aside>
       </div>
     </div>
+  );
+}
+
+function NextMatch({
+  canCreate,
+  groupId,
+  match,
+}: Readonly<{
+  canCreate: boolean;
+  groupId: string;
+  match: MatchPreview | null;
+}>) {
+  return (
+    <section
+      className={`${styles.nextMatch} ui-surface ui-surface--feature`}
+      aria-labelledby="next-match-title"
+    >
+      <Text tone="accent" variant="label">
+        PRÓXIMO PARTIDO
+      </Text>
+      {match ? (
+        <>
+          <div className={styles.nextMatchHeader}>
+            <div>
+              <Text as="h2" id="next-match-title" variant="heading-lg">
+                {formatLongDate(match.scheduledAt)}
+              </Text>
+              <Text tone="muted">{match.locationText}</Text>
+            </div>
+            <strong className={styles.capacity}>
+              {match.confirmedCount} / {match.capacity}
+              <small> ANOTADOS</small>
+            </strong>
+          </div>
+          {match.participationStatus && (
+            <p className={styles.actorStatus}>
+              {match.participationStatus === "CONFIRMED"
+                ? "✓ ESTÁS ANOTADO"
+                : "ESTÁS EN ESPERA"}
+            </p>
+          )}
+          <Link
+            className="ui-button ui-button--primary"
+            href={`/play/matches/${match.id}`}
+          >
+            Ver partido
+          </Link>
+        </>
+      ) : (
+        <div className={styles.compactEmpty}>
+          <Text as="h2" id="next-match-title" variant="heading-md">
+            No hay próximos partidos.
+          </Text>
+          {canCreate && (
+            <Link
+              className="ui-button ui-button--primary"
+              href={`/groups/${groupId}/matches/new`}
+            >
+              Crear partido
+            </Link>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Roster({
+  members,
+}: Readonly<{ members: GroupOverviewResponse["rosterPreview"] }>) {
+  return (
+    <div className={`${styles.memberList} ui-list`}>
+      {members.map((membership) => (
+        <Link
+          className={`${styles.member} ui-row`}
+          href={`/players/${membership.player.id}`}
+          key={membership.id}
+        >
+          <strong>{membership.player.displayName}</strong>
+          {membership.role !== "MEMBER" && (
+            <Badge kind="role">
+              {membership.role === "OWNER" ? "PROPIETARIO" : "MOD"}
+            </Badge>
+          )}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function MatchRow({ match }: Readonly<{ match: MatchPreview }>) {
+  return (
+    <Link
+      className={`${styles.matchRow} ui-row`}
+      href={`/play/matches/${match.id}`}
+    >
+      <span className={styles.matchDate}>
+        {formatShortDate(match.scheduledAt)}
+      </span>
+      <span className="ui-row__content">
+        <strong className="ui-row__primary">{match.locationText}</strong>
+        <small className="ui-row__secondary">{statusLabel(match.status)}</small>
+      </span>
+      <strong className="ui-row__metric">
+        {match.result
+          ? `${match.result.teamAGoals}–${match.result.teamBGoals}`
+          : `${match.confirmedCount}/${match.capacity}`}
+      </strong>
+    </Link>
   );
 }
 
@@ -310,174 +486,48 @@ function Stat({
   );
 }
 
+function roleLabel(role: "OWNER" | "MODERATOR" | "MEMBER") {
+  if (role === "OWNER") return "PROPIETARIO";
+  if (role === "MODERATOR") return "MODERADOR";
+  return "MIEMBRO";
+}
+
+function statusLabel(status: MatchPreview["status"]) {
+  const labels = {
+    DRAFT: "BORRADOR",
+    OPEN: "ABIERTO",
+    STARTED: "EN JUEGO",
+    FINISHED: "FINALIZADO",
+    CANCELLED: "CANCELADO",
+  } as const;
+  return labels[status];
+}
+
 function formatDecimal(value: string | null) {
   return value === null ? "—" : Number(value).toFixed(1);
 }
 
-function uniqueActivity<T extends { stableId: string }>(items: T[]) {
-  return [...new Map(items.map((item) => [item.stableId, item])).values()];
+function formatLongDate(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(value));
 }
 
-function InvitationManager({ groupId }: Readonly<{ groupId: string }>) {
-  const queryClient = useQueryClient();
-  const [type, setType] = useState<"SINGLE_USE" | "TIME_LIMITED">("SINGLE_USE");
-  const [duration, setDuration] = useState("24");
-  const [secretUrl, setSecretUrl] = useState<string | null>(null);
-  const invitations = useQuery({
-    queryKey: queryKeys.invitations(groupId),
-    queryFn: () => api.invitations(groupId),
-  });
-  const create = useMutation({
-    mutationFn: (form: FormData) =>
-      api.createInvitation(
-        groupId,
-        type === "SINGLE_USE"
-          ? { type }
-          : {
-              type,
-              expiresAt: new Date(
-                Date.now() + Number(duration) * 3_600_000,
-              ).toISOString(),
-              maxUses: form.get("maxUses") ? Number(form.get("maxUses")) : null,
-            },
-      ),
-    onSuccess: async (result) => {
-      setSecretUrl(`${window.location.origin}/invite/${result.token}`);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.invitations(groupId),
-      });
-    },
-  });
-  async function share() {
-    if (!secretUrl) return;
-    if (navigator.share)
-      await navigator.share({ title: "Invitación F5 Groups", url: secretUrl });
-    else await navigator.clipboard.writeText(secretUrl);
-  }
-  return (
-    <aside className={styles.invites}>
-      <Text tone="accent" variant="label">
-        SUMAR JUGADORES
-      </Text>
-      <Text as="h2" variant="heading-lg">
-        Invitación
-      </Text>
-      <form
-        action={(data) => create.mutate(data)}
-        className={styles.inviteForm}
-      >
-        <fieldset>
-          <legend>Tipo</legend>
-          <label>
-            <input
-              checked={type === "SINGLE_USE"}
-              name="type"
-              onChange={() => setType("SINGLE_USE")}
-              type="radio"
-            />{" "}
-            Un solo uso
-          </label>
-          <label>
-            <input
-              checked={type === "TIME_LIMITED"}
-              name="type"
-              onChange={() => setType("TIME_LIMITED")}
-              type="radio"
-            />{" "}
-            Temporal
-          </label>
-        </fieldset>
-        {type === "TIME_LIMITED" && (
-          <>
-            <label>
-              <span>Duración</span>
-              <select
-                onChange={(event) => setDuration(event.target.value)}
-                value={duration}
-              >
-                <option value="1">1 hora</option>
-                <option value="24">1 día</option>
-                <option value="168">7 días</option>
-                <option value="720">1 mes</option>
-              </select>
-            </label>
-            <label>
-              <span>Máximo de usos · opcional</span>
-              <input min="1" name="maxUses" type="number" />
-            </label>
-          </>
-        )}
-        {create.isError && (
-          <p className={styles.error} role="alert">
-            {create.error.message}
-          </p>
-        )}
-        <Button disabled={create.isPending} type="submit">
-          Generar enlace
-        </Button>
-      </form>
-      {secretUrl && (
-        <div className={styles.secret}>
-          <Text variant="label">ENLACE LISTO</Text>
-          <code>{secretUrl}</code>
-          <Button
-            onClick={() => {
-              void navigator.clipboard.writeText(secretUrl);
-            }}
-            variant="secondary"
-          >
-            Copiar enlace
-          </Button>
-          <Button
-            onClick={() => {
-              void share();
-            }}
-            variant="quiet"
-          >
-            Compartir
-          </Button>
-          <small>Este secreto se muestra solo ahora.</small>
-        </div>
-      )}
-      {invitations.isError && (
-        <p className={styles.error} role="alert">
-          {invitations.error.message}
-        </p>
-      )}
-      <div className={styles.invitationList}>
-        {invitations.data?.map((invitation) => (
-          <article key={invitation.id}>
-            <span>
-              <strong>
-                {invitation.type === "SINGLE_USE" ? "UN SOLO USO" : "TEMPORAL"}
-              </strong>
-              <small>
-                {invitation.status} · {invitation.useCount}
-                {invitation.maxUses ? ` / ${invitation.maxUses}` : " usos"}
-              </small>
-              <small>
-                Creada por {invitation.createdByDisplayName} ·{" "}
-                {formatDate(invitation.createdAt)}
-              </small>
-              <small>
-                {invitation.expiresAt
-                  ? `Vence ${formatDate(invitation.expiresAt)}`
-                  : "Sin vencimiento"}
-              </small>
-            </span>
-            {invitation.status === "ACTIVE" && (
-              <Link href={`/groups/${groupId}/settings`}>Gestionar</Link>
-            )}
-          </article>
-        ))}
-      </div>
-    </aside>
-  );
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(value));
 }
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("es-AR", {
-    dateStyle: "short",
-    timeStyle: "short",
+    day: "2-digit",
+    month: "short",
   }).format(new Date(value));
 }

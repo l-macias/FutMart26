@@ -83,7 +83,7 @@ export function userMessageForApiError(code: string, status = 0) {
     ballot_already_submitted: "Tu voto ya fue enviado.",
     invalid_ballot: "Revisá las evaluaciones antes de enviar tu voto.",
     active_matches_prevent_archive:
-      "Resolvé los partidos Draft, Open o Started antes de archivar el grupo.",
+      "Resolvé los partidos en borrador, abiertos o en juego antes de archivar el grupo.",
     network_error: "No pudimos conectar con el servidor. Intentá nuevamente.",
     invalid_sporting_result:
       "Los goles o asistencias cargados no coinciden con el resultado.",

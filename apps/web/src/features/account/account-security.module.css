@@ -1,15 +1,23 @@
 .page {
   display: grid;
-  gap: var(--space-6);
-  max-inline-size: 64rem;
+  gap: var(--space-5);
+  max-inline-size: var(--content-settings);
   margin-inline: auto;
+  padding-block-end: var(--space-7);
+}
+.back {
+  color: var(--foreground-muted);
+  font-size: var(--type-label-size);
+  font-weight: 700;
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
 }
 .header,
 .section,
 .form,
 .sessions {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 .sectionHeading,
 .session {
@@ -20,6 +28,16 @@
 }
 .form {
   max-inline-size: 34rem;
+}
+.sessions {
+  max-block-size: 28rem;
+  overflow-y: auto;
+  padding-inline-end: var(--space-2);
+  border-block: var(--border-width-thin) solid var(--border-subtle);
+}
+.sessions:focus-visible {
+  outline: var(--border-width-strong) solid var(--accent-primary);
+  outline-offset: var(--space-1);
 }
 .field {
   display: grid;
@@ -43,9 +61,9 @@
   outline: none;
 }
 .session {
-  border-inline-start: var(--border-width-strong) solid var(--border-subtle);
-  padding: var(--space-4);
-  background: var(--background-surface);
+  min-block-size: var(--row-min-height-default);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
 }
 .current {
   display: inline-block;
@@ -65,10 +83,14 @@
 }
 .danger {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-5);
-  border: var(--border-width-thin) solid var(--state-negative);
-  background: var(--background-surface);
+  border-inline-start: var(--border-width-strong) solid var(--state-negative);
+  background: color-mix(
+    in srgb,
+    var(--state-negative) 4%,
+    var(--background-surface)
+  );
 }
 .danger a {
   color: var(--accent-primary);

@@ -454,13 +454,13 @@ function Team({
               </span>
               <span className={styles.details}>
                 {participant.kind === "GUEST" ? (
-                  "OVR —"
+                  "— OVR"
                 ) : (
                   <>
                     {participant.preferredRoles.length
                       ? participant.preferredRoles.join(" · ")
                       : "LIBRE"}{" "}
-                    · OVR {Math.round(Number(participant.internalOvr))}
+                    · {Math.round(Number(participant.internalOvr))} OVR
                   </>
                 )}
                 {participant.willingToPlayGoalkeeper && (
@@ -506,6 +506,7 @@ function formatDate(value: string) {
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(new Date(value));
 }
 function diagnosticLabel(value: Teams["diagnostics"][number] | undefined) {

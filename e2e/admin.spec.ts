@@ -39,14 +39,38 @@ test("@critical superadmin can resolve a report and a normal user is denied", as
     await admin.getByLabel("Email").fill(operator.email);
     await admin.getByLabel("Contraseña").fill(operator.password);
     await admin.getByRole("button", { name: "Ingresar" }).click();
+    await expect(admin.getByRole("heading", { name: "Resumen" })).toBeVisible();
+    await admin.getByRole("link", { name: "Jugadores" }).click();
+    await admin.getByLabel("Buscar jugadores").fill(target.name);
+    await admin.getByRole("link", { name: target.name }).click();
+    await expect(
+      admin.getByRole("heading", { name: target.name }),
+    ).toBeVisible();
+    await admin.getByLabel("Motivo").fill("E2E reversible moderation check");
+    await admin.getByRole("button", { name: "Suspender cuenta" }).click();
+    await admin.getByRole("button", { name: "Confirmar" }).click();
+    await expect(
+      admin.getByText("Acción registrada en Auditoría."),
+    ).toBeVisible();
+    await admin.getByLabel("Motivo").fill("E2E restores the test account");
+    await admin.getByRole("button", { name: "Reactivar cuenta" }).click();
+    await admin.getByRole("button", { name: "Confirmar" }).click();
+    await expect(
+      admin.getByText("Acción registrada en Auditoría."),
+    ).toBeVisible();
     await admin.goto(`http://127.0.0.1:3001/reports/${report.id}`);
     await admin
-      .getByLabel("Motivo/resolución")
+      .getByLabel("Motivo y resolución")
       .fill("Resolved by E2E operator");
     await admin.getByRole("button", { name: "Resolver" }).click();
-    await expect(admin.getByText(/RESOLVED/)).toBeVisible();
+    await admin.getByRole("button", { name: "Confirmar" }).click();
+    await expect(admin.getByText(/RESUELTO/)).toBeVisible();
+    await admin.goto("http://127.0.0.1:3001/system");
+    await expect(admin.getByRole("heading", { name: "Sistema" })).toBeVisible();
     await admin.goto("http://127.0.0.1:3001/audit");
-    await expect(admin.getByText(/REPORT_RESOLVED/)).toBeVisible();
+    await expect(
+      admin.getByText("Reporte resuelto", { exact: true }),
+    ).toBeVisible();
     await adminContext.close();
   } finally {
     await reporter.api.dispose();

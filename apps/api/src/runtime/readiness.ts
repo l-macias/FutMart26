@@ -16,6 +16,7 @@ export interface ReadinessSnapshot {
   storage: "ready" | "configured" | "disabled" | "unavailable";
   version: string | null;
   gitSha: string | null;
+  buildTimestamp: string | null;
 }
 
 export class ReadinessService {
@@ -70,6 +71,7 @@ export class ReadinessService {
       storage,
       version: this.config.APP_VERSION ?? null,
       gitSha: this.config.GIT_SHA ?? null,
+      buildTimestamp: this.config.BUILD_TIMESTAMP ?? null,
     };
   }
 }

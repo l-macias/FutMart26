@@ -41,11 +41,21 @@ void test(
     const mail = new InMemoryAuthMailService();
     const auth = createTestAuth(connection.db, mail);
     const email = `${randomUUID()}@test.local`;
-    const originalPassword = "original-password-123";
-    const recoveredPassword = "recovered-password-456";
-    const changedPassword = "changed-password-789";
+    const originalPassword = "start888";
+    const recoveredPassword = "reset888";
+    const changedPassword = "change88";
 
     try {
+      const shortPassword = await authRequest(auth, "/sign-up/email", {
+        body: {
+          email: `${randomUUID()}@test.local`,
+          name: "Short password",
+          password: "seven77",
+        },
+        ip: "192.0.2.9",
+      });
+      assert.notEqual(shortPassword.status, 200);
+      assert.equal(mail.messages.length, 0);
       const signUp = await authRequest(auth, "/sign-up/email", {
         body: {
           callbackURL: "http://localhost:3000/auth/verify-email?verified=1",
@@ -92,6 +102,30 @@ void test(
       assert.equal(verifyResponse.status, 302);
       assert.match(verifyResponse.headers.get("location") ?? "", /verified=1/);
 
+      const duplicateAuth = createTestAuth(connection.db, mail, {
+        AUTH_REQUIRE_EMAIL_VERIFICATION: "false",
+      });
+      const duplicateSignUp = await authRequest(
+        duplicateAuth,
+        "/sign-up/email",
+        {
+          body: {
+            email,
+            name: "Duplicate auth test player",
+            password: originalPassword,
+          },
+          ip: "192.0.2.10",
+        },
+      );
+      assert.equal(duplicateSignUp.status, 422);
+      const duplicateSignUpBody = (await duplicateSignUp.json()) as {
+        code?: string;
+      };
+      assert.equal(
+        duplicateSignUpBody.code,
+        "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
+      );
+
       const unknownMailCount = mail.messages.length;
       const unknownRecovery = await authRequest(
         auth,
@@ -120,6 +154,11 @@ void test(
       const resetMail = latestMail(mail, "PASSWORD_RESET");
       const resetToken = new URL(resetMail.url).pathname.split("/").at(-1)!;
 
+      const shortReset = await authRequest(auth, "/reset-password", {
+        body: { newPassword: "seven77", token: resetToken },
+        ip: "192.0.2.151",
+      });
+      assert.notEqual(shortReset.status, 200);
       const reset = await authRequest(auth, "/reset-password", {
         body: { newPassword: recoveredPassword, token: resetToken },
         ip: "192.0.2.16",
@@ -164,6 +203,17 @@ void test(
         ip: "192.0.2.22",
       });
       assert.equal(wrongChange.status, 400);
+
+      const shortChange = await authRequest(auth, "/change-password", {
+        body: {
+          currentPassword: recoveredPassword,
+          newPassword: "seven77",
+          revokeOtherSessions: true,
+        },
+        cookie: cookieA,
+        ip: "192.0.2.221",
+      });
+      assert.notEqual(shortChange.status, 200);
 
       const change = await authRequest(auth, "/change-password", {
         body: {

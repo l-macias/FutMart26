@@ -1,0 +1,123 @@
+.match,
+.heading,
+.status,
+.capacity {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.match {
+  position: relative;
+  isolation: isolate;
+  gap: var(--space-5);
+  overflow: hidden;
+  padding: var(--density-feature-padding);
+}
+
+.match::after {
+  position: absolute;
+  z-index: -1;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inline-size: min(32%, 12rem);
+  background: linear-gradient(
+    145deg,
+    transparent 18%,
+    color-mix(in srgb, var(--pitch-surface) 26%, transparent) 18% 42%,
+    transparent 42% 58%,
+    color-mix(in srgb, var(--pitch-surface) 18%, transparent) 58% 82%,
+    transparent 82%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.topline {
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.heading {
+  gap: var(--space-1);
+}
+
+.date {
+  color: var(--foreground-muted);
+}
+
+.group {
+  max-inline-size: 16ch;
+}
+
+.status {
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: var(--space-4);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.capacity {
+  gap: var(--space-1);
+}
+
+.capacity > strong {
+  color: var(--foreground-primary);
+  font: 800 var(--type-score-size) / 0.85
+    var(--font-display, var(--font-display-fallback));
+  font-variant-numeric: tabular-nums;
+}
+
+.capacity > span,
+.missing,
+.complete {
+  color: var(--foreground-muted);
+  font: 800 var(--type-metadata-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+}
+
+.missing,
+.complete {
+  padding-block-end: var(--space-1);
+}
+
+.missing {
+  color: var(--accent-primary);
+}
+
+.complete {
+  color: var(--state-positive);
+}
+
+.action {
+  inline-size: 100%;
+  min-block-size: var(--touch-target-min);
+  justify-content: space-between;
+}
+
+@media (min-width: 48rem) {
+  .match {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-7);
+  }
+
+  .topline,
+  .action {
+    grid-column: 1 / -1;
+  }
+
+  .status {
+    min-inline-size: 10rem;
+    align-self: end;
+  }
+
+  .action {
+    inline-size: auto;
+    min-inline-size: 13rem;
+    justify-self: start;
+  }
+}

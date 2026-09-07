@@ -802,6 +802,8 @@ export const notificationType = pgEnum("notification_type", [
   "CONNECTION_ACCEPTED",
   "GROUP_INVITATION_RECEIVED",
   "MATCH_INVITATION_RECEIVED",
+  "GROUP_MODERATOR_GRANTED",
+  "GROUP_MODERATOR_REMOVED",
 ]);
 export const playerConnectionStatus = pgEnum("player_connection_status", [
   "PENDING",

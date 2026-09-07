@@ -1,9 +1,8 @@
-import { TerritorialRankingScreen } from "@/features/territorial-ranking/territorial-ranking-screen";
+import { redirect } from "next/navigation";
 
 export default async function VenueRankingPage({
   params,
 }: Readonly<{ params: Promise<{ venueId: string }> }>) {
-  return (
-    <TerritorialRankingScreen scopeId={(await params).venueId} type="VENUE" />
-  );
+  const { venueId } = await params;
+  redirect(`/rankings?scope=venue&venueId=${encodeURIComponent(venueId)}`);
 }

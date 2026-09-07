@@ -2,9 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { Button, Text } from "@football/ui";
+import { Badge, Button, Text } from "@football/ui";
+import { MatchStateMark } from "@football/football-ui";
 
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { api } from "@/lib/api/resources";
@@ -14,6 +15,7 @@ import { ReportControl } from "@/components/report-control/report-control";
 
 import styles from "./matches.module.css";
 import { InviteConnectionControl } from "@/features/directed-invitations/invite-connection-control";
+import { matchInformationArchitecture } from "./match-information-architecture";
 
 export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
   const queryClient = useQueryClient();
@@ -45,26 +47,56 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     queryFn: () => api.result(matchId),
     enabled: closureEnabled,
   });
+  const actorPlayed =
+    finalRoster.data?.participants.some(
+      (participant) =>
+        participant.isCurrentActor &&
+        participant.kind === "PLAYER" &&
+        participant.attendance === "PLAYED",
+    ) ?? false;
   const progression = useQuery({
     queryKey: queryKeys.progressionReveal(matchId),
     queryFn: () => api.progressionReveal(matchId),
-    enabled: match.data?.status === "FINISHED",
+    enabled: match.data?.status === "FINISHED" && actorPlayed,
     retry: false,
   });
   const groupId = match.data?.groupId;
+  const group = useQuery({
+    queryKey: queryKeys.group(groupId ?? "none"),
+    queryFn: () => api.group(groupId!),
+    enabled: Boolean(groupId) && match.data?.status === "FINISHED",
+  });
+  const voting = useQuery({
+    queryKey: queryKeys.voting(matchId),
+    queryFn: () => api.voting(matchId),
+    enabled:
+      match.data?.status === "FINISHED" &&
+      actorPlayed &&
+      result.data?.status === "CONFIRMED" &&
+      finalRoster.data?.votingStarted === true,
+  });
   const guests = useQuery({
     queryKey: queryKeys.groupGuests(groupId ?? "none"),
     queryFn: () => api.groupGuests(groupId!),
-    enabled: Boolean(groupId),
+    enabled:
+      Boolean(groupId) &&
+      match.data?.status === "OPEN" &&
+      Boolean(match.data.canManage || match.data.canManageGuests),
   });
   const policy = useQuery({
     queryKey: queryKeys.guestPolicy(groupId ?? "none"),
     queryFn: () => api.guestPolicy(groupId!),
-    enabled: Boolean(groupId),
+    enabled:
+      Boolean(groupId) &&
+      match.data?.status === "OPEN" &&
+      Boolean(match.data.canManage || match.data.canManageGuests),
   });
   const preferences = useQuery({
     queryKey: queryKeys.footballPreferences,
     queryFn: api.preferences,
+    enabled:
+      Boolean(match.data?.canManage) &&
+      (match.data?.status === "DRAFT" || match.data?.status === "OPEN"),
   });
   const [guestId, setGuestId] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
@@ -97,14 +129,22 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
   );
 
   async function refresh() {
-    await Promise.all([
+    const invalidations = [
       queryClient.invalidateQueries({ queryKey: queryKeys.match(matchId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.roster(matchId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.teams(matchId) }),
       queryClient.invalidateQueries({
         queryKey: queryKeys.personalMatchesRoot,
       }),
-    ]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.personalHome }),
+    ];
+    if (groupId)
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.groupOverview(groupId),
+        }),
+      );
+    await Promise.all(invalidations);
   }
   const publish = useMutation({
     mutationFn: () => api.publishMatch(matchId),
@@ -186,6 +226,9 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
             queryKey: queryKeys.matches(groupId),
           }),
           queryClient.invalidateQueries({
+            queryKey: queryKeys.groupOverview(groupId),
+          }),
+          queryClient.invalidateQueries({
             queryKey: queryKeys.groupActivity(groupId),
           }),
         ]);
@@ -239,160 +282,98 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
   ]
     .filter(Boolean)
     .join(" · ");
+  const composition = matchInformationArchitecture(
+    match.data.status,
+    match.data.canManage || match.data.canManageGuests || match.data.canClose,
+  );
+
+  if (match.data.status === "FINISHED")
+    return (
+      <FinishedMatchView
+        finalRoster={finalRoster.data}
+        groupName={group.data?.name}
+        location={location}
+        match={match.data}
+        matchId={matchId}
+        progression={progression.data}
+        result={result.data}
+        teams={teams.data}
+        voting={voting.data}
+      />
+    );
+
+  if (composition.showStartedTeams)
+    return (
+      <StartedMatchView
+        canClose={match.data.canClose}
+        groupId={match.data.groupId}
+        location={location}
+        matchId={matchId}
+        scheduledAt={match.data.scheduledAt}
+        teams={teams.data}
+        teamsError={teams.isError}
+        teamsPending={teams.isPending}
+      />
+    );
+
+  if (match.data.status === "CANCELLED")
+    return (
+      <CancelledMatchView
+        groupId={match.data.groupId}
+        location={location}
+        matchId={matchId}
+        roster={roster.data}
+        scheduledAt={match.data.scheduledAt}
+      />
+    );
 
   return (
     <main className={styles.page}>
       <Link className={styles.back} href={`/groups/${match.data.groupId}`}>
         ← GRUPO
       </Link>
-      <header className={styles.matchHero}>
+      <header
+        className={`${styles.matchHero} ${isOpen ? styles.openHero : styles.draftHero}`}
+      >
         <div>
-          <Text tone="accent" variant="label">
-            {match.data.status} · F5
-          </Text>
+          <div className={styles.heroState}>
+            <MatchStateMark tone={isOpen ? "positive" : "neutral"}>
+              {isOpen ? "ABIERTO" : "BORRADOR"}
+            </MatchStateMark>
+            <span>F5</span>
+          </div>
           <Text as="h1" variant="display-lg">
             {formatMatchDate(date)}
           </Text>
           <Text variant="heading-lg">{location}</Text>
+          {isOpen && (
+            <Text className={styles.heroStatus} tone="muted" variant="metadata">
+              {match.data.recruitment.effectiveStatus === "CLOSED"
+                ? "Convocatoria cerrada"
+                : match.data.recruitment.effectiveStatus === "FULL"
+                  ? "Cupo completo"
+                  : "Convocatoria abierta"}
+            </Text>
+          )}
         </div>
-        <div className={styles.capacity}>
+        <div
+          aria-label={`${roster.data.confirmedCount} de ${roster.data.capacity} confirmados`}
+          className={styles.capacity}
+        >
           <strong>
             {roster.data.confirmedCount}
             <span>/{roster.data.capacity}</span>
           </strong>
           <small>CONFIRMADOS</small>
-        </div>
-      </header>
-      <ReportControl targetId={matchId} targetType="MATCH" />
-
-      {match.data.venue && (
-        <div className={styles.rowActions}>
-          <Link
-            className={styles.teamLink}
-            href={`/rankings/venues/${match.data.venue.id}`}
-          >
-            RANKING DE LA SEDE
-          </Link>
-          <Link
-            className={styles.teamLink}
-            href={`/rankings/cities/${match.data.venue.cityKey}`}
-          >
-            RANKING DE {match.data.venue.city.toLocaleUpperCase("es-AR")}
-          </Link>
-        </div>
-      )}
-
-      {match.data.status === "STARTED" && (
-        <div className={styles.playingState}>
-          <Text tone="accent" variant="label">
-            PARTIDO EN JUEGO
-          </Text>
-          <strong>Inscripciones y equipos bloqueados.</strong>
-          {match.data.canClose && (
-            <Link
-              className={styles.teamLink}
-              href={`/play/matches/${matchId}/close`}
-            >
-              CERRAR PARTIDO
-            </Link>
+          {isOpen && (
+            <small>
+              {roster.data.availableSpots === 0
+                ? "CUPO COMPLETO"
+                : `FALTAN ${roster.data.availableSpots}`}
+            </small>
           )}
         </div>
-      )}
-      {match.data.status === "CANCELLED" && (
-        <section className={styles.cancelledState}>
-          <Text tone="accent" variant="label">
-            PARTIDO CANCELADO
-          </Text>
-          <Text as="h2" variant="heading-lg">
-            La convocatoria quedó cerrada.
-          </Text>
-          <Text tone="muted">
-            El roster se conserva como historia operativa, pero ya no se puede
-            anotar, iniciar, reclutar ni votar.
-          </Text>
-        </section>
-      )}
-      {match.data.status === "FINISHED" && result.data && (
-        <section className={styles.finishedState}>
-          <div>
-            <Text tone="accent" variant="label">
-              FINALIZADO
-            </Text>
-            <Text as="h2" variant="display-lg">
-              {result.data.status === "NOT_PLAYED"
-                ? "PARTIDO NO JUGADO"
-                : result.data.status === "CONFIRMED"
-                  ? `${result.data.teamAGoals} — ${result.data.teamBGoals}`
-                  : "CIERRE PENDIENTE"}
-            </Text>
-            {finalRoster.data?.confirmedAt && (
-              <p className={styles.muted}>
-                {
-                  finalRoster.data.participants.filter(
-                    (item) => item.attendance === "PLAYED",
-                  ).length
-                }{" "}
-                jugaron ·{" "}
-                {
-                  finalRoster.data.participants.filter(
-                    (item) => item.attendance === "NO_SHOW",
-                  ).length
-                }{" "}
-                ausente
-              </p>
-            )}
-          </div>
-          <div className={styles.rowActions}>
-            {progression.data?.status === "AVAILABLE" ||
-            (progression.data?.status === "PROGRESSION_PENDING" &&
-              ["READY_TO_MATERIALIZE", "EARLIER_MATCH_PENDING"].includes(
-                progression.data.reason,
-              )) ? (
-              <Link
-                className={styles.teamLink}
-                href={`/play/matches/${matchId}/progression`}
-              >
-                VER MI PROGRESO
-              </Link>
-            ) : null}
-            {result.data.status === "CONFIRMED" &&
-            finalRoster.data?.votingStarted ? (
-              <Link
-                className={styles.teamLink}
-                href={`/play/matches/${matchId}/voting`}
-              >
-                IR A VOTACIÓN
-              </Link>
-            ) : result.data.status === "CONFIRMED" &&
-              finalRoster.data?.votingStartsAt ? (
-              <span className={styles.muted}>
-                Votación disponible a las{" "}
-                {new Date(finalRoster.data.votingStartsAt).toLocaleTimeString(
-                  "es-AR",
-                  { hour: "2-digit", minute: "2-digit" },
-                )}
-              </span>
-            ) : null}
-            {(finalRoster.data?.confirmedAt ||
-              result.data.status === "CONFIRMED" ||
-              result.data.status === "NOT_PLAYED" ||
-              finalRoster.data?.closureEditable) && (
-              <Link
-                className={styles.teamLink}
-                href={`/play/matches/${matchId}/close`}
-              >
-                {finalRoster.data?.closureEditable
-                  ? result.data.status === "CONFIRMED" ||
-                    result.data.status === "NOT_PLAYED"
-                    ? "VER / CORREGIR CIERRE"
-                    : "COMPLETAR CIERRE"
-                  : "VER CIERRE"}
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
-
+      </header>
       {match.data.scheduleChange && (
         <div className={styles.scheduleNotice}>
           <strong>HORARIO ACTUALIZADO</strong>
@@ -402,97 +383,53 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
           </span>
         </div>
       )}
-      {match.data.canManage &&
-        (match.data.status === "DRAFT" || match.data.status === "OPEN") && (
-          <section className={styles.managementActions}>
-            <div>
-              <Text tone="accent" variant="label">
-                OPERACIÓN
-              </Text>
-              <Text as="h2" variant="heading-lg">
-                Administrar partido.
-              </Text>
-            </div>
-            <div className={styles.actions}>
-              <Link
-                className="ui-button ui-button--secondary"
-                href={`/play/matches/${matchId}/edit`}
-              >
-                Editar datos
-              </Link>
+      {composition.showAdmission && (
+        <section className={styles.personalState}>
+          <div>
+            <Text tone="accent" variant="label">
+              TU ESTADO
+            </Text>
+            <Text as="h2" variant="heading-lg">
+              {current
+                ? current.status === "CONFIRMED"
+                  ? `Estás confirmado · #${current.admissionNumber}`
+                  : `Estás en espera · #${current.admissionNumber}`
+                : personalStateCopy(match.data.status)}
+            </Text>
+            {current?.status === "WAITLISTED" && (
+              <p>{current.waitlistPosition}.º suplente</p>
+            )}
+            {current?.promotedAt && (
+              <p className={styles.positive}>
+                Entraste al partido. Ahora estás confirmado.
+              </p>
+            )}
+          </div>
+          <div className={styles.actions}>
+            {match.data.status === "DRAFT" && match.data.canManage && (
               <Button
-                onClick={() => setCancelMatchConfirmOpen(true)}
-                variant="quiet"
+                disabled={publish.isPending}
+                onClick={() => publish.mutate()}
               >
-                Cancelar partido
+                Publicar convocatoria
               </Button>
-            </div>
-          </section>
-        )}
-      <RecruitmentPanel
-        canManage={match.data.canManage}
-        isProfileMatch={matchesProfile(
-          match.data.recruitment.needs,
-          preferences.data,
-        )}
-        onSave={(input) => saveRecruitment.mutate(input)}
-        pending={saveRecruitment.isPending}
-        recruitment={match.data.recruitment}
-        status={match.data.status}
-      />
-      {match.data.canManage && match.data.status === "OPEN" && (
-        <InviteConnectionControl
-          destinationId={matchId}
-          kind="match"
-          recruitment={match.data.recruitment}
-        />
+            )}
+            {canJoin && (
+              <Button disabled={join.isPending} onClick={() => join.mutate()}>
+                Anotarme
+              </Button>
+            )}
+            {isOpen && current && (
+              <Button
+                disabled={leave.isPending}
+                onClick={() => setLeaveConfirmOpen(true)}
+              >
+                Darme de baja
+              </Button>
+            )}
+          </div>
+        </section>
       )}
-      <section className={styles.personalState}>
-        <div>
-          <Text tone="accent" variant="label">
-            TU ESTADO
-          </Text>
-          <Text as="h2" variant="heading-lg">
-            {current
-              ? current.status === "CONFIRMED"
-                ? `Estás confirmado · #${current.admissionNumber}`
-                : `Estás en espera · #${current.admissionNumber}`
-              : personalStateCopy(match.data.status)}
-          </Text>
-          {current?.status === "WAITLISTED" && (
-            <p>{current.waitlistPosition}.º suplente</p>
-          )}
-          {current?.promotedAt && (
-            <p className={styles.positive}>
-              Entraste al partido. Ahora estás confirmado.
-            </p>
-          )}
-        </div>
-        <div className={styles.actions}>
-          {match.data.status === "DRAFT" && match.data.canManage && (
-            <Button
-              disabled={publish.isPending}
-              onClick={() => publish.mutate()}
-            >
-              Publicar convocatoria
-            </Button>
-          )}
-          {canJoin && (
-            <Button disabled={join.isPending} onClick={() => join.mutate()}>
-              Anotarme
-            </Button>
-          )}
-          {isOpen && current && (
-            <Button
-              disabled={leave.isPending}
-              onClick={() => setLeaveConfirmOpen(true)}
-              variant="secondary"
-            >
-              Darme de baja
-            </Button>
-          )}
-        </div>
-      </section>
       <ConfirmDialog
         confirmDisabled={leave.isPending}
         confirmLabel="Darme de baja"
@@ -514,6 +451,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
         onCancel={() => setCancelMatchConfirmOpen(false)}
         onConfirm={() => cancelMatch.mutate()}
         open={cancelMatchConfirmOpen}
+        tone="danger"
         title="¿Cancelar este partido?"
       />
 
@@ -536,7 +474,24 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
         </p>
       )}
 
-      {!teams.isPending && !teams.isError && (
+      {composition.showOperationalRoster && (
+        <MatchRoster
+          canManageGuests={false}
+          canManageParticipants={false}
+          cancelPending={false}
+          demoteId=""
+          onCancel={() => undefined}
+          onDemoteChange={() => undefined}
+          onRemoveGuest={() => undefined}
+          onSwap={() => undefined}
+          removeGuestPending={false}
+          roster={roster.data}
+          showActions={false}
+          swapPending={false}
+        />
+      )}
+
+      {!teams.isPending && !teams.isError && isOpen && (
         <section className={styles.teamsSummary}>
           <div>
             <Text tone="accent" variant="label">
@@ -545,7 +500,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
             <Text as="h2" variant="heading-lg">
               {teams.data.assignedCount > 0
                 ? `Equipo A · ${teams.data.TEAM_A.participants.length} / Equipo B · ${teams.data.TEAM_B.participants.length}`
-                : "Los equipos todavía no fueron armados."}
+                : "Pendientes"}
             </Text>
             {teams.data.rosterChanged && (
               <p className={styles.teamWarning} role="alert">
@@ -553,142 +508,645 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
                 <span>Revisá o regenerá los equipos antes de iniciar.</span>
               </p>
             )}
-            {match.data.status === "STARTED" && (
-              <p className={styles.muted}>
-                Al terminar el partido, cargá asistencia, resultado y
-                estadísticas desde el cierre.
-              </p>
+          </div>
+          {teams.data.assignedCount > 0 && (
+            <Link
+              className={styles.teamLink}
+              href={`/play/matches/${matchId}/teams`}
+            >
+              VER EQUIPOS
+            </Link>
+          )}
+        </section>
+      )}
+
+      {composition.showOrganizerTools && (
+        <details className={styles.organizerTools}>
+          <summary>
+            <span>
+              ADMINISTRAR PARTIDO ·{" "}
+              {match.data.status === "DRAFT" ? "BORRADOR" : "CONVOCATORIA"}
+            </span>
+          </summary>
+          <div className={styles.organizerContent}>
+            {match.data.canManage && (
+              <ManagementSection
+                description="Fecha, hora, duración, cupo y lugar permitidos por el estado actual."
+                title="DATOS"
+              >
+                <Link
+                  className="ui-button ui-button--secondary"
+                  href={`/play/matches/${matchId}/edit`}
+                >
+                  Editar datos
+                </Link>
+              </ManagementSection>
+            )}
+            {composition.showRecruitment && match.data.canManage && (
+              <ManagementSection
+                description="Definí si el partido busca jugadores y qué perfiles necesita."
+                title="CONVOCATORIA"
+              >
+                <RecruitmentPanel
+                  canManage={match.data.canManage}
+                  isProfileMatch={matchesProfile(
+                    match.data.recruitment.needs,
+                    preferences.data,
+                  )}
+                  onSave={(input) => saveRecruitment.mutate(input)}
+                  pending={saveRecruitment.isPending}
+                  recruitment={match.data.recruitment}
+                  status={match.data.status}
+                />
+              </ManagementSection>
+            )}
+            {isOpen && (
+              <ManagementSection
+                description="Invitaciones, confirmados, espera e invitados del partido."
+                title="PARTICIPANTES"
+              >
+                {match.data.canManage && (
+                  <InviteConnectionControl
+                    destinationId={matchId}
+                    kind="match"
+                    recruitment={match.data.recruitment}
+                  />
+                )}
+                <MatchRoster
+                  canManageGuests={match.data.canManageGuests}
+                  canManageParticipants={match.data.canManage}
+                  cancelPending={cancel.isPending}
+                  demoteId={demoteId}
+                  onCancel={(id) => cancel.mutate(id)}
+                  onDemoteChange={setDemoteId}
+                  onRemoveGuest={(id) => removeGuest.mutate(id)}
+                  onSwap={(id) => swap.mutate(id)}
+                  removeGuestPending={removeGuest.isPending}
+                  roster={roster.data}
+                  showActions
+                  swapPending={swap.isPending}
+                />
+                {(guests.isError || policy.isError) && (
+                  <p className={styles.auxiliaryError} role="status">
+                    No pudimos cargar las opciones de invitados. El roster
+                    principal sigue disponible.
+                  </p>
+                )}
+                <GuestControls
+                  guestId={guestId}
+                  guests={(guests.data ?? []).filter(
+                    (guest) => !activeGroupGuestIds.has(guest.id),
+                  )}
+                  feedback={guestFeedback}
+                  newGuestName={newGuestName}
+                  policy={policy.data}
+                  setGuestId={(id) => {
+                    setGuestFeedback(null);
+                    setGuestId(id);
+                  }}
+                  setNewGuestName={(name) => {
+                    setGuestFeedback(null);
+                    setNewGuestName(name);
+                  }}
+                  add={() => {
+                    setGuestFeedback(null);
+                    addGuest.mutate(guestId);
+                  }}
+                  create={() => {
+                    setGuestFeedback(null);
+                    createAndAddGuest.mutate();
+                  }}
+                />
+              </ManagementSection>
+            )}
+            {isOpen && match.data.canManage && (
+              <ManagementSection
+                description="Armá o ajustá la composición antes de iniciar."
+                title="EQUIPOS"
+              >
+                <Link
+                  className="ui-button ui-button--secondary"
+                  href={`/play/matches/${matchId}/teams`}
+                >
+                  {teams.data?.assignedCount
+                    ? "Editar equipos"
+                    : "Armar equipos"}
+                </Link>
+              </ManagementSection>
+            )}
+            {match.data.canManage && (
+              <ManagementSection
+                danger
+                description="La cancelación cierra la convocatoria y notifica a sus participantes."
+                title="ZONA DE RIESGO"
+              >
+                <Button
+                  onClick={() => setCancelMatchConfirmOpen(true)}
+                  variant="danger"
+                >
+                  Cancelar partido
+                </Button>
+              </ManagementSection>
             )}
           </div>
-          <Link
-            className={styles.teamLink}
-            href={`/play/matches/${matchId}/teams`}
-          >
-            {teams.data.canManage && match.data.status === "OPEN"
-              ? teams.data.assignedCount > 0
-                ? "EDITAR EQUIPOS"
-                : "ARMAR EQUIPOS"
-              : "VER EQUIPOS"}
-          </Link>
-        </section>
+        </details>
       )}
-
-      <div className={styles.rosterGrid}>
-        <Roster
-          title="CONFIRMADOS"
-          rows={roster.data.confirmed}
-          canManageParticipants={match.data.canManage && isOpen}
-          canManageGuests={match.data.canManageGuests && isOpen}
-          onCancel={(id) => cancel.mutate(id)}
-          onRemoveGuest={(id) => removeGuest.mutate(id)}
-        />
-        <section className={styles.rosterSection}>
-          <Text as="h2" variant="heading-lg">
-            EN ESPERA
-          </Text>
-          {roster.data.waitlist.length === 0 ? (
-            <p className={styles.muted}>No hay suplentes.</p>
-          ) : (
-            roster.data.waitlist.map((participant, index) => (
-              <article className={styles.rosterRow} key={participant.id}>
-                <span>#{participant.position}</span>
-                <strong>{participant.displayName}</strong>
-                <small>
-                  {index + 1}.º suplente
-                  {participant.kind === "GUEST" ? " · INVITADO" : ""}
-                </small>
-                {isOpen &&
-                  ((participant.kind === "PLAYER" && match.data.canManage) ||
-                    (participant.kind === "GUEST" &&
-                      (participant.addedByCurrentActor ||
-                        match.data.canManageGuests))) && (
-                    <div className={styles.rowActions}>
-                      <Button
-                        disabled={cancel.isPending || removeGuest.isPending}
-                        onClick={() =>
-                          participant.kind === "GUEST"
-                            ? removeGuest.mutate(participant.id)
-                            : cancel.mutate(participant.id)
-                        }
-                        variant="quiet"
-                      >
-                        {participant.kind === "GUEST" ? "Retirar" : "Cancelar"}
-                      </Button>
-                      {match.data.canManage && demoteId && (
-                        <Button
-                          disabled={swap.isPending}
-                          onClick={() => swap.mutate(participant.id)}
-                          variant="quiet"
-                        >
-                          Confirmar por swap
-                        </Button>
-                      )}
-                    </div>
-                  )}
-              </article>
-            ))
-          )}
-          {match.data.canManage &&
-            isOpen &&
-            roster.data.waitlist.length > 0 && (
-              <label className={styles.compactField}>
-                <span>CONFIRMADO A PASAR A ESPERA</span>
-                <select
-                  onChange={(event) => setDemoteId(event.target.value)}
-                  value={demoteId}
-                >
-                  <option value="">Seleccionar…</option>
-                  {roster.data.confirmed.map((participant) => (
-                    <option key={participant.id} value={participant.id}>
-                      {participant.displayName}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  El swap conserva el cupo y manda al confirmado al final de la
-                  espera.
-                </small>
-              </label>
-            )}
-        </section>
-      </div>
-
-      {isOpen && (
-        <>
-          {(guests.isError || policy.isError) && (
-            <p className={styles.auxiliaryError} role="status">
-              No pudimos cargar las opciones de invitados. El roster principal
-              sigue disponible.
-            </p>
-          )}
-          <GuestControls
-            guestId={guestId}
-            guests={(guests.data ?? []).filter(
-              (guest) => !activeGroupGuestIds.has(guest.id),
-            )}
-            feedback={guestFeedback}
-            newGuestName={newGuestName}
-            policy={policy.data}
-            setGuestId={(id) => {
-              setGuestFeedback(null);
-              setGuestId(id);
-            }}
-            setNewGuestName={(name) => {
-              setGuestFeedback(null);
-              setNewGuestName(name);
-            }}
-            add={() => {
-              setGuestFeedback(null);
-              addGuest.mutate(guestId);
-            }}
-            create={() => {
-              setGuestFeedback(null);
-              createAndAddGuest.mutate();
-            }}
-          />
-        </>
-      )}
+      <ReportControl targetId={matchId} targetType="MATCH" />
     </main>
+  );
+}
+
+type MatchRead = Awaited<ReturnType<typeof api.match>>;
+type RosterRead = Awaited<ReturnType<typeof api.roster>>;
+type FinalRosterRead = Awaited<ReturnType<typeof api.finalRoster>>;
+type ResultRead = Awaited<ReturnType<typeof api.result>>;
+type TeamsRead = Awaited<ReturnType<typeof api.teams>>;
+type VotingRead = Awaited<ReturnType<typeof api.voting>>;
+type ProgressionRead = Awaited<ReturnType<typeof api.progressionReveal>>;
+
+function StartedMatchView({
+  canClose,
+  groupId,
+  location,
+  matchId,
+  scheduledAt,
+  teams,
+  teamsError,
+  teamsPending,
+}: Readonly<{
+  canClose: boolean;
+  groupId: string;
+  location: string;
+  matchId: string;
+  scheduledAt: string;
+  teams?: TeamsRead;
+  teamsError: boolean;
+  teamsPending: boolean;
+}>) {
+  return (
+    <main className={styles.page}>
+      <Link className={styles.back} href={`/groups/${groupId}`}>
+        ← GRUPO
+      </Link>
+      <header className={`${styles.matchHero} ${styles.startedHero}`}>
+        <div>
+          <div className={styles.heroState}>
+            <MatchStateMark tone="positive">EN JUEGO</MatchStateMark>
+            <span>F5</span>
+          </div>
+          <Text as="h1" variant="display-lg">
+            {formatMatchDate(new Date(scheduledAt))}
+          </Text>
+          <Text variant="heading-lg">{location}</Text>
+        </div>
+        <div
+          className={styles.startedMatchup}
+          aria-label="Equipo A contra Equipo B"
+        >
+          <strong>EQUIPO A</strong>
+          <span>VS</span>
+          <strong>EQUIPO B</strong>
+        </div>
+      </header>
+      {teamsPending ? (
+        <p role="status">Cargando equipos…</p>
+      ) : teams && teams.assignedCount > 0 ? (
+        <section className={styles.startedTeams}>
+          <StartedTeam
+            label="EQUIPO A"
+            participants={teams.TEAM_A.participants}
+          />
+          <StartedTeam
+            label="EQUIPO B"
+            participants={teams.TEAM_B.participants}
+          />
+        </section>
+      ) : teamsError ? (
+        <p className={styles.auxiliaryError} role="status">
+          No pudimos mostrar la composición de los equipos.
+        </p>
+      ) : (
+        <p className={styles.muted}>Los equipos no están disponibles.</p>
+      )}
+      {canClose && (
+        <details className={styles.organizerTools}>
+          <summary>
+            <span>ADMINISTRAR PARTIDO · EN JUEGO</span>
+          </summary>
+          <div className={styles.organizerContent}>
+            <ManagementSection
+              description="Marcá quién jugó y quién no se presentó."
+              title="ASISTENCIA"
+            >
+              <Text tone="muted">
+                Se completa junto con el cierre deportivo.
+              </Text>
+            </ManagementSection>
+            <ManagementSection
+              description="Cargá resultado, goles y asistencias antes de finalizar."
+              title="RESULTADO Y EVENTOS"
+            >
+              <Link
+                className="ui-button ui-button--secondary"
+                href={`/play/matches/${matchId}/close`}
+              >
+                Cargar cierre
+              </Link>
+            </ManagementSection>
+            <ManagementSection
+              description="Revisá la planilla y confirmá el final del partido."
+              title="CIERRE"
+            >
+              <Link
+                className="ui-button ui-button--secondary"
+                href={`/play/matches/${matchId}/close`}
+              >
+                Revisar y finalizar
+              </Link>
+            </ManagementSection>
+          </div>
+        </details>
+      )}
+      <ReportControl targetId={matchId} targetType="MATCH" />
+    </main>
+  );
+}
+
+function StartedTeam({
+  label,
+  participants,
+}: Readonly<{
+  label: string;
+  participants: TeamsRead["TEAM_A"]["participants"];
+}>) {
+  return (
+    <section className={styles.startedTeam}>
+      <Text as="h2" variant="heading-lg">
+        {label}
+      </Text>
+      {participants.map((participant) => (
+        <article
+          className={styles.startedPlayer}
+          key={participant.participantId}
+        >
+          <div>
+            <strong>{participant.displayName}</strong>
+            {participant.kind === "GUEST" ? (
+              <Badge kind="role">INVITADO</Badge>
+            ) : null}
+          </div>
+          <span className={styles.rosterOvr}>
+            {participant.internalOvr
+              ? `${Math.round(Number(participant.internalOvr))} OVR`
+              : "—"}
+          </span>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function CancelledMatchView({
+  groupId,
+  location,
+  matchId,
+  roster,
+  scheduledAt,
+}: Readonly<{
+  groupId: string;
+  location: string;
+  matchId: string;
+  roster: RosterRead;
+  scheduledAt: string;
+}>) {
+  return (
+    <main className={styles.page}>
+      <Link className={styles.back} href={`/groups/${groupId}`}>
+        ← GRUPO
+      </Link>
+      <header className={`${styles.matchHero} ${styles.cancelledHero}`}>
+        <div>
+          <div className={styles.heroState}>
+            <MatchStateMark tone="negative">CANCELADO</MatchStateMark>
+            <span>F5</span>
+          </div>
+          <Text as="h1" variant="display-lg">
+            {formatMatchDate(new Date(scheduledAt))}
+          </Text>
+          <Text variant="heading-lg">{location}</Text>
+        </div>
+      </header>
+      <section className={styles.cancelledState}>
+        <Text as="h2" variant="heading-lg">
+          La convocatoria quedó cerrada.
+        </Text>
+        <Text tone="muted">
+          Se conserva el plantel registrado como historia operativa.
+        </Text>
+      </section>
+      <Roster
+        canManageGuests={false}
+        canManageParticipants={false}
+        onCancel={() => undefined}
+        onRemoveGuest={() => undefined}
+        rows={roster.confirmed}
+        showActions={false}
+        title={`CONFIRMADOS · ${roster.confirmed.length}`}
+      />
+      <ReportControl targetId={matchId} targetType="MATCH" />
+    </main>
+  );
+}
+
+function FinishedMatchView({
+  finalRoster,
+  groupName,
+  location,
+  match,
+  matchId,
+  progression,
+  result,
+  teams,
+  voting,
+}: Readonly<{
+  finalRoster?: FinalRosterRead;
+  groupName?: string;
+  location: string;
+  match: MatchRead;
+  matchId: string;
+  progression?: ProgressionRead;
+  result?: ResultRead;
+  teams?: TeamsRead;
+  voting?: VotingRead;
+}>) {
+  const actorParticipant = finalRoster?.participants.find(
+    (participant) => participant.isCurrentActor,
+  );
+  const actorPlayed = actorParticipant?.attendance === "PLAYED";
+  const actorTeamParticipant = teams
+    ? [...teams.TEAM_A.participants, ...teams.TEAM_B.participants].find(
+        (participant) =>
+          participant.participantId === actorParticipant?.participantId,
+      )
+    : undefined;
+  const canOpenProgression =
+    actorPlayed &&
+    voting?.status !== "OPEN" &&
+    (progression?.status === "AVAILABLE" ||
+      (progression?.status === "PROGRESSION_PENDING" &&
+        ["READY_TO_MATERIALIZE", "EARLIER_MATCH_PENDING"].includes(
+          progression.reason,
+        )));
+  const stats = new Map(
+    result?.participants.map((row) => [row.participantId, row]) ?? [],
+  );
+
+  return (
+    <main className={styles.page}>
+      <Link className={styles.back} href={`/groups/${match.groupId}`}>
+        ← {groupName ? groupName.toLocaleUpperCase("es-AR") : "GRUPO"}
+      </Link>
+      <header className={`${styles.matchHero} ${styles.finishedHero}`}>
+        <div>
+          <div className={styles.heroState}>
+            <MatchStateMark>FINALIZADO</MatchStateMark>
+            <span>F5</span>
+          </div>
+          <Text as="h1" variant="display-lg">
+            {formatMatchDate(new Date(match.scheduledAt))}
+          </Text>
+          <Text variant="heading-lg">{location}</Text>
+        </div>
+        <div
+          aria-label={
+            result?.status === "CONFIRMED"
+              ? `Resultado final: Equipo A ${result.teamAGoals}, Equipo B ${result.teamBGoals}`
+              : "Resultado final no disponible"
+          }
+          className={styles.finalScore}
+        >
+          <small>RESULTADO FINAL</small>
+          <div>
+            <span>EQUIPO A</span>
+            <Text as="span" className={styles.scoreValue} variant="score">
+              {result?.status === "CONFIRMED"
+                ? `${result.teamAGoals} — ${result.teamBGoals}`
+                : result?.status === "NOT_PLAYED"
+                  ? "NO JUGADO"
+                  : "PENDIENTE"}
+            </Text>
+            <span>EQUIPO B</span>
+          </div>
+        </div>
+      </header>
+      {result?.status === "CONFIRMED" && teams ? (
+        <section className={styles.matchSheet}>
+          <Text tone="accent" variant="label">
+            PLANILLA DEL PARTIDO
+          </Text>
+          <div className={styles.finishedTeams}>
+            <FinishedTeam
+              label="EQUIPO A"
+              participants={teams.TEAM_A.participants}
+              roster={finalRoster}
+            />
+            <FinishedTeam
+              label="EQUIPO B"
+              participants={teams.TEAM_B.participants}
+              roster={finalRoster}
+            />
+          </div>
+          <FinishedStats participants={teams} stats={stats} />
+        </section>
+      ) : null}
+
+      {actorPlayed ? (
+        <section className={styles.actorMatch}>
+          <Text tone="accent" variant="label">
+            TU PARTIDO
+          </Text>
+          {actorTeamParticipant?.rating ? (
+            <div className={styles.actorMetrics}>
+              <div className={styles.actorNote}>
+                <span>NOTA</span>
+                <strong>
+                  {Number(actorTeamParticipant.rating).toFixed(1)}
+                </strong>
+              </div>
+              {progression?.status === "AVAILABLE" && (
+                <div className={styles.actorOvr}>
+                  <span>OVR</span>
+                  <strong>
+                    {Number(progression.snapshot.overall.before).toFixed(1)}
+                    <i aria-hidden="true">→</i>
+                    {Number(progression.snapshot.overall.after).toFixed(1)}
+                  </strong>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Text as="h2" variant="heading-md">
+              Tu evaluación todavía no está disponible
+            </Text>
+          )}
+          <div className={styles.rowActions}>
+            {voting?.status === "OPEN" && !voting.hasSubmitted ? (
+              <Link
+                className="ui-button ui-button--primary"
+                href={`/play/matches/${matchId}/voting`}
+              >
+                VOTAR AHORA
+              </Link>
+            ) : null}
+            {voting?.status === "OPEN" && voting.hasSubmitted ? (
+              <span className={styles.positive}>VOTO ENVIADO</span>
+            ) : null}
+            {voting?.status === "CLOSED" ? (
+              <span className={styles.muted}>VOTACIÓN CERRADA</span>
+            ) : null}
+            {canOpenProgression ? (
+              <Link
+                className="ui-button ui-button--secondary"
+                href={`/play/matches/${matchId}/progression`}
+              >
+                VER MI PROGRESIÓN
+              </Link>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {finalRoster?.closureEditable ? (
+        <details className={styles.organizerTools}>
+          <summary>
+            <span>ADMINISTRAR PARTIDO · FINALIZADO</span>
+          </summary>
+          <div className={styles.organizerContent}>
+            <ManagementSection
+              description="El cierre sólo puede revisarse mientras el dominio todavía lo permite."
+              title="REVISIÓN DEL CIERRE"
+            >
+              <Link
+                className="ui-button ui-button--secondary"
+                href={`/play/matches/${matchId}/close`}
+              >
+                Ver o corregir cierre
+              </Link>
+            </ManagementSection>
+          </div>
+        </details>
+      ) : null}
+      <ReportControl targetId={matchId} targetType="MATCH" />
+    </main>
+  );
+}
+
+function FinishedStats({
+  participants,
+  stats,
+}: Readonly<{
+  participants: TeamsRead;
+  stats: Map<string, ResultRead["participants"][number]>;
+}>) {
+  const names = new Map(
+    [
+      ...participants.TEAM_A.participants,
+      ...participants.TEAM_B.participants,
+    ].map((participant) => [
+      participant.participantId,
+      participant.displayName,
+    ]),
+  );
+  const goals = [...stats.entries()].filter(([, value]) => value.goals > 0);
+  const assists = [...stats.entries()].filter(([, value]) => value.assists > 0);
+  if (goals.length === 0 && assists.length === 0) return null;
+  return (
+    <div className={styles.finishedStats}>
+      {goals.length > 0 && (
+        <section>
+          <Text tone="accent" variant="label">
+            GOLES
+          </Text>
+          {goals.map(([participantId, value]) => (
+            <p key={participantId}>
+              {names.get(participantId)} ×{value.goals}
+            </p>
+          ))}
+        </section>
+      )}
+      {assists.length > 0 && (
+        <section>
+          <Text tone="accent" variant="label">
+            ASISTENCIAS
+          </Text>
+          {assists.map(([participantId, value]) => (
+            <p key={participantId}>
+              {names.get(participantId)} ×{value.assists}
+            </p>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function FinishedTeam({
+  label,
+  participants,
+  roster,
+}: Readonly<{
+  label: string;
+  participants: TeamsRead["TEAM_A"]["participants"];
+  roster?: FinalRosterRead;
+}>) {
+  const attendance = new Map(
+    roster?.participants.map((row) => [row.participantId, row.attendance]) ??
+      [],
+  );
+  return (
+    <section className={styles.finishedTeam}>
+      <Text as="h2" variant="heading-lg">
+        {label}
+      </Text>
+      <div className={styles.sheetHeader} aria-hidden="true">
+        <span>JUGADOR</span>
+        <span>OVR</span>
+        <span>NOTA</span>
+      </div>
+      <div className={styles.sheetRows} role="list">
+        {participants.map((participant) => {
+          const noShow =
+            attendance.get(participant.participantId) === "NO_SHOW";
+          return (
+            <article
+              className={styles.sheetRow}
+              key={participant.participantId}
+              role="listitem"
+            >
+              <div>
+                <strong>{participant.displayName}</strong>
+                <div className={styles.rowBadges}>
+                  {participant.kind === "GUEST" ? (
+                    <Badge kind="role">INVITADO</Badge>
+                  ) : null}
+                  {noShow ? <Badge kind="state">NO JUGÓ</Badge> : null}
+                </div>
+              </div>
+              <span className={styles.sheetOvr}>
+                {participant.internalOvr
+                  ? Math.round(Number(participant.internalOvr))
+                  : "—"}
+              </span>
+              <strong className={styles.sheetNote}>
+                {participant.rating
+                  ? Number(participant.rating).toFixed(1)
+                  : "—"}
+              </strong>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -700,6 +1158,32 @@ const recruitmentRoles: RecruitmentRole[] = [
   "OFENSIVO",
   "PORTERO",
 ];
+
+function ManagementSection({
+  children,
+  danger = false,
+  description,
+  title,
+}: Readonly<{
+  children: ReactNode;
+  danger?: boolean;
+  description: string;
+  title: string;
+}>) {
+  return (
+    <section
+      className={`${styles.managementSection} ${danger ? styles.managementDanger : ""}`}
+    >
+      <div>
+        <Text tone={danger ? "muted" : "accent"} variant="label">
+          {title}
+        </Text>
+        <Text tone="muted">{description}</Text>
+      </div>
+      <div className={styles.managementSectionContent}>{children}</div>
+    </section>
+  );
+}
 
 function RecruitmentPanel({
   canManage,
@@ -820,6 +1304,123 @@ function matchesProfile(
   );
 }
 
+function MatchRoster({
+  canManageGuests,
+  canManageParticipants,
+  cancelPending,
+  demoteId,
+  onCancel,
+  onDemoteChange,
+  onRemoveGuest,
+  onSwap,
+  removeGuestPending,
+  roster,
+  showActions,
+  swapPending,
+}: Readonly<{
+  canManageGuests: boolean;
+  canManageParticipants: boolean;
+  cancelPending: boolean;
+  demoteId: string;
+  onCancel: (id: string) => void;
+  onDemoteChange: (id: string) => void;
+  onRemoveGuest: (id: string) => void;
+  onSwap: (id: string) => void;
+  removeGuestPending: boolean;
+  roster: RosterRead;
+  showActions: boolean;
+  swapPending: boolean;
+}>) {
+  return (
+    <div className={styles.rosterGrid}>
+      <Roster
+        canManageGuests={canManageGuests}
+        canManageParticipants={canManageParticipants}
+        onCancel={onCancel}
+        onRemoveGuest={onRemoveGuest}
+        rows={roster.confirmed}
+        showActions={showActions}
+        title={`CONFIRMADOS · ${roster.confirmed.length}`}
+      />
+      <section className={styles.rosterSection}>
+        <Text as="h2" variant="heading-lg">
+          EN ESPERA · {roster.waitlist.length}
+        </Text>
+        {roster.waitlist.length === 0 ? (
+          <p className={styles.muted}>Sin jugadores en espera.</p>
+        ) : (
+          <div className={styles.rosterList} role="list">
+            {roster.waitlist.map((participant, index) => (
+              <article
+                className={styles.rosterRow}
+                key={participant.id}
+                role="listitem"
+              >
+                <span>#{participant.position}</span>
+                <strong>{participant.displayName}</strong>
+                <small className={styles.rosterMeta}>
+                  {index + 1}.º suplente
+                  {participant.kind === "GUEST" ? (
+                    <Badge kind="role">INVITADO</Badge>
+                  ) : null}
+                </small>
+                {showActions &&
+                  ((participant.kind === "PLAYER" && canManageParticipants) ||
+                    (participant.kind === "GUEST" &&
+                      (participant.addedByCurrentActor ||
+                        canManageGuests))) && (
+                    <div className={styles.rowActions}>
+                      <Button
+                        disabled={cancelPending || removeGuestPending}
+                        onClick={() =>
+                          participant.kind === "GUEST"
+                            ? onRemoveGuest(participant.id)
+                            : onCancel(participant.id)
+                        }
+                        variant="quiet"
+                      >
+                        {participant.kind === "GUEST" ? "Retirar" : "Cancelar"}
+                      </Button>
+                      {canManageParticipants && demoteId && (
+                        <Button
+                          disabled={swapPending}
+                          onClick={() => onSwap(participant.id)}
+                          variant="quiet"
+                        >
+                          Confirmar por swap
+                        </Button>
+                      )}
+                    </div>
+                  )}
+              </article>
+            ))}
+          </div>
+        )}
+        {showActions && canManageParticipants && roster.waitlist.length > 0 && (
+          <label className={styles.compactField}>
+            <span>CONFIRMADO A PASAR A ESPERA</span>
+            <select
+              onChange={(event) => onDemoteChange(event.target.value)}
+              value={demoteId}
+            >
+              <option value="">Seleccionar…</option>
+              {roster.confirmed.map((participant) => (
+                <option key={participant.id} value={participant.id}>
+                  {participant.displayName}
+                </option>
+              ))}
+            </select>
+            <small>
+              El swap conserva el cupo y manda al confirmado al final de la
+              espera.
+            </small>
+          </label>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function Roster({
   title,
   rows,
@@ -827,6 +1428,7 @@ function Roster({
   canManageGuests,
   onCancel,
   onRemoveGuest,
+  showActions,
 }: Readonly<{
   title: string;
   rows: Awaited<ReturnType<typeof api.roster>>["confirmed"];
@@ -834,6 +1436,7 @@ function Roster({
   canManageGuests: boolean;
   onCancel: (id: string) => void;
   onRemoveGuest: (id: string) => void;
+  showActions: boolean;
 }>) {
   return (
     <section className={styles.rosterSection}>
@@ -843,28 +1446,42 @@ function Roster({
       {rows.length === 0 ? (
         <p className={styles.muted}>Todavía no hay jugadores.</p>
       ) : (
-        rows.map((participant) => (
-          <article className={styles.rosterRow} key={participant.id}>
-            <span>#{participant.position}</span>
-            <strong>{participant.displayName}</strong>
-            <small>
-              {participant.kind === "GUEST" ? "INVITADO" : "JUGADOR"}
-            </small>
-            {(participant.addedByCurrentActor || canManageGuests) &&
-            participant.kind === "GUEST" ? (
-              <Button
-                onClick={() => onRemoveGuest(participant.id)}
-                variant="quiet"
-              >
-                Retirar
-              </Button>
-            ) : canManageParticipants && participant.kind === "PLAYER" ? (
-              <Button onClick={() => onCancel(participant.id)} variant="quiet">
-                Cancelar
-              </Button>
-            ) : null}
-          </article>
-        ))
+        <div className={styles.rosterList} role="list">
+          {rows.map((participant) => (
+            <article
+              className={styles.rosterRow}
+              key={participant.id}
+              role="listitem"
+            >
+              <span>#{participant.position}</span>
+              <strong>{participant.displayName}</strong>
+              <small className={styles.rosterMeta}>
+                {participant.kind === "GUEST" ? (
+                  <Badge kind="role">INVITADO</Badge>
+                ) : null}
+              </small>
+              {showActions &&
+              (participant.addedByCurrentActor || canManageGuests) &&
+              participant.kind === "GUEST" ? (
+                <Button
+                  onClick={() => onRemoveGuest(participant.id)}
+                  variant="quiet"
+                >
+                  Retirar
+                </Button>
+              ) : showActions &&
+                canManageParticipants &&
+                participant.kind === "PLAYER" ? (
+                <Button
+                  onClick={() => onCancel(participant.id)}
+                  variant="quiet"
+                >
+                  Cancelar
+                </Button>
+              ) : null}
+            </article>
+          ))}
+        </div>
       )}
     </section>
   );
@@ -957,7 +1574,7 @@ function GuestControls({
 }
 
 function personalStateCopy(status: string) {
-  if (status === "DRAFT") return "Convocatoria en Draft";
+  if (status === "DRAFT") return "Partido en borrador";
   if (status === "CANCELLED") return "Partido cancelado";
   if (status === "STARTED") return "Partido en juego";
   if (status === "FINISHED") return "Partido finalizado";
@@ -971,11 +1588,13 @@ function formatMatchDate(date: Date) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(date);
 }
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("es-AR", {
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   }).format(new Date(value));
 }

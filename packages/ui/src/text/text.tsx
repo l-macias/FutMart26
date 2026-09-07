@@ -6,6 +6,7 @@ export type TextVariant =
   | "score"
   | "heading-lg"
   | "heading-md"
+  | "heading-sm"
   | "body"
   | "label"
   | "metadata";

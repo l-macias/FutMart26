@@ -92,7 +92,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e:critical
       - uses: actions/upload-artifact@v4
@@ -103,3 +102,56 @@ jobs:
             playwright-report
             test-results
           retention-days: 7
+
+  container-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Define safe release metadata
+        shell: bash
+        run: |
+          echo "APP_VERSION=0.0.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: api
+          push: false
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.test
+            NEXT_PUBLIC_AUTH_REQUIRE_EMAIL_VERIFICATION=true
+            APP_VERSION=${{ env.APP_VERSION }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIMESTAMP=${{ env.BUILD_TIMESTAMP }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: web
+          push: false
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.test
+            NEXT_PUBLIC_AUTH_REQUIRE_EMAIL_VERIFICATION=true
+            APP_VERSION=${{ env.APP_VERSION }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIMESTAMP=${{ env.BUILD_TIMESTAMP }}
+          cache-from: type=gha
+      - name: Build Admin image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: admin
+          push: false
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://api.example.test
+            NEXT_PUBLIC_AUTH_REQUIRE_EMAIL_VERIFICATION=true
+            APP_VERSION=${{ env.APP_VERSION }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIMESTAMP=${{ env.BUILD_TIMESTAMP }}
+          cache-from: type=gha

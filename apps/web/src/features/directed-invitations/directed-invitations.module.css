@@ -8,7 +8,9 @@
   min-inline-size: 0;
 }
 .page {
-  gap: var(--space-7);
+  gap: var(--section-gap);
+  max-inline-size: var(--content-wide);
+  margin-inline: auto;
   padding-block-end: var(--space-7);
 }
 .header {
@@ -20,16 +22,12 @@
   gap: var(--space-3);
 }
 .list {
-  gap: var(--space-2);
   padding: 0;
   margin: 0;
   list-style: none;
 }
 .list li {
   gap: var(--space-3);
-  padding: var(--space-3);
-  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
-  background: var(--background-surface);
 }
 .list li > div {
   gap: var(--space-1);
@@ -40,10 +38,14 @@
     var(--font-interface, var(--font-interface-fallback));
   text-transform: uppercase;
 }
-.actions {
-  display: flex !important;
+.list li > .actions {
+  display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) !important;
+  gap: var(--space-2);
+}
+.feedback {
+  margin: 0;
+  color: var(--color-success);
 }
 .state {
   padding: var(--space-6);
@@ -69,7 +71,7 @@
   background: var(--background-surface);
   text-align: start;
 }
-@media (min-width: 40rem) {
+@media (min-width: 48rem) {
   .list li {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;

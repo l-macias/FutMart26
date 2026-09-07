@@ -28,12 +28,16 @@ const productionEnvironment = {
   SMTP_HOST: "smtp.example.test",
   SMTP_PORT: "587",
   SMTP_SECURE: "false",
+  SMTP_REQUIRE_TLS: "true",
   MAIL_FROM: "F5 Groups <no-reply@example.test>",
   OBJECT_STORAGE_ENABLED: "true",
   OBJECT_STORAGE_ENDPOINT: "https://storage.example.test",
   OBJECT_STORAGE_BUCKET: "football-media",
   OBJECT_STORAGE_ACCESS_KEY: "access-key",
   OBJECT_STORAGE_SECRET_KEY: "secret-key",
+  APP_VERSION: "v0.1.0-rc.1",
+  GIT_SHA: "d523d5edd6659955bef1d23df45a1078421a7296",
+  BUILD_TIMESTAMP: "2026-09-07T12:00:00.000Z",
 } satisfies NodeJS.ProcessEnv;
 
 void test("production environment validation is strict and provider-agnostic", () => {
@@ -43,6 +47,15 @@ void test("production environment validation is strict and provider-agnostic", (
   assert.throws(() => loadConfig({ ...productionEnvironment, SMTP_HOST: "" }));
   assert.throws(() =>
     loadConfig({ ...productionEnvironment, OBJECT_STORAGE_ENABLED: "false" }),
+  );
+  assert.throws(() =>
+    loadConfig({
+      ...productionEnvironment,
+      OBJECT_STORAGE_ENDPOINT: "http://storage.example.test",
+    }),
+  );
+  assert.throws(() =>
+    loadConfig({ ...productionEnvironment, BUILD_TIMESTAMP: "" }),
   );
   assert.throws(() =>
     loadConfig({
@@ -101,6 +114,7 @@ void test("health is independent while readiness fails closed without DB", async
   assert.equal((await app.inject("/health")).statusCode, 200);
   const ready = await app.inject("/ready");
   assert.equal(ready.statusCode, 503);
+  assert.equal((await app.inject("/readiness")).statusCode, 503);
   assert.deepEqual(ready.json(), {
     status: "not_ready",
     database: "unavailable",
@@ -109,6 +123,7 @@ void test("health is independent while readiness fails closed without DB", async
     storage: "disabled",
     version: null,
     gitSha: null,
+    buildTimestamp: null,
   });
   assert.doesNotMatch(ready.body, /postgres|password|secret-key/i);
   await app.close();
@@ -198,6 +213,25 @@ void test("backup and restore scripts enforce destructive-operation guardrails",
   assert.notEqual(backup.status, 0);
   assert.match(`${backup.stderr}${backup.stdout}`, /BACKUP_DIR is required/);
 
+  const nestedBackup = spawnSync(
+    process.execPath,
+    [path.join(root, "scripts/backup-db.mjs")],
+    {
+      cwd: path.join(root, "apps/api"),
+      env: {
+        ...process.env,
+        DATABASE_URL: productionEnvironment.DATABASE_URL,
+        BACKUP_DIR: path.join(root, ".runtime/forbidden-backup"),
+      },
+      encoding: "utf8",
+    },
+  );
+  assert.notEqual(nestedBackup.status, 0);
+  assert.match(
+    `${nestedBackup.stderr}${nestedBackup.stdout}`,
+    /BACKUP_DIR must be outside the repository/,
+  );
+
   const restore = spawnSync(
     process.execPath,
     [path.join(root, "scripts/restore-db.mjs")],
@@ -232,6 +266,9 @@ function testConfig(): ApiConfig {
     OBJECT_STORAGE_ENABLED: "false",
     OBJECT_STORAGE_READINESS_CHECK: "false",
     LOG_LEVEL: "silent",
+    APP_VERSION: undefined,
+    GIT_SHA: undefined,
+    BUILD_TIMESTAMP: undefined,
   });
 }
 

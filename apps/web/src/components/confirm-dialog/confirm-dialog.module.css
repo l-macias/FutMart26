@@ -1,9 +1,11 @@
 .dialog {
   inline-size: min(28rem, calc(100% - var(--space-6)));
   padding: 0;
-  border: var(--border-width-thin) solid var(--border-accent);
-  background: var(--background-elevated);
+  border: var(--border-width-thin) solid var(--border-strong);
+  border-radius: var(--radius-overlay);
+  background: var(--color-overlay);
   color: var(--foreground-primary);
+  box-shadow: var(--elevation-overlay);
 }
 
 .dialog::backdrop {
@@ -13,7 +15,7 @@
 .content {
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-6);
+  padding: var(--density-feature-padding);
 }
 
 .actions {

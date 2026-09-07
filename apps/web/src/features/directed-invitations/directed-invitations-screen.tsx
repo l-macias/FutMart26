@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 
 import { Text } from "@football/ui";
 
@@ -12,6 +13,7 @@ import styles from "./directed-invitations.module.css";
 
 export function DirectedInvitationsScreen() {
   const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState<string | null>(null);
   const invitations = useQuery({
     queryKey: queryKeys.directedInvitations,
     queryFn: api.directedInvitations,
@@ -40,17 +42,17 @@ export function DirectedInvitationsScreen() {
         queryClient.invalidateQueries({
           queryKey: queryKeys.notificationUnreadCount,
         }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.personalHome }),
       ]);
-      if (
+      setFeedback(
         result &&
-        "outcome" in result &&
-        (result.outcome === "CONFIRMED" || result.outcome === "WAITLISTED")
-      )
-        window.alert(
-          result.outcome === "CONFIRMED"
+          "outcome" in result &&
+          (result.outcome === "CONFIRMED" || result.outcome === "WAITLISTED")
+          ? result.outcome === "CONFIRMED"
             ? "Te sumaste al partido."
-            : "Quedaste en lista de espera.",
-        );
+            : "Quedaste en lista de espera."
+          : "Invitación actualizada.",
+      );
     },
   });
 
@@ -72,19 +74,21 @@ export function DirectedInvitationsScreen() {
           Invitaciones
         </Text>
         <Text tone="muted">
-          Aceptar siempre respeta membership, cupo y lista de espera.
+          Aceptar siempre respeta la membresía, el cupo y la lista de espera.
         </Text>
       </header>
       <section className={styles.section}>
         <Text as="h2" variant="heading-lg">
           Invitaciones a grupos
         </Text>
-        <ul className={styles.list}>
+        <ul className={`${styles.list} ui-list`}>
           {invitations.data.groupInvitations.map((invite) => (
-            <li key={invite.id}>
-              <div>
-                <strong>{invite.group.name}</strong>
-                <span>{invite.invitedBy.displayName} te invitó</span>
+            <li className="ui-row" key={invite.id}>
+              <div className="ui-row__content">
+                <strong className="ui-row__primary">{invite.group.name}</strong>
+                <span className="ui-row__secondary">
+                  {invite.invitedBy.displayName} te invitó
+                </span>
               </div>
               {invite.status === "PENDING" ? (
                 <Actions
@@ -118,18 +122,24 @@ export function DirectedInvitationsScreen() {
         <Text as="h2" variant="heading-lg">
           Invitaciones a partidos
         </Text>
-        <ul className={styles.list}>
+        <ul className={`${styles.list} ui-list`}>
           {invitations.data.matchInvitations.map((invite) => (
-            <li key={invite.id}>
-              <div>
+            <li className="ui-row" key={invite.id}>
+              <div className="ui-row__content">
                 <Link href={`/play/matches/${invite.match.id}`}>
-                  <strong>{invite.match.groupName}</strong>
+                  <strong className="ui-row__primary">
+                    {invite.match.groupName}
+                  </strong>
                 </Link>
-                <span>
-                  {new Date(invite.match.scheduledAt).toLocaleString("es-AR")} ·{" "}
-                  {invite.match.locationText}
+                <span className="ui-row__secondary">
+                  {new Intl.DateTimeFormat("es-AR", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    hourCycle: "h23",
+                  }).format(new Date(invite.match.scheduledAt))}{" "}
+                  · {invite.match.locationText}
                 </span>
-                <span>
+                <span className="ui-row__secondary">
                   {invite.invitedBy.displayName} te invitó · el cupo no está
                   reservado
                 </span>
@@ -167,6 +177,11 @@ export function DirectedInvitationsScreen() {
           La invitación ya no está disponible o el partido cambió.
         </Text>
       )}
+      {feedback ? (
+        <p className={styles.feedback} role="status">
+          {feedback}
+        </p>
+      ) : null}
     </main>
   );
 }
@@ -205,7 +220,15 @@ function Actions({
 function Status({ value }: Readonly<{ value: string }>) {
   return (
     <Text tone="muted" variant="label">
-      {value}
+      {invitationStatusLabel(value)}
     </Text>
   );
+}
+
+function invitationStatusLabel(value: string) {
+  if (value === "ACCEPTED") return "ACEPTADA";
+  if (value === "REJECTED") return "RECHAZADA";
+  if (value === "EXPIRED") return "VENCIDA";
+  if (value === "REVOKED") return "REVOCADA";
+  return "NO DISPONIBLE";
 }

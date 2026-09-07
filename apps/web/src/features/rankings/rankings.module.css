@@ -1,0 +1,269 @@
+.page,
+.header,
+.context,
+.rankingLayout,
+.positionCard,
+.ranking,
+.list {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.page {
+  gap: var(--section-gap);
+  max-inline-size: var(--content-wide);
+  padding-block-end: var(--space-8);
+}
+
+.header {
+  gap: var(--space-1);
+  padding-block-start: var(--space-2);
+}
+
+.scopes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-block-end: var(--border-width-thin) solid var(--border-strong);
+}
+
+.scopeButton {
+  min-block-size: var(--touch-target-min);
+  padding-inline: var(--space-2);
+  border: 0;
+  border-block-end: var(--border-width-strong) solid transparent;
+  background: transparent;
+  color: var(--foreground-muted);
+  cursor: pointer;
+  font: 800 var(--type-label-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+}
+
+.scopeButton:hover {
+  color: var(--foreground-primary);
+  background: color-mix(in srgb, var(--background-elevated) 72%, transparent);
+}
+
+.scopeButton[aria-current="page"] {
+  border-block-end-color: var(--accent-primary);
+  color: var(--foreground-primary);
+}
+
+.context {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  max-inline-size: 32rem;
+}
+
+.context span,
+.positionCard > span,
+.listHeading > span {
+  color: var(--foreground-muted);
+  font: 700 var(--type-metadata-size) / 1.2
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+}
+
+.context select {
+  min-block-size: var(--control-height-compact);
+  padding-block: var(--space-2);
+}
+
+.rankingLayout {
+  gap: var(--section-gap);
+}
+
+.positionCard {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--density-compact-padding) var(--space-4);
+  border-inline-start: var(--border-width-strong) solid var(--accent-primary);
+  border-block: var(--border-width-thin) solid var(--border-subtle);
+  background: var(--color-surface-feature);
+}
+
+.positionCard strong {
+  color: var(--accent-primary);
+  font: 900 var(--type-heading-xl-size) / 0.9
+    var(--font-display, var(--font-display-fallback));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.positionCard strong small {
+  color: var(--foreground-primary);
+  font-size: var(--type-heading-md-size);
+}
+
+.positionCard p {
+  max-inline-size: 42rem;
+  margin: 0;
+  color: var(--foreground-muted);
+}
+
+.ranking {
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.listHeading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block-end: var(--space-2);
+  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.row {
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.row + .row {
+  border-block-start: var(--border-width-thin) solid var(--border-subtle);
+}
+
+.row a {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: var(--row-min-height-default);
+  padding: var(--density-compact-padding);
+  border-inline-start: var(--border-width-strong) solid transparent;
+  color: inherit;
+  text-decoration: none;
+}
+
+.row a:hover {
+  background: color-mix(in srgb, var(--background-elevated) 68%, transparent);
+}
+
+.row a:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+.row a > strong {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row a > small {
+  color: var(--accent-primary);
+  font: 800 var(--type-metadata-size) / 1
+    var(--font-interface, var(--font-interface-fallback));
+  letter-spacing: var(--type-tracking-label);
+}
+
+.row a > b,
+.rank {
+  font: 900 var(--type-heading-md-size) / 1
+    var(--font-display, var(--font-display-fallback));
+  font-variant-numeric: tabular-nums;
+}
+
+.rank {
+  color: var(--foreground-muted);
+}
+
+.top a {
+  border-inline-start-color: color-mix(
+    in srgb,
+    var(--pitch-surface) 65%,
+    transparent
+  );
+}
+
+.top:first-child a {
+  border-inline-start-color: var(--accent-primary);
+}
+
+.top .rank,
+.top:first-child a > b,
+.current .rank {
+  color: var(--accent-primary);
+}
+
+.current a {
+  background: color-mix(in srgb, var(--background-elevated) 78%, transparent);
+}
+
+.empty,
+.state {
+  margin: 0;
+  padding-block: var(--space-4);
+  border-block: var(--border-width-thin) solid var(--border-subtle);
+  color: var(--foreground-muted);
+}
+
+.state p {
+  margin: 0;
+}
+
+.ranking > :global(.ui-button) {
+  justify-self: start;
+}
+
+@media (min-width: 48rem) {
+  .rankingLayout {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.38fr);
+    align-items: start;
+  }
+
+  .positionCard {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    inset-block-start: var(--space-4);
+  }
+
+  .ranking {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .row a {
+    grid-template-columns: 4rem minmax(0, 1fr) auto 4rem;
+    padding-inline: var(--space-4);
+  }
+}
+
+@media (max-width: 30rem) {
+  .scopeButton {
+    padding-inline: var(--space-1);
+    font-size: var(--type-metadata-size);
+  }
+
+  .context {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .row a {
+    grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  }
+
+  .row a > small {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .row a > b {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}

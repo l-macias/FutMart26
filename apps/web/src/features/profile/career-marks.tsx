@@ -1,20 +1,20 @@
 import { Text } from "@football/ui";
-import type { RewardsResponse } from "@football/contracts";
+import type { OwnPlayerProfile } from "@football/contracts";
 
 import styles from "./profile.module.css";
 
 export function CareerMarks({
   rewards,
-}: Readonly<{ rewards: RewardsResponse }>) {
+}: Readonly<{ rewards: OwnPlayerProfile["rewards"] }>) {
   return (
     <section aria-labelledby="marks-title" className={styles.panelSection}>
       <Text as="h2" id="marks-title" variant="heading-lg">
-        Logros
+        Logros y premios
       </Text>
       <div className={styles.markGroup}>
         <div>
-          <Text as="span" tone="accent" variant="label">
-            Achievements
+          <Text as="h3" tone="accent" variant="heading-sm">
+            Logros
           </Text>
           <Text tone="muted">Hitos verificables de carrera.</Text>
         </div>
@@ -39,26 +39,27 @@ export function CareerMarks({
       </div>
       <div className={styles.markGroup}>
         <div>
-          <Text as="span" className={styles.positive} variant="label">
-            Awards
+          <Text as="h3" className={styles.positive} variant="heading-sm">
+            Premios
           </Text>
           <Text tone="muted">Reconocimientos por rendimiento.</Text>
         </div>
         <ul className={styles.awardList}>
-          {rewards.recentAwards.map((award) => (
-            <li key={`${award.matchId}:${award.type}`}>
+          {rewards.awardSummary.map((award) => (
+            <li key={award.type}>
               <span aria-hidden="true" />
               <span>
                 <Text as="span" variant="heading-md">
                   {award.title}
+                  {award.count > 1 ? ` ×${award.count}` : ""}
                 </Text>
                 <Text as="span" tone="muted" variant="metadata">
-                  {award.context.group.name}
+                  {award.description}
                 </Text>
               </span>
             </li>
           ))}
-          {rewards.recentAwards.length === 0 ? (
+          {rewards.awardSummary.length === 0 ? (
             <li>
               <span aria-hidden="true" />
               <Text tone="muted">Todavía no recibiste premios de partido.</Text>

@@ -37,7 +37,7 @@ test("@critical register, verify, compliance and football onboarding", async ({
   await page.getByRole("button", { name: "Entrar a la app" }).click();
   await expect(page).toHaveURL(/\/play$/);
   await expect(
-    page.getByRole("heading", { name: "Lo que viene." }),
+    page.getByRole("heading", { name: "Tus partidos." }),
   ).toBeVisible();
 });
 

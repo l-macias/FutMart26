@@ -6,7 +6,7 @@ import {
   OverallDisplay,
   TacticalDivider,
 } from "@football/football-ui";
-import { Button, IconButton, Surface, Text } from "@football/ui";
+import { Badge, Button, IconButton, Surface, Text } from "@football/ui";
 
 import styles from "./page.module.css";
 
@@ -37,7 +37,7 @@ export default function DesignSystemPreviewPage() {
           Internal preview / development only
         </Text>
         <Text as="h1" variant="display-lg">
-          Visual Foundation v1
+          Visual Foundation V2
         </Text>
         <Text className={styles.lede} tone="muted" variant="body">
           Night Pitch como estructura, detalle táctico como sistema y energía
@@ -95,6 +95,8 @@ export default function DesignSystemPreviewPage() {
         <div className={styles.componentRow}>
           <Button>Primary action</Button>
           <Button variant="secondary">Secondary</Button>
+          <Button variant="management">Management</Button>
+          <Button variant="danger">Danger</Button>
           <Button variant="quiet">Quiet</Button>
           <IconButton label="Ejemplo de acción universal">
             <span aria-hidden="true" className={styles.plusMark} />
@@ -117,11 +119,41 @@ export default function DesignSystemPreviewPage() {
               Elevación reservada para jerarquía real.
             </Text>
           </Surface>
+          <Surface className={styles.surfaceSample} elevation="feature">
+            <Text as="h3" variant="heading-md">
+              Sports feature
+            </Text>
+            <Text tone="muted" variant="body">
+              Partido próximo, resultado o momento deportivo principal.
+            </Text>
+          </Surface>
+        </div>
+        <div className={styles.componentRow}>
+          <Badge kind="role">MOD</Badge>
+          <Badge kind="state">EN JUEGO</Badge>
+          <Badge kind="attention">PENDIENTE</Badge>
+        </div>
+        <div className={styles.rowSample}>
+          <div className="ui-row">
+            <div className="ui-row__content">
+              <div className="ui-row__primary">Juan Pérez</div>
+              <div className="ui-row__secondary">Moderador · Delantero</div>
+            </div>
+            <div className="ui-row__metric">78 OVR</div>
+          </div>
+          <div className="ui-row">
+            <div className="ui-row__content">
+              <div className="ui-row__primary">Complejo Norte</div>
+              <div className="ui-row__secondary">Jueves · 20:30</div>
+            </div>
+            <div className="ui-row__metric">6 / 10</div>
+          </div>
         </div>
       </PreviewSection>
 
       <PreviewSection title="Football language">
         <div className={styles.footballRow}>
+          <OverallDisplay size="compact" value="72" />
           <OverallDisplay value="84" />
           <div className={styles.stateStack}>
             <MatchStateMark>Neutral</MatchStateMark>

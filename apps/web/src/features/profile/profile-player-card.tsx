@@ -1,10 +1,8 @@
-import type { PlayerImage } from "@football/contracts";
+import type { OwnPlayerProfile, PlayerImage } from "@football/contracts";
 
 import { PlayerCard } from "@/components/player-card/player-card";
 import { mediaContentUrl } from "@/lib/api/client";
-import { api } from "@/lib/api/resources";
-
-type Performance = Awaited<ReturnType<typeof api.performance>>;
+type Performance = OwnPlayerProfile["performance"];
 
 export function ProfilePlayerCard({
   name,

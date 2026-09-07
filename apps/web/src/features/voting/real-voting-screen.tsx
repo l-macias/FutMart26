@@ -194,6 +194,7 @@ export function RealVotingScreen({ matchId }: Readonly<{ matchId: string }>) {
                 month: "short",
                 hour: "2-digit",
                 minute: "2-digit",
+                hourCycle: "h23",
               })}
               .
             </Text>
@@ -334,6 +335,7 @@ export function RealVotingScreen({ matchId }: Readonly<{ matchId: string }>) {
               {new Date(voting.data.closesAt).toLocaleTimeString("es-AR", {
                 hour: "2-digit",
                 minute: "2-digit",
+                hourCycle: "h23",
               })}
             </Text>
             <Text as="span" tone="muted" variant="metadata">

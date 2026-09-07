@@ -3,7 +3,10 @@ import { Buffer } from "node:buffer";
 import { asc, eq, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
-import type { TerritorialRankingResponse } from "@football/contracts";
+import type {
+  RankingContextsResponse,
+  TerritorialRankingResponse,
+} from "@football/contracts";
 import {
   countryDisplayName,
   idSchema,
@@ -13,6 +16,8 @@ import {
 import type { Database } from "@football/database";
 import {
   accountSuspensions,
+  groupMemberships,
+  groups,
   matches,
   matchParticipants,
   matchSportingResults,
@@ -59,6 +64,186 @@ type RankingRow = {
 
 export class TerritorialRankingService {
   constructor(private readonly database: Database) {}
+
+  async contexts(actorPlayerId: string): Promise<RankingContextsResponse> {
+    type GroupRow = { id: string; name: string };
+    type CityRow = {
+      city_key: string;
+      name: string;
+      ranked_player_count: number | string;
+      actor_matches_played: number | string;
+      last_played_at: Date | string;
+    };
+    type VenueRow = CityRow & {
+      id: string;
+      city: string;
+      name: string;
+    };
+    const [groupResult, cityResult, venueResult] = await Promise.all([
+      this.database.execute<GroupRow>(sql`
+        select ${groups.id} as id, ${groups.name} as name
+        from ${groupMemberships}
+        inner join ${groups} on ${groups.id} = ${groupMemberships.groupId}
+        where ${groupMemberships.playerId} = ${actorPlayerId}::uuid
+          and ${groupMemberships.status} = 'ACTIVE'
+          and ${groups.status} = 'ACTIVE'
+          and exists (
+            select 1
+            from ${groupMemberships} ranked_membership
+            inner join ${playerPerformances} ranked_performance
+              on ranked_performance.player_id = ranked_membership.player_id
+              and ranked_performance.discipline = 'F5'
+              and ranked_performance.processed_match_count > 0
+            where ranked_membership.group_id = ${groups.id}
+              and ranked_membership.status = 'ACTIVE'
+          )
+        order by ${groupMemberships.joinedAt} asc, ${groups.id} asc
+        limit 100
+      `),
+      this.database.execute<CityRow>(sql`
+        with ranked_city as (
+          select
+            ${venues.normalizedCity} as city_key,
+            min(${venues.city}) as name,
+            count(distinct ${players.id})::int as ranked_player_count,
+            max(${matches.scheduledAt}) as last_played_at
+          from ${matches}
+          inner join ${venues} on ${venues.id} = ${matches.venueId}
+          inner join ${matchSportingResults}
+            on ${matchSportingResults.matchId} = ${matches.id}
+            and ${matchSportingResults.status} = 'CONFIRMED'
+          inner join ${matchParticipants}
+            on ${matchParticipants.matchId} = ${matches.id}
+            and ${matchParticipants.kind} = 'PLAYER'
+            and ${matchParticipants.status} = 'CONFIRMED'
+            and ${matchParticipants.attendance} = 'PLAYED'
+          inner join ${players} on ${players.id} = ${matchParticipants.playerId}
+          inner join ${playerPerformances}
+            on ${playerPerformances.playerId} = ${players.id}
+            and ${playerPerformances.discipline} = 'F5'
+            and ${playerPerformances.processedMatchCount} > 0
+          where ${matches.discipline} = 'F5'
+            and ${matches.status} = 'FINISHED'
+            and ${players.profileVisibility} = 'PUBLIC'
+            and ${players.accountStatus} = 'ACTIVE'
+            and not exists (
+              select 1 from ${accountSuspensions}
+              where ${accountSuspensions.authUserId} = ${players.authUserId}
+                and ${accountSuspensions.reactivatedAt} is null
+            )
+          group by ${venues.normalizedCity}
+        ), actor_city as (
+          select ${venues.normalizedCity} as city_key,
+            count(distinct ${matches.id})::int as matches_played
+          from ${matches}
+          inner join ${venues} on ${venues.id} = ${matches.venueId}
+          inner join ${matchSportingResults}
+            on ${matchSportingResults.matchId} = ${matches.id}
+            and ${matchSportingResults.status} = 'CONFIRMED'
+          inner join ${matchParticipants}
+            on ${matchParticipants.matchId} = ${matches.id}
+            and ${matchParticipants.playerId} = ${actorPlayerId}::uuid
+            and ${matchParticipants.kind} = 'PLAYER'
+            and ${matchParticipants.status} = 'CONFIRMED'
+            and ${matchParticipants.attendance} = 'PLAYED'
+          where ${matches.discipline} = 'F5' and ${matches.status} = 'FINISHED'
+          group by ${venues.normalizedCity}
+        )
+        select
+          ranked_city.city_key,
+          ranked_city.name,
+          ranked_city.ranked_player_count,
+          coalesce(actor_city.matches_played, 0)::int as actor_matches_played,
+          ranked_city.last_played_at
+        from ranked_city
+        left join actor_city on actor_city.city_key = ranked_city.city_key
+        order by actor_matches_played desc, ranked_city.last_played_at desc, ranked_city.name asc
+        limit 100
+      `),
+      this.database.execute<VenueRow>(sql`
+        with ranked_venue as (
+          select
+            ${venues.id} as id,
+            ${venues.displayName} as name,
+            ${venues.city} as city,
+            ${venues.normalizedCity} as city_key,
+            count(distinct ${players.id})::int as ranked_player_count,
+            max(${matches.scheduledAt}) as last_played_at
+          from ${matches}
+          inner join ${venues} on ${venues.id} = ${matches.venueId}
+          inner join ${matchSportingResults}
+            on ${matchSportingResults.matchId} = ${matches.id}
+            and ${matchSportingResults.status} = 'CONFIRMED'
+          inner join ${matchParticipants}
+            on ${matchParticipants.matchId} = ${matches.id}
+            and ${matchParticipants.kind} = 'PLAYER'
+            and ${matchParticipants.status} = 'CONFIRMED'
+            and ${matchParticipants.attendance} = 'PLAYED'
+          inner join ${players} on ${players.id} = ${matchParticipants.playerId}
+          inner join ${playerPerformances}
+            on ${playerPerformances.playerId} = ${players.id}
+            and ${playerPerformances.discipline} = 'F5'
+            and ${playerPerformances.processedMatchCount} > 0
+          where ${matches.discipline} = 'F5'
+            and ${matches.status} = 'FINISHED'
+            and ${players.profileVisibility} = 'PUBLIC'
+            and ${players.accountStatus} = 'ACTIVE'
+            and not exists (
+              select 1 from ${accountSuspensions}
+              where ${accountSuspensions.authUserId} = ${players.authUserId}
+                and ${accountSuspensions.reactivatedAt} is null
+            )
+          group by ${venues.id}, ${venues.displayName}, ${venues.city}, ${venues.normalizedCity}
+        ), actor_venue as (
+          select ${matches.venueId} as venue_id,
+            count(distinct ${matches.id})::int as matches_played
+          from ${matches}
+          inner join ${matchSportingResults}
+            on ${matchSportingResults.matchId} = ${matches.id}
+            and ${matchSportingResults.status} = 'CONFIRMED'
+          inner join ${matchParticipants}
+            on ${matchParticipants.matchId} = ${matches.id}
+            and ${matchParticipants.playerId} = ${actorPlayerId}::uuid
+            and ${matchParticipants.kind} = 'PLAYER'
+            and ${matchParticipants.status} = 'CONFIRMED'
+            and ${matchParticipants.attendance} = 'PLAYED'
+          where ${matches.discipline} = 'F5' and ${matches.status} = 'FINISHED'
+          group by ${matches.venueId}
+        )
+        select
+          ranked_venue.id,
+          ranked_venue.name,
+          ranked_venue.city,
+          ranked_venue.city_key,
+          ranked_venue.ranked_player_count,
+          coalesce(actor_venue.matches_played, 0)::int as actor_matches_played,
+          ranked_venue.last_played_at
+        from ranked_venue
+        left join actor_venue on actor_venue.venue_id = ranked_venue.id
+        order by actor_matches_played desc, ranked_venue.last_played_at desc, ranked_venue.name asc
+        limit 100
+      `),
+    ]);
+
+    return {
+      discipline: "F5",
+      groups: Array.from(groupResult),
+      cities: Array.from(cityResult).map((row) => ({
+        key: encodeCityRankingKey(row.city_key),
+        name: row.name,
+        rankedPlayerCount: Number(row.ranked_player_count),
+        actorMatchesPlayed: Number(row.actor_matches_played),
+      })),
+      venues: Array.from(venueResult).map((row) => ({
+        id: row.id,
+        name: row.name,
+        city: row.city,
+        cityKey: encodeCityRankingKey(row.city_key),
+        rankedPlayerCount: Number(row.ranked_player_count),
+        actorMatchesPlayed: Number(row.actor_matches_played),
+      })),
+    };
+  }
 
   async list(
     actorPlayerId: string,
