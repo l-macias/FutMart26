@@ -68,6 +68,8 @@ export function userMessageForApiError(code: string, status = 0) {
     invalid_match_transition:
       "Esa acción ya no está disponible en el estado actual del partido.",
     match_not_open: "La convocatoria ya no admite inscripciones.",
+    match_registration_closed:
+      "La convocatoria cerró porque el partido ya comenzó.",
     roster_locked: "El roster quedó bloqueado al iniciar el partido.",
     capacity_below_confirmed:
       "El cupo no puede ser menor que la cantidad de participantes confirmados.",

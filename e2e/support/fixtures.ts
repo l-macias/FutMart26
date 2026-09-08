@@ -126,7 +126,7 @@ export async function createFinishedMatch(owner: E2eUser, member: E2eUser) {
   const created = await owner.api.post(`/groups/${group.id}/matches`, {
     data: {
       discipline: "F5",
-      scheduledAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+      scheduledAt: new Date(Date.now() + 30 * 60_000).toISOString(),
       durationMinutes: 60,
       capacity: 2,
       locationText: "Cancha E2E",
@@ -148,6 +148,17 @@ export async function createFinishedMatch(owner: E2eUser, member: E2eUser) {
     TEAM_A: { participants: { participantId: string }[] };
   };
   const teamAScorerId = generatedTeams.TEAM_A.participants[0]?.participantId;
+  const database = postgres(e2eDatabaseUrl(), { max: 1 });
+  try {
+    await database`
+      update matches
+      set scheduled_at = ${new Date(Date.now() - 2 * 60 * 60_000)},
+          updated_at = now()
+      where id = ${match.id}
+    `;
+  } finally {
+    await database.end();
+  }
   await expectOk(owner.api.post(`/matches/${match.id}/start`));
   await expectOk(owner.api.post(`/matches/${match.id}/finish`));
   await expectOk(

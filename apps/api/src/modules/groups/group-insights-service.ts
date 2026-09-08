@@ -34,6 +34,7 @@ import {
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
+import { effectiveMatchPhase } from "../matches/match-effective-phase.js";
 import {
   groupCapabilities,
   hasGroupCapability,
@@ -93,7 +94,10 @@ const awardTitles: Record<AwardType, string> = {
 };
 
 export class GroupInsightsService {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async overview(
     actorPlayerId: string,
@@ -115,6 +119,7 @@ export class GroupInsightsService {
       id: matches.id,
       status: matches.status,
       scheduledAt: matches.scheduledAt,
+      durationMinutes: matches.durationMinutes,
       locationText: matches.locationText,
       capacity: matches.capacity,
       confirmedCount: sql<number>`(
@@ -148,6 +153,7 @@ export class GroupInsightsService {
           eq(matchSportingResults.matchId, matches.id),
         );
 
+    const now = this.clock();
     const [memberCountRows, rosterRows, activeRows, draftRows, historyRows] =
       await Promise.all([
         this.database
@@ -184,6 +190,7 @@ export class GroupInsightsService {
             and(
               eq(matches.groupId, groupId),
               inArray(matches.status, ["OPEN", "STARTED"]),
+              sql`${matches.scheduledAt} + (${matches.durationMinutes} * interval '1 minute') > ${now.toISOString()}::timestamptz`,
             ),
           )
           .orderBy(asc(matches.scheduledAt), asc(matches.id))
@@ -200,7 +207,11 @@ export class GroupInsightsService {
           .where(
             and(
               eq(matches.groupId, groupId),
-              inArray(matches.status, ["FINISHED", "CANCELLED"]),
+              sql`(
+                ${matches.status} in ('FINISHED', 'CANCELLED') or
+                (${matches.status} in ('OPEN', 'STARTED') and
+                  ${matches.scheduledAt} + (${matches.durationMinutes} * interval '1 minute') <= ${now.toISOString()}::timestamptz)
+              )`,
             ),
           )
           .orderBy(desc(matches.scheduledAt), desc(matches.id))
@@ -226,11 +237,11 @@ export class GroupInsightsService {
         joinedAt: row.joinedAt.toISOString(),
         player: { id: row.playerId, displayName: row.displayName },
       })),
-      nextMatch: nextRow ? overviewMatch(nextRow) : null,
+      nextMatch: nextRow ? overviewMatch(nextRow, now) : null,
       upcomingMatches: [...remainingActiveRows, ...draftRows]
         .slice(0, 6)
-        .map(overviewMatch),
-      historyMatches: historyRows.map(overviewMatch),
+        .map((row) => overviewMatch(row, now)),
+      historyMatches: historyRows.map((row) => overviewMatch(row, now)),
       canManageGroup: membership.groupStatus === "ACTIVE" && canManageGroup,
       canCreateMatch,
     };
@@ -469,23 +480,29 @@ const managementCapabilities = [
   "MATCH_MANAGE",
 ] as const satisfies readonly GroupCapability[];
 
-function overviewMatch(row: {
-  id: string;
-  status: "DRAFT" | "OPEN" | "STARTED" | "FINISHED" | "CANCELLED";
-  scheduledAt: Date;
-  locationText: string;
-  capacity: number;
-  confirmedCount: number;
-  waitlistCount: number;
-  participationStatus: "CONFIRMED" | "WAITLISTED" | null;
-  resultStatus: "DRAFT" | "CONFIRMED" | "NOT_PLAYED" | null;
-  teamAGoals: number | null;
-  teamBGoals: number | null;
-}): GroupOverviewResponse["historyMatches"][number] {
+function overviewMatch(
+  row: {
+    id: string;
+    status: "DRAFT" | "OPEN" | "STARTED" | "FINISHED" | "CANCELLED";
+    scheduledAt: Date;
+    durationMinutes: number;
+    locationText: string;
+    capacity: number;
+    confirmedCount: number;
+    waitlistCount: number;
+    participationStatus: "CONFIRMED" | "WAITLISTED" | null;
+    resultStatus: "DRAFT" | "CONFIRMED" | "NOT_PLAYED" | null;
+    teamAGoals: number | null;
+    teamBGoals: number | null;
+  },
+  now: Date,
+): GroupOverviewResponse["historyMatches"][number] {
   return {
     id: row.id,
     status: row.status,
+    effectivePhase: effectiveMatchPhase(row, now),
     scheduledAt: row.scheduledAt.toISOString(),
+    durationMinutes: row.durationMinutes,
     locationText: row.locationText,
     capacity: row.capacity,
     confirmedCount: Number(row.confirmedCount),

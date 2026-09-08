@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, inArray, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 
 import type { Database } from "@football/database";
 import {
@@ -15,6 +15,7 @@ import {
   matchTeamAssignments,
   matches,
   players,
+  votingSessions,
   venueCourts,
   venues,
 } from "@football/database/schema";
@@ -27,6 +28,10 @@ import {
   hasGroupCapability,
 } from "../groups/capabilities.js";
 import { MatchRecruitmentService } from "./match-recruitment-service.js";
+import {
+  effectiveMatchPhase,
+  matchAcceptsRegistration,
+} from "./match-effective-phase.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type DatabaseExecutor = Database | Transaction;
@@ -47,10 +52,16 @@ type MatchUpdate = Partial<
 >;
 
 export class MatchService {
+  private readonly recruitment: MatchRecruitmentService;
+
   constructor(
     private readonly database: Database,
-    private readonly recruitment = new MatchRecruitmentService(database),
-  ) {}
+    recruitment?: MatchRecruitmentService,
+    private readonly clock: () => Date = () => new Date(),
+  ) {
+    this.recruitment =
+      recruitment ?? new MatchRecruitmentService(database, this.clock);
+  }
 
   async create(actorPlayerId: string, groupId: string, input: MatchInput) {
     this.validateCapacity(input.capacity);
@@ -105,7 +116,7 @@ export class MatchService {
               defaultDurationMinutes: input.durationMinutes,
               defaultCapacity: input.capacity,
               updatedByPlayerId: actorPlayerId,
-              updatedAt: new Date(),
+              updatedAt: this.clock(),
             },
           });
       }
@@ -211,7 +222,7 @@ export class MatchService {
     actorPlayerId: string,
     limits: { upcomingLimit: number; historyLimit: number },
   ) {
-    const now = new Date();
+    const now = this.clock();
     const select = {
       match: matches,
       groupId: groups.id,
@@ -251,8 +262,12 @@ export class MatchService {
         limit 1
       )`,
       resultStatus: matchSportingResults.status,
+      resultConfirmedAt: matchSportingResults.confirmedAt,
       teamAGoals: matchSportingResults.teamAGoals,
       teamBGoals: matchSportingResults.teamBGoals,
+      votingStatus: votingSessions.status,
+      votingOpenedAt: votingSessions.openedAt,
+      votingClosesAt: votingSessions.closesAt,
     };
     const base = () =>
       this.database
@@ -278,7 +293,8 @@ export class MatchService {
         .leftJoin(
           matchSportingResults,
           eq(matchSportingResults.matchId, matches.id),
-        );
+        )
+        .leftJoin(votingSessions, eq(votingSessions.matchId, matches.id));
     const actorParticipated = sql`exists (
       select 1 from ${matchParticipants} own_participation
       where own_participation.match_id = ${matches.id}
@@ -294,14 +310,21 @@ export class MatchService {
     )`;
     const [currentRows, upcoming, history] = await Promise.all([
       base()
-        .where(and(eq(matches.status, "STARTED"), actorIsActive))
+        .where(
+          and(
+            inArray(matches.status, ["OPEN", "STARTED"]),
+            actorIsActive,
+            sql`${matches.scheduledAt} + (${matches.durationMinutes} * interval '1 minute') > ${now.toISOString()}::timestamptz`,
+            or(eq(matches.status, "STARTED"), lte(matches.scheduledAt, now)),
+          ),
+        )
         .orderBy(desc(matches.scheduledAt), asc(matches.id))
         .limit(1),
       base()
         .where(
           and(
             eq(matches.status, "OPEN"),
-            gte(matches.scheduledAt, now),
+            gt(matches.scheduledAt, now),
             actorIsActive,
           ),
         )
@@ -310,7 +333,13 @@ export class MatchService {
       base()
         .where(
           and(
-            inArray(matches.status, ["FINISHED", "CANCELLED"]),
+            or(
+              inArray(matches.status, ["FINISHED", "CANCELLED"]),
+              and(
+                inArray(matches.status, ["OPEN", "STARTED"]),
+                sql`${matches.scheduledAt} + (${matches.durationMinutes} * interval '1 minute') <= ${now.toISOString()}::timestamptz`,
+              ),
+            ),
             actorParticipated,
           ),
         )
@@ -425,7 +454,7 @@ export class MatchService {
           "Expected one waitlisted and one confirmed participant",
           409,
         );
-      const now = new Date();
+      const now = this.clock();
       await tx
         .update(matchParticipants)
         .set({
@@ -466,6 +495,12 @@ export class MatchService {
         true,
       );
       if (match.status !== "DRAFT") this.invalidTransition();
+      if (match.scheduledAt <= this.clock())
+        throw new ApplicationError(
+          "match_registration_closed",
+          "The scheduled start has already passed",
+          409,
+        );
       const blockers = await tx.execute(sql`
         select older.id
         from ${matches} older
@@ -493,7 +528,7 @@ export class MatchService {
           "An older played Match requires sporting closure before publication",
           409,
         );
-      const now = new Date();
+      const now = this.clock();
       await tx
         .update(matches)
         .set({ status: "OPEN", publishedAt: now, updatedAt: now })
@@ -513,6 +548,15 @@ export class MatchService {
       );
       if (match.status !== "DRAFT" && match.status !== "OPEN")
         this.invalidTransition();
+      if (
+        match.status === "OPEN" &&
+        !matchAcceptsRegistration(match, this.clock())
+      )
+        throw new ApplicationError(
+          "match_registration_closed",
+          "The registration window has closed",
+          409,
+        );
       if (input.capacity !== undefined) {
         this.validateCapacity(input.capacity);
         const confirmedCount = await this.confirmedCount(tx, matchId);
@@ -551,7 +595,7 @@ export class MatchService {
       }
       await tx
         .update(matches)
-        .set({ ...input, ...location, updatedAt: new Date() })
+        .set({ ...input, ...location, updatedAt: this.clock() })
         .where(eq(matches.id, matchId));
       if (
         match.status === "OPEN" &&
@@ -575,13 +619,23 @@ export class MatchService {
       );
       if (match.status !== "DRAFT" && match.status !== "OPEN")
         this.invalidTransition();
+      if (
+        match.status === "OPEN" &&
+        !matchAcceptsRegistration(match, this.clock())
+      )
+        throw new ApplicationError(
+          "match_registration_closed",
+          "The registration window has closed",
+          409,
+        );
+      const now = this.clock();
       await tx
         .update(matches)
         .set({
           status: "CANCELLED",
-          cancelledAt: new Date(),
+          cancelledAt: now,
           cancelledByPlayerId: actorPlayerId,
-          updatedAt: new Date(),
+          updatedAt: now,
         })
         .where(eq(matches.id, matchId));
     });
@@ -621,7 +675,7 @@ export class MatchService {
           "Every confirmed participant must have one team assignment before START",
           409,
         );
-      const now = new Date();
+      const now = this.clock();
       await tx
         .update(matches)
         .set({ status: "STARTED", rosterLockedAt: now, updatedAt: now })
@@ -691,8 +745,8 @@ export class MatchService {
         .update(matchPlayerInvitations)
         .set({
           status: "ACCEPTED",
-          respondedAt: new Date(),
-          updatedAt: new Date(),
+          respondedAt: this.clock(),
+          updatedAt: this.clock(),
         })
         .where(
           and(
@@ -1015,7 +1069,7 @@ export class MatchService {
   ) {
     const confirmedCount = await this.confirmedCount(tx, match.id);
     const status = confirmedCount < match.capacity ? "CONFIRMED" : "WAITLISTED";
-    const now = new Date();
+    const now = this.clock();
     const [participant] = await tx
       .insert(matchParticipants)
       .values({
@@ -1056,7 +1110,7 @@ export class MatchService {
         .orderBy(asc(matchParticipants.admissionOrder))
         .limit(1);
       if (!next) return;
-      const now = new Date();
+      const now = this.clock();
       await tx
         .update(matchParticipants)
         .set({
@@ -1075,7 +1129,7 @@ export class MatchService {
     id: string,
     actorPlayerId: string,
   ) {
-    const now = new Date();
+    const now = this.clock();
     await tx
       .delete(matchTeamAssignments)
       .where(eq(matchTeamAssignments.participantId, id));
@@ -1116,13 +1170,30 @@ export class MatchService {
       changedAt: string;
     } | null = null,
   ) {
-    const [counts] = await this.database
-      .select({
-        confirmed: sql<number>`count(*) filter (where ${matchParticipants.status} = 'CONFIRMED')::int`,
-        waitlisted: sql<number>`count(*) filter (where ${matchParticipants.status} = 'WAITLISTED')::int`,
-      })
-      .from(matchParticipants)
-      .where(eq(matchParticipants.matchId, match.id));
+    const [[counts], [phaseContext]] = await Promise.all([
+      this.database
+        .select({
+          confirmed: sql<number>`count(*) filter (where ${matchParticipants.status} = 'CONFIRMED')::int`,
+          waitlisted: sql<number>`count(*) filter (where ${matchParticipants.status} = 'WAITLISTED')::int`,
+        })
+        .from(matchParticipants)
+        .where(eq(matchParticipants.matchId, match.id)),
+      this.database
+        .select({
+          resultConfirmedAt: matchSportingResults.confirmedAt,
+          votingStatus: votingSessions.status,
+          votingOpenedAt: votingSessions.openedAt,
+          votingClosesAt: votingSessions.closesAt,
+        })
+        .from(matches)
+        .leftJoin(
+          matchSportingResults,
+          eq(matchSportingResults.matchId, matches.id),
+        )
+        .leftJoin(votingSessions, eq(votingSessions.matchId, matches.id))
+        .where(eq(matches.id, match.id))
+        .limit(1),
+    ]);
     const confirmedCount = counts?.confirmed ?? 0;
     const recruitment = await this.recruitment.modelForMatch(
       match,
@@ -1143,7 +1214,7 @@ export class MatchService {
           .limit(1)
       : [];
     return {
-      ...this.baseSummary(match),
+      ...this.baseSummary(match, phaseContext),
       confirmedCount,
       waitlistCount: counts?.waitlisted ?? 0,
       availableSpots: Math.max(0, match.capacity - confirmedCount),
@@ -1175,12 +1246,38 @@ export class MatchService {
     };
   }
 
-  private baseSummary(match: MatchRow) {
+  private baseSummary(
+    match: MatchRow,
+    phaseContext?: {
+      resultConfirmedAt: Date | null;
+      votingStatus: "OPEN" | "CLOSED" | null;
+      votingOpenedAt: Date | null;
+      votingClosesAt: Date | null;
+    },
+  ) {
+    const voting =
+      phaseContext?.votingStatus &&
+      phaseContext.votingOpenedAt &&
+      phaseContext.votingClosesAt
+        ? {
+            status: phaseContext.votingStatus,
+            opensAt: phaseContext.votingOpenedAt,
+            closesAt: phaseContext.votingClosesAt,
+          }
+        : null;
     return {
       id: match.id,
       groupId: match.groupId,
       discipline: match.discipline,
       status: match.status,
+      effectivePhase: effectiveMatchPhase(
+        {
+          ...match,
+          resultConfirmedAt: phaseContext?.resultConfirmedAt ?? null,
+          voting,
+        },
+        this.clock(),
+      ),
       scheduledAt: match.scheduledAt.toISOString(),
       durationMinutes: match.durationMinutes,
       capacity: match.capacity,
@@ -1209,14 +1306,34 @@ export class MatchService {
     participationStatus: "CONFIRMED" | "WAITLISTED" | null;
     waitlistPosition: number | null;
     resultStatus: "DRAFT" | "CONFIRMED" | "NOT_PLAYED" | null;
+    resultConfirmedAt: Date | null;
     teamAGoals: number | null;
     teamBGoals: number | null;
+    votingStatus: "OPEN" | "CLOSED" | null;
+    votingOpenedAt: Date | null;
+    votingClosesAt: Date | null;
   }) {
+    const voting =
+      row.votingStatus && row.votingOpenedAt && row.votingClosesAt
+        ? {
+            status: row.votingStatus,
+            opensAt: row.votingOpenedAt,
+            closesAt: row.votingClosesAt,
+          }
+        : null;
     return {
       id: row.match.id,
       group: { id: row.groupId, name: row.groupName },
       discipline: row.match.discipline,
       status: row.match.status,
+      effectivePhase: effectiveMatchPhase(
+        {
+          ...row.match,
+          resultConfirmedAt: row.resultConfirmedAt,
+          voting,
+        },
+        this.clock(),
+      ),
       scheduledAt: row.match.scheduledAt.toISOString(),
       durationMinutes: row.match.durationMinutes,
       capacity: row.match.capacity,
@@ -1438,6 +1555,12 @@ export class MatchService {
       throw new ApplicationError("roster_locked", "Roster is locked", 409);
     if (match.status !== "OPEN")
       throw new ApplicationError("match_not_open", "Match is not open", 409);
+    if (!matchAcceptsRegistration(match, this.clock()))
+      throw new ApplicationError(
+        "match_registration_closed",
+        "The registration window has closed",
+        409,
+      );
   }
 
   private invalidTransition(): never {

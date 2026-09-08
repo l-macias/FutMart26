@@ -1224,6 +1224,16 @@ export const matchStatusSchema = z.enum([
   "FINISHED",
   "CANCELLED",
 ]);
+export const effectiveMatchPhaseSchema = z.enum([
+  "DRAFT",
+  "OPEN",
+  "IN_PROGRESS",
+  "AWAITING_RESULT",
+  "VOTING_OPEN",
+  "FINISHED",
+  "CANCELLED",
+]);
+export type EffectiveMatchPhase = z.infer<typeof effectiveMatchPhaseSchema>;
 export const matchParticipantStatusSchema = z.enum([
   "CONFIRMED",
   "WAITLISTED",
@@ -1396,6 +1406,7 @@ export const matchSchema = z.object({
   groupId: idSchema,
   discipline: matchDisciplineSchema,
   status: matchStatusSchema,
+  effectivePhase: effectiveMatchPhaseSchema,
   scheduledAt: z.iso.datetime(),
   durationMinutes: z.number().int(),
   capacity: z.number().int(),
@@ -1423,7 +1434,9 @@ export const matchSchema = z.object({
 export const groupOverviewMatchSchema = z.object({
   id: idSchema,
   status: matchStatusSchema,
+  effectivePhase: effectiveMatchPhaseSchema,
   scheduledAt: z.iso.datetime(),
+  durationMinutes: z.number().int().positive(),
   locationText: z.string(),
   capacity: z.number().int().positive(),
   confirmedCount: z.number().int().nonnegative(),
@@ -1452,6 +1465,7 @@ export const personalMatchSchema = z.object({
   group: z.object({ id: idSchema, name: z.string() }),
   discipline: matchDisciplineSchema,
   status: matchStatusSchema,
+  effectivePhase: effectiveMatchPhaseSchema,
   scheduledAt: z.iso.datetime(),
   durationMinutes: z.number().int().positive(),
   capacity: z.number().int().positive(),

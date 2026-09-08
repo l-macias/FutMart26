@@ -19,6 +19,7 @@ import { ApplicationError } from "../errors.js";
 import { hasGroupCapability } from "../groups/capabilities.js";
 import { encodeCityRankingKey } from "../venues/venue-city-key.js";
 import { presentVenueGeography } from "../venues/venue-geography-key.js";
+import { matchAcceptsRegistration } from "./match-effective-phase.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type MatchRow = typeof matches.$inferSelect;
@@ -36,7 +37,10 @@ const cursorSchema = z
   .strict();
 
 export class MatchRecruitmentService {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async replace(
     actorPlayerId: string,
@@ -59,6 +63,15 @@ export class MatchRecruitmentService {
         throw new ApplicationError(
           "match_not_open",
           "Recruitment is locked",
+          409,
+        );
+      if (
+        match.status === "OPEN" &&
+        !matchAcceptsRegistration(match, this.clock())
+      )
+        throw new ApplicationError(
+          "match_registration_closed",
+          "The registration window has closed",
           409,
         );
       const roles = new Set(input.needs.map((need) => need.role));
@@ -153,6 +166,7 @@ export class MatchRecruitmentService {
           eq(groups.status, "ACTIVE"),
           eq(matches.discipline, "F5"),
           eq(matches.status, "OPEN"),
+          gt(matches.scheduledAt, this.clock()),
           eq(matches.recruitmentEnabled, true),
           sql`${matches.capacity} > ${confirmedSql}`,
           sql`not exists (
@@ -231,7 +245,7 @@ export class MatchRecruitmentService {
     return {
       enabled,
       effectiveStatus:
-        !enabled || match.status !== "OPEN"
+        !enabled || !matchAcceptsRegistration(match, this.clock())
           ? ("CLOSED" as const)
           : openSpots === 0
             ? ("FULL" as const)

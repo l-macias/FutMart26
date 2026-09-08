@@ -229,8 +229,8 @@ function MatchRows({ matches }: Readonly<{ matches: PersonalMatch[] }>) {
                 {match.result.teamAGoals} — {match.result.teamBGoals}
               </span>
             ) : (
-              <MatchStateMark tone={statusTone(match.status)}>
-                {statusLabel(match.status)}
+              <MatchStateMark tone={statusTone(match.effectivePhase)}>
+                {statusLabel(match.effectivePhase)}
               </MatchStateMark>
             )}
           </Link>
@@ -254,14 +254,22 @@ function participationLabel(status: "CONFIRMED" | "WAITLISTED") {
   return status === "CONFIRMED" ? "Estás anotado" : "Lista de espera";
 }
 
-function statusLabel(status: PersonalMatch["status"]) {
+function statusLabel(status: PersonalMatch["effectivePhase"]) {
   if (status === "OPEN") return "Convocatoria";
-  if (status === "STARTED") return "En juego";
+  if (status === "IN_PROGRESS") return "En juego";
+  if (status === "AWAITING_RESULT") return "Esperando resultado";
+  if (status === "VOTING_OPEN") return "Votación abierta";
   if (status === "FINISHED") return "Finalizado";
   if (status === "CANCELLED") return "Cancelado";
   return "Borrador";
 }
 
-function statusTone(status: PersonalMatch["status"]): "positive" | "warning" {
-  return status === "CANCELLED" || status === "DRAFT" ? "warning" : "positive";
+function statusTone(
+  status: PersonalMatch["effectivePhase"],
+): "positive" | "warning" {
+  return status === "CANCELLED" ||
+    status === "DRAFT" ||
+    status === "AWAITING_RESULT"
+    ? "warning"
+    : "positive";
 }

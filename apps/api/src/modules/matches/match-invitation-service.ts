@@ -15,11 +15,15 @@ import {
 
 import { ApplicationError } from "../errors.js";
 import { hasGroupCapability } from "../groups/capabilities.js";
+import { matchAcceptsRegistration } from "./match-effective-phase.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export class MatchInvitationService {
-  constructor(private readonly database: Database) {}
+  constructor(
+    private readonly database: Database,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async create(
     actorPlayerId: string,
@@ -33,8 +37,14 @@ export class MatchInvitationService {
         422,
       );
     const match = await this.requireManager(actorPlayerId, matchId);
-    if (match.status !== "OPEN" || match.rosterLockedAt)
+    if (match.rosterLockedAt || match.status !== "OPEN")
       throw new ApplicationError("match_not_open", "Match is not open", 409);
+    if (!matchAcceptsRegistration(match, this.clock()))
+      throw new ApplicationError(
+        "match_registration_closed",
+        "The registration window has closed",
+        409,
+      );
     await this.requireConnection(actorPlayerId, invitedPlayerId);
     const [membership] = await this.database
       .select({ id: groupMemberships.id })

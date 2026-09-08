@@ -14,6 +14,7 @@ void test("Home read model is bounded and keeps optional sections isolated", asy
     },
     discipline: "F5" as const,
     status: "STARTED" as const,
+    effectivePhase: "IN_PROGRESS" as const,
     scheduledAt: new Date().toISOString(),
     durationMinutes: 60,
     capacity: 10,

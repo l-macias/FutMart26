@@ -549,7 +549,9 @@ async function seedMatches(membershipsByGroup) {
       ? atDays(index + 1, index % 4)
       : status === "FINISHED"
         ? atDays(index - 42, index % 4)
-        : atDays(-1, index % 3);
+        : status === "STARTED" && index === 11
+          ? new Date(now.getTime() - 30 * 60_000)
+          : atDays(-1, index % 3);
     const locked = ["STARTED", "FINISHED"].includes(status);
     return {
       id: matchIds[index],
@@ -1063,11 +1065,15 @@ async function validateAndSummarize() {
     await sql`select visibility from groups where id = ${groupIds[3]}`;
   const [progressionDiscontinuities] = await sql`
     with ordered as (
-      select player_id, before_ovr,
-        lag(after_ovr) over (partition by player_id order by processed_at, match_id) as previous_after
-      from progression_snapshots
-      where player_id = any(${[playerIds[0], playerIds[2]]})
-        and discipline = 'F5'
+      select snapshot.player_id, snapshot.before_ovr,
+        lag(snapshot.after_ovr) over (
+          partition by snapshot.player_id
+          order by match.scheduled_at, match.id
+        ) as previous_after
+      from progression_snapshots snapshot
+      join matches match on match.id = snapshot.match_id
+      where snapshot.player_id = any(${[playerIds[0], playerIds[2]]})
+        and snapshot.discipline = 'F5'
     )
     select count(*)::int as count
     from ordered

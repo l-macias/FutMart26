@@ -109,7 +109,7 @@ export function ProgressionRevealScreen({
       VOTING_NOT_STARTED: "La votación todavía no comenzó.",
       CLOSURE_INCOMPLETE: "El cierre deportivo todavía no está completo.",
       EARLIER_MATCH_PENDING:
-        "Primero debe procesarse un partido anterior para conservar tu historia.",
+        "La progresión está pendiente porque todavía no terminó la evaluación de un partido anterior.",
       READY_TO_MATERIALIZE: "Preparando tu progreso…",
     }[data.reason];
     return <RevealState title={copy} />;

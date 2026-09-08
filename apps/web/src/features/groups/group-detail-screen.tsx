@@ -380,7 +380,9 @@ function NextMatch({
       aria-labelledby="next-match-title"
     >
       <Text tone="accent" variant="label">
-        PRÓXIMO PARTIDO
+        {match?.effectivePhase === "IN_PROGRESS"
+          ? "EN JUEGO"
+          : "PRÓXIMO PARTIDO"}
       </Text>
       {match ? (
         <>
@@ -463,7 +465,9 @@ function MatchRow({ match }: Readonly<{ match: MatchPreview }>) {
       </span>
       <span className="ui-row__content">
         <strong className="ui-row__primary">{match.locationText}</strong>
-        <small className="ui-row__secondary">{statusLabel(match.status)}</small>
+        <small className="ui-row__secondary">
+          {statusLabel(match.effectivePhase)}
+        </small>
       </span>
       <strong className="ui-row__metric">
         {match.result
@@ -492,11 +496,13 @@ function roleLabel(role: "OWNER" | "MODERATOR" | "MEMBER") {
   return "MIEMBRO";
 }
 
-function statusLabel(status: MatchPreview["status"]) {
+function statusLabel(status: MatchPreview["effectivePhase"]) {
   const labels = {
     DRAFT: "BORRADOR",
     OPEN: "ABIERTO",
-    STARTED: "EN JUEGO",
+    IN_PROGRESS: "EN JUEGO",
+    AWAITING_RESULT: "ESPERANDO RESULTADO",
+    VOTING_OPEN: "VOTACIÓN ABIERTA",
     FINISHED: "FINALIZADO",
     CANCELLED: "CANCELADO",
   } as const;

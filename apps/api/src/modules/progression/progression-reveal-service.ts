@@ -150,7 +150,8 @@ export class ProgressionRevealService {
     } catch (error) {
       if (
         error instanceof ApplicationError &&
-        error.code === "progression_out_of_order"
+        (error.code === "progression_chain_blocked" ||
+          error.code === "progression_out_of_order")
       )
         return {
           ...current,

@@ -20,7 +20,9 @@ export function CompactMatch({ match }: Readonly<{ match: PersonalMatch }>) {
     <Surface as="section" className={styles.match} elevation="feature">
       <div className={styles.topline}>
         <Text as="span" tone="accent" variant="label">
-          {match.status === "STARTED" ? "EN JUEGO" : "PRÓXIMO PARTIDO"}
+          {match.effectivePhase === "IN_PROGRESS"
+            ? "EN JUEGO"
+            : "PRÓXIMO PARTIDO"}
         </Text>
         {match.participation ? (
           <MatchStateMark

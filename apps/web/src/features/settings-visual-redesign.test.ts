@@ -44,7 +44,8 @@ void test("Group Settings presents progressive sections as rows and keeps risk e
 });
 
 void test("Match Management keeps lifecycle tools compact and cancellation dangerous", () => {
-  assert.match(match, /ADMINISTRAR PARTIDO · EN JUEGO/);
+  assert.match(match, /ADMINISTRAR PARTIDO ·\{" "\}/);
+  assert.match(match, /awaitingResult \? "ESPERANDO RESULTADO" : "EN JUEGO"/);
   assert.match(match, /ADMINISTRAR PARTIDO · FINALIZADO/);
   assert.match(match, /title="ZONA DE RIESGO"/);
   assert.match(match, /tone="danger"/);

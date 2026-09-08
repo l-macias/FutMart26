@@ -8,17 +8,18 @@ export type MatchInformationArchitecture = {
 };
 
 export function matchInformationArchitecture(
-  status: "DRAFT" | "OPEN" | "STARTED" | "FINISHED" | "CANCELLED",
+  phase: EffectiveMatchPhase,
   canUseOrganizerTools: boolean,
 ): MatchInformationArchitecture {
   return {
-    showAdmission: status === "DRAFT" || status === "OPEN",
-    showOperationalRoster: status === "OPEN",
-    showRecruitment: status === "DRAFT" || status === "OPEN",
-    showStartedTeams: status === "STARTED",
-    showFinishedSummary: status === "FINISHED",
+    showAdmission: phase === "DRAFT" || phase === "OPEN",
+    showOperationalRoster: phase === "OPEN",
+    showRecruitment: phase === "DRAFT" || phase === "OPEN",
+    showStartedTeams: phase === "IN_PROGRESS" || phase === "AWAITING_RESULT",
+    showFinishedSummary: phase === "VOTING_OPEN" || phase === "FINISHED",
     showOrganizerTools:
       canUseOrganizerTools &&
-      (status === "DRAFT" || status === "OPEN" || status === "STARTED"),
+      ["DRAFT", "OPEN", "IN_PROGRESS", "AWAITING_RESULT"].includes(phase),
   };
 }
+import type { EffectiveMatchPhase } from "@football/contracts";

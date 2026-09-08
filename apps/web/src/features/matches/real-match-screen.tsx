@@ -28,7 +28,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     ...queryPolicy.volatile,
     queryKey: queryKeys.roster(matchId),
     queryFn: () => api.roster(matchId),
-    refetchInterval: match.data?.status === "OPEN" ? 30_000 : false,
+    refetchInterval: match.data?.effectivePhase === "OPEN" ? 30_000 : false,
   });
   const teams = useQuery({
     ...queryPolicy.volatile,
@@ -80,7 +80,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     queryFn: () => api.groupGuests(groupId!),
     enabled:
       Boolean(groupId) &&
-      match.data?.status === "OPEN" &&
+      match.data?.effectivePhase === "OPEN" &&
       Boolean(match.data.canManage || match.data.canManageGuests),
   });
   const policy = useQuery({
@@ -88,7 +88,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     queryFn: () => api.guestPolicy(groupId!),
     enabled:
       Boolean(groupId) &&
-      match.data?.status === "OPEN" &&
+      match.data?.effectivePhase === "OPEN" &&
       Boolean(match.data.canManage || match.data.canManageGuests),
   });
   const preferences = useQuery({
@@ -96,7 +96,8 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     queryFn: api.preferences,
     enabled:
       Boolean(match.data?.canManage) &&
-      (match.data?.status === "DRAFT" || match.data?.status === "OPEN"),
+      (match.data?.effectivePhase === "DRAFT" ||
+        match.data?.effectivePhase === "OPEN"),
   });
   const [guestId, setGuestId] = useState("");
   const [newGuestName, setNewGuestName] = useState("");
@@ -272,8 +273,8 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     );
 
   const current = roster.data.currentParticipation;
-  const canJoin = match.data.status === "OPEN" && !current;
-  const isOpen = match.data.status === "OPEN";
+  const canJoin = match.data.effectivePhase === "OPEN" && !current;
+  const isOpen = match.data.effectivePhase === "OPEN";
   const date = new Date(match.data.scheduledAt);
   const location = [
     match.data.venue?.displayName ?? match.data.locationText,
@@ -283,11 +284,11 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     .filter(Boolean)
     .join(" · ");
   const composition = matchInformationArchitecture(
-    match.data.status,
+    match.data.effectivePhase,
     match.data.canManage || match.data.canManageGuests || match.data.canClose,
   );
 
-  if (match.data.status === "FINISHED")
+  if (composition.showFinishedSummary)
     return (
       <FinishedMatchView
         finalRoster={finalRoster.data}
@@ -306,9 +307,12 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     return (
       <StartedMatchView
         canClose={match.data.canClose}
+        canManage={match.data.canManage}
+        effectivePhase={match.data.effectivePhase}
         groupId={match.data.groupId}
         location={location}
         matchId={matchId}
+        persistedStatus={match.data.status}
         scheduledAt={match.data.scheduledAt}
         teams={teams.data}
         teamsError={teams.isError}
@@ -316,7 +320,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
       />
     );
 
-  if (match.data.status === "CANCELLED")
+  if (match.data.effectivePhase === "CANCELLED")
     return (
       <CancelledMatchView
         groupId={match.data.groupId}
@@ -666,23 +670,31 @@ type ProgressionRead = Awaited<ReturnType<typeof api.progressionReveal>>;
 
 function StartedMatchView({
   canClose,
+  canManage,
+  effectivePhase,
   groupId,
   location,
   matchId,
+  persistedStatus,
   scheduledAt,
   teams,
   teamsError,
   teamsPending,
 }: Readonly<{
   canClose: boolean;
+  canManage: boolean;
+  effectivePhase: MatchRead["effectivePhase"];
   groupId: string;
   location: string;
   matchId: string;
+  persistedStatus: MatchRead["status"];
   scheduledAt: string;
   teams?: TeamsRead;
   teamsError: boolean;
   teamsPending: boolean;
 }>) {
+  const awaitingResult = effectivePhase === "AWAITING_RESULT";
+  const canLoadClosure = persistedStatus === "STARTED" && canClose;
   return (
     <main className={styles.page}>
       <Link className={styles.back} href={`/groups/${groupId}`}>
@@ -691,7 +703,9 @@ function StartedMatchView({
       <header className={`${styles.matchHero} ${styles.startedHero}`}>
         <div>
           <div className={styles.heroState}>
-            <MatchStateMark tone="positive">EN JUEGO</MatchStateMark>
+            <MatchStateMark tone={awaitingResult ? "warning" : "positive"}>
+              {awaitingResult ? "ESPERANDO RESULTADO" : "EN JUEGO"}
+            </MatchStateMark>
             <span>F5</span>
           </div>
           <Text as="h1" variant="display-lg">
@@ -728,42 +742,61 @@ function StartedMatchView({
       ) : (
         <p className={styles.muted}>Los equipos no están disponibles.</p>
       )}
-      {canClose && (
+      {(canLoadClosure || canManage) && (
         <details className={styles.organizerTools}>
           <summary>
-            <span>ADMINISTRAR PARTIDO · EN JUEGO</span>
+            <span>
+              ADMINISTRAR PARTIDO ·{" "}
+              {awaitingResult ? "ESPERANDO RESULTADO" : "EN JUEGO"}
+            </span>
           </summary>
           <div className={styles.organizerContent}>
-            <ManagementSection
-              description="Marcá quién jugó y quién no se presentó."
-              title="ASISTENCIA"
-            >
-              <Text tone="muted">
-                Se completa junto con el cierre deportivo.
-              </Text>
-            </ManagementSection>
-            <ManagementSection
-              description="Cargá resultado, goles y asistencias antes de finalizar."
-              title="RESULTADO Y EVENTOS"
-            >
-              <Link
-                className="ui-button ui-button--secondary"
-                href={`/play/matches/${matchId}/close`}
+            {canLoadClosure ? (
+              <>
+                <ManagementSection
+                  description="Marcá quién jugó y quién no se presentó."
+                  title="ASISTENCIA"
+                >
+                  <Text tone="muted">
+                    Se completa junto con el cierre deportivo.
+                  </Text>
+                </ManagementSection>
+                <ManagementSection
+                  description="Cargá resultado, goles y asistencias antes de finalizar."
+                  title="RESULTADO Y EVENTOS"
+                >
+                  <Link
+                    className="ui-button ui-button--secondary"
+                    href={`/play/matches/${matchId}/close`}
+                  >
+                    Cargar cierre
+                  </Link>
+                </ManagementSection>
+                <ManagementSection
+                  description="Revisá la planilla y confirmá el final del partido."
+                  title="CIERRE"
+                >
+                  <Link
+                    className="ui-button ui-button--secondary"
+                    href={`/play/matches/${matchId}/close`}
+                  >
+                    Revisar y finalizar
+                  </Link>
+                </ManagementSection>
+              </>
+            ) : (
+              <ManagementSection
+                description="Confirmá los equipos e iniciá el partido antes de cargar el resultado."
+                title="PREPARAR CIERRE"
               >
-                Cargar cierre
-              </Link>
-            </ManagementSection>
-            <ManagementSection
-              description="Revisá la planilla y confirmá el final del partido."
-              title="CIERRE"
-            >
-              <Link
-                className="ui-button ui-button--secondary"
-                href={`/play/matches/${matchId}/close`}
-              >
-                Revisar y finalizar
-              </Link>
-            </ManagementSection>
+                <Link
+                  className="ui-button ui-button--secondary"
+                  href={`/play/matches/${matchId}/teams`}
+                >
+                  Revisar equipos
+                </Link>
+              </ManagementSection>
+            )}
           </div>
         </details>
       )}

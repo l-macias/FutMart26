@@ -14,6 +14,7 @@ import {
   playerPerformances,
   progressionConfigVersions,
   progressionSnapshots,
+  votingSessions,
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
@@ -553,7 +554,7 @@ void test(
       (error) => hasDatabaseCode(error, "23505"),
     );
 
-    // Distinct Matches for the same Players serialize and preserve historical order.
+    // Requesting a later Match processes eligible predecessors chronologically.
     const ordered = await groupWithMembers("ordered", 1);
     const early = await completedMatch(
       ordered.owner.id,
@@ -561,25 +562,31 @@ void test(
       [ordered.owner.id, ordered.members[0]!.id],
       new Date("2027-04-01T10:00:00.000Z"),
     );
-    const late = await completedMatch(
+    const middle = await completedMatch(
       ordered.owner.id,
       ordered.group.id,
       [ordered.owner.id, ordered.members[0]!.id],
       new Date("2027-04-02T10:00:00.000Z"),
     );
+    const late = await completedMatch(
+      ordered.owner.id,
+      ordered.group.id,
+      [ordered.owner.id, ordered.members[0]!.id],
+      new Date("2027-04-03T10:00:00.000Z"),
+    );
     const earlySession = await voting.open(ordered.owner.id, early.match.id);
     now = earlySession.closesAt;
     await voting.get(ordered.owner.id, early.match.id);
+    const middleSession = await voting.open(ordered.owner.id, middle.match.id);
+    now = middleSession.closesAt;
+    await voting.get(ordered.owner.id, middle.match.id);
     const lateSession = await voting.open(ordered.owner.id, late.match.id);
     now = lateSession.closesAt;
     const race = await Promise.allSettled([
       progression.processMatch(early.match.id),
       progression.processMatch(late.match.id),
     ]);
-    assert.ok(race.some((result) => result.status === "fulfilled"));
-    if (race[1].status === "rejected")
-      assert.ok(hasCode("progression_out_of_order")(race[1].reason));
-    await progression.processMatch(early.match.id);
+    assert.ok(race.every((result) => result.status === "fulfilled"));
     const historicalBeforeLater = await reveals.get(
       ordered.owner.id,
       early.match.id,
@@ -598,10 +605,40 @@ void test(
           eq(playerPerformances.discipline, "F5"),
         ),
       );
-    assert.equal(orderedPerformance[0]?.processedMatchCount, 2);
+    assert.equal(orderedPerformance[0]?.processedMatchCount, 3);
     assert.equal(orderedPerformance[0]?.lastProcessedMatchId, late.match.id);
+    const orderedSnapshots = await connection.db
+      .select()
+      .from(progressionSnapshots)
+      .where(eq(progressionSnapshots.playerId, ordered.owner.id));
+    assert.equal(
+      orderedSnapshots.find((row) => row.matchId === early.match.id)
+        ?.processingOutcome,
+      "NO_EVIDENCE",
+    );
+    assert.equal(
+      orderedSnapshots.find((row) => row.matchId === early.match.id)?.beforeOvr,
+      orderedSnapshots.find((row) => row.matchId === early.match.id)?.afterOvr,
+    );
+    assert.equal(
+      orderedSnapshots.filter((row) =>
+        [early.match.id, middle.match.id, late.match.id].includes(row.matchId),
+      ).length,
+      3,
+    );
+    const earlySnapshot = orderedSnapshots.find(
+      (row) => row.matchId === early.match.id,
+    );
+    const middleSnapshot = orderedSnapshots.find(
+      (row) => row.matchId === middle.match.id,
+    );
+    const lateSnapshot = orderedSnapshots.find(
+      (row) => row.matchId === late.match.id,
+    );
+    assert.equal(earlySnapshot?.afterOvr, middleSnapshot?.beforeOvr);
+    assert.equal(middleSnapshot?.afterOvr, lateSnapshot?.beforeOvr);
 
-    // A failure on a later Player rolls back earlier snapshots and provisioning.
+    // A genuinely ineligible predecessor blocks the chain and rolls everything back.
     const rollback = await groupWithMembers("rollback", 2);
     const sorted = [...rollback.members].sort((a, b) =>
       a.id.localeCompare(b.id),
@@ -629,12 +666,21 @@ void test(
       current.match.id,
     );
     now = currentSession.closesAt;
+    await connection.db
+      .update(votingSessions)
+      .set({
+        status: "OPEN",
+        closesAt: new Date(now.getTime() + 60 * 60 * 1000),
+        closedAt: null,
+        closeReason: null,
+      })
+      .where(eq(votingSessions.matchId, priorForSecond.match.id));
     await assert.rejects(
       () => progression.processMatch(current.match.id),
-      hasCode("progression_out_of_order"),
+      hasCode("progression_chain_blocked"),
     );
     const orderedPending = await reveals.materialize(
-      sorted[0]!.id,
+      sorted[1]!.id,
       current.match.id,
     );
     assert.equal(orderedPending.status, "PROGRESSION_PENDING");

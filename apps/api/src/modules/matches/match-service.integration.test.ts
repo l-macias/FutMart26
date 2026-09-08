@@ -752,3 +752,99 @@ void test(
     await connection.close();
   },
 );
+
+void test(
+  "Match temporal boundaries close registration and move expired Matches to history",
+  { skip: !safeTestDatabaseUrl },
+  async () => {
+    const connection = createDatabase(safeTestDatabaseUrl!);
+    await migrate(connection.db, {
+      migrationsFolder: path.resolve(
+        process.cwd(),
+        "../../packages/database/drizzle",
+      ),
+    });
+    let now = new Date("2030-09-01T19:59:59.000Z");
+    const service = new MatchService(connection.db, undefined, () => now);
+    const playerService = new PlayerService(connection.db);
+    const groupService = new GroupService(connection.db);
+
+    async function seedPlayer(displayName: string) {
+      const authUserId = randomUUID();
+      await connection.db.insert(authUser).values({
+        id: authUserId,
+        email: `${authUserId}@temporal-matches.test`,
+        name: displayName,
+      });
+      return playerService.provision(authUserId, displayName);
+    }
+
+    const owner = await seedPlayer("Temporal owner");
+    const member = await seedPlayer("Temporal member");
+    const group = await groupService.create(owner.id, "Temporal lifecycle");
+    await connection.db.insert(groupMemberships).values({
+      id: randomUUID(),
+      groupId: group.id,
+      playerId: member.id,
+      role: "MEMBER",
+      capabilities: [],
+    });
+    const match = await service.create(owner.id, group.id, {
+      discipline: "F5",
+      scheduledAt: new Date("2030-09-01T20:00:00.000Z"),
+      durationMinutes: 60,
+      capacity: 10,
+      locationText: "Cancha temporal",
+    });
+    await service.publish(owner.id, match.id);
+    await service.join(owner.id, match.id);
+    assert.equal(
+      (await service.get(owner.id, match.id)).effectivePhase,
+      "OPEN",
+    );
+
+    now = new Date("2030-09-01T20:00:00.000Z");
+    assert.equal(
+      (await service.get(owner.id, match.id)).effectivePhase,
+      "IN_PROGRESS",
+    );
+    await assert.rejects(
+      () => service.join(member.id, match.id),
+      (error) =>
+        error instanceof ApplicationError &&
+        error.code === "match_registration_closed",
+    );
+    await assert.rejects(
+      () => service.leave(owner.id, match.id),
+      (error) =>
+        error instanceof ApplicationError &&
+        error.code === "match_registration_closed",
+    );
+    assert.equal(
+      (
+        await service.listForPlayer(owner.id, {
+          upcomingLimit: 5,
+          historyLimit: 5,
+        })
+      ).current?.effectivePhase,
+      "IN_PROGRESS",
+    );
+
+    now = new Date("2030-09-01T21:00:00.000Z");
+    const personal = await service.listForPlayer(owner.id, {
+      upcomingLimit: 5,
+      historyLimit: 5,
+    });
+    assert.equal(personal.current, null);
+    assert.equal(
+      personal.history.find((item) => item.id === match.id)?.effectivePhase,
+      "AWAITING_RESULT",
+    );
+    assert.equal(
+      (await service.get(owner.id, match.id)).effectivePhase,
+      "AWAITING_RESULT",
+    );
+
+    await connection.close();
+  },
+);

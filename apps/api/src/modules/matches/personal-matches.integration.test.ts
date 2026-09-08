@@ -71,7 +71,7 @@ void test(
       await matches.publish(player.id, unrelated.id);
       const cancelled = await matches.create(player.id, second.id, {
         discipline: "F5",
-        scheduledAt: new Date(Date.now() - 86_400_000),
+        scheduledAt: new Date(Date.now() + 4 * 86_400_000),
         durationMinutes: 50,
         capacity: 9,
         locationText: "Past pitch",

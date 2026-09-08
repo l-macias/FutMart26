@@ -86,93 +86,78 @@ export class ProgressionService {
       const results = [];
       for (const participant of participants) {
         if (!participant.playerId) continue;
+        const existingBeforeLock = await this.snapshot(
+          tx,
+          participant.playerId,
+          matchId,
+          match.discipline,
+        );
+        if (existingBeforeLock) {
+          results.push(existingBeforeLock);
+          continue;
+        }
+        const predecessors = await this.pendingPredecessors(
+          tx,
+          participant.playerId,
+          matchId,
+          match.scheduledAt,
+          match.discipline,
+        );
+        for (const predecessor of predecessors) {
+          try {
+            await this.requireEffectivelyClosedVoting(
+              tx,
+              predecessor.match,
+              processedAt,
+            );
+          } catch (error) {
+            if (
+              error instanceof ApplicationError &&
+              error.code === "progression_not_ready"
+            )
+              throw new ApplicationError(
+                "progression_chain_blocked",
+                "An earlier Match is not ready for progression",
+                409,
+              );
+            throw error;
+          }
+        }
         await this.provisionAndLockPerformance(
           tx,
           participant.playerId,
           match.discipline,
         );
-        const existing = await this.snapshot(
+        const existingAfterLock = await this.snapshot(
           tx,
           participant.playerId,
           matchId,
           match.discipline,
         );
-        if (existing) {
-          results.push(existing);
+        if (existingAfterLock) {
+          results.push(existingAfterLock);
           continue;
         }
-        await this.assertHistoricalOrder(
+        for (const predecessor of predecessors) {
+          await this.processPlayerMatch(
+            tx,
+            predecessor.match,
+            predecessor.participantId,
+            participant.playerId,
+            config,
+            configRow.id,
+            processedAt,
+          );
+        }
+        const snapshot = await this.processPlayerMatch(
           tx,
-          participant.playerId,
-          matchId,
-          match.scheduledAt,
-          processedAt,
-        );
-        const performance = await this.performance(
-          tx,
-          participant.playerId,
-          match.discipline,
-        );
-        const evidence = await this.evidence(
-          tx,
-          matchId,
+          match,
           participant.participantId,
           participant.playerId,
-        );
-        const calculation = calculateProgression(
-          this.stateFromPerformance(performance),
-          evidence,
           config,
-        );
-        const snapshot = {
-          id: randomUUID(),
-          playerId: participant.playerId,
-          matchId,
-          discipline: match.discipline,
-          beforeAttributes: calculation.beforeAttributes,
-          afterAttributes: calculation.afterAttributes,
-          attributeDeltas: calculation.attributeDeltas,
-          beforeOvr: calculation.beforeOvr,
-          afterOvr: calculation.afterOvr,
-          ovrDelta: calculation.ovrDelta,
-          evaluationsReceived: calculation.evaluationsReceived,
-          eligibleEvaluatorsForTarget: calculation.eligibleEvaluatorsForTarget,
-          aggregatedRating: calculation.aggregatedRating,
-          participationRatio: calculation.participationRatio,
-          confidenceMultiplier: calculation.confidenceMultiplier,
-          rawPerformanceSignal: calculation.rawPerformanceSignal,
-          effectivePerformanceSignal: calculation.effectivePerformanceSignal,
-          streakBefore: calculation.streakBefore,
-          streakAfter: calculation.streakAfter,
-          streakMultiplier: calculation.streakMultiplier,
-          progressionBudget: calculation.progressionBudget,
-          baseDistribution: calculation.baseDistribution,
-          tagCoverage: calculation.tagCoverage,
-          tagDistribution: calculation.tagDistribution,
-          finalDistribution: calculation.finalDistribution,
-          configVersionId: configRow.id,
-          processingOutcome: calculation.processingOutcome,
+          configRow.id,
           processedAt,
-        };
-        await tx.insert(progressionSnapshots).values(snapshot);
-        await tx
-          .update(playerPerformances)
-          .set({
-            velocidad: calculation.afterAttributes.VELOCIDAD,
-            pase: calculation.afterAttributes.PASE,
-            regate: calculation.afterAttributes.REGATE,
-            remate: calculation.afterAttributes.REMATE,
-            defensa: calculation.afterAttributes.DEFENSA,
-            fisico: calculation.afterAttributes.FISICO,
-            internalOvr: calculation.afterOvr,
-            streakDirection: calculation.streakAfter.direction,
-            streakCount: calculation.streakAfter.count,
-            processedMatchCount: performance.processedMatchCount + 1,
-            lastProcessedMatchId: matchId,
-            lastProcessedScheduledAt: match.scheduledAt,
-            updatedAt: processedAt,
-          })
-          .where(eq(playerPerformances.id, performance.id));
+        );
         results.push(snapshot);
       }
       return results;
@@ -283,21 +268,17 @@ export class ProgressionService {
     );
   }
 
-  private async assertHistoricalOrder(
+  private pendingPredecessors(
     tx: Transaction,
     playerId: string,
     matchId: string,
     scheduledAt: Date,
-    now: Date,
+    discipline: "F5",
   ) {
-    const rows = await tx
+    return tx
       .select({
-        id: matches.id,
-        scheduledAt: matches.scheduledAt,
-        durationMinutes: matches.durationMinutes,
-        resultConfirmedAt: matchSportingResults.confirmedAt,
-        sessionStatus: votingSessions.status,
-        sessionClosesAt: votingSessions.closesAt,
+        match: matches,
+        participantId: matchParticipants.id,
       })
       .from(matches)
       .innerJoin(
@@ -310,14 +291,6 @@ export class ProgressionService {
           eq(matchParticipants.attendance, "PLAYED"),
         ),
       )
-      .innerJoin(
-        matchSportingResults,
-        and(
-          eq(matchSportingResults.matchId, matches.id),
-          eq(matchSportingResults.status, "CONFIRMED"),
-        ),
-      )
-      .leftJoin(votingSessions, eq(votingSessions.matchId, matches.id))
       .leftJoin(
         progressionSnapshots,
         and(
@@ -329,29 +302,89 @@ export class ProgressionService {
       .where(
         and(
           eq(matches.status, "FINISHED"),
+          eq(matches.discipline, discipline),
+          sql`${matches.rosterConfirmedAt} is not null`,
           sql`${progressionSnapshots.id} is null`,
           sql`${matches.id} <> ${matchId}`,
           sql`(${matches.scheduledAt} < ${scheduledAt.toISOString()}::timestamptz or (${matches.scheduledAt} = ${scheduledAt.toISOString()}::timestamptz and ${matches.id}::text < ${matchId}::text))`,
         ),
-      );
+      )
+      .orderBy(asc(matches.scheduledAt), asc(matches.id));
+  }
 
-    const hasEarlierReadyMatch = rows.some((row) => {
-      if (row.sessionStatus === "CLOSED") return true;
-      if (row.sessionClosesAt && row.sessionClosesAt <= now) return true;
-      if (!row.resultConfirmedAt) return false;
-      const opensAt = votingOpensAt(
-        row.scheduledAt,
-        row.durationMinutes,
-        row.resultConfirmedAt,
-      );
-      return votingClosesAt(opensAt) <= now;
-    });
-    if (hasEarlierReadyMatch)
-      throw new ApplicationError(
-        "progression_out_of_order",
-        "An earlier closed Match must be processed first",
-        409,
-      );
+  private async processPlayerMatch(
+    tx: Transaction,
+    match: typeof matches.$inferSelect,
+    participantId: string,
+    playerId: string,
+    config: ReturnType<typeof progressionConfigSchema.parse>,
+    configVersionId: string,
+    processedAt: Date,
+  ) {
+    const existing = await this.snapshot(
+      tx,
+      playerId,
+      match.id,
+      match.discipline,
+    );
+    if (existing) return existing;
+    const performance = await this.performance(tx, playerId, match.discipline);
+    const evidence = await this.evidence(tx, match.id, participantId, playerId);
+    const calculation = calculateProgression(
+      this.stateFromPerformance(performance),
+      evidence,
+      config,
+    );
+    const snapshot = {
+      id: randomUUID(),
+      playerId,
+      matchId: match.id,
+      discipline: match.discipline,
+      beforeAttributes: calculation.beforeAttributes,
+      afterAttributes: calculation.afterAttributes,
+      attributeDeltas: calculation.attributeDeltas,
+      beforeOvr: calculation.beforeOvr,
+      afterOvr: calculation.afterOvr,
+      ovrDelta: calculation.ovrDelta,
+      evaluationsReceived: calculation.evaluationsReceived,
+      eligibleEvaluatorsForTarget: calculation.eligibleEvaluatorsForTarget,
+      aggregatedRating: calculation.aggregatedRating,
+      participationRatio: calculation.participationRatio,
+      confidenceMultiplier: calculation.confidenceMultiplier,
+      rawPerformanceSignal: calculation.rawPerformanceSignal,
+      effectivePerformanceSignal: calculation.effectivePerformanceSignal,
+      streakBefore: calculation.streakBefore,
+      streakAfter: calculation.streakAfter,
+      streakMultiplier: calculation.streakMultiplier,
+      progressionBudget: calculation.progressionBudget,
+      baseDistribution: calculation.baseDistribution,
+      tagCoverage: calculation.tagCoverage,
+      tagDistribution: calculation.tagDistribution,
+      finalDistribution: calculation.finalDistribution,
+      configVersionId,
+      processingOutcome: calculation.processingOutcome,
+      processedAt,
+    };
+    await tx.insert(progressionSnapshots).values(snapshot);
+    await tx
+      .update(playerPerformances)
+      .set({
+        velocidad: calculation.afterAttributes.VELOCIDAD,
+        pase: calculation.afterAttributes.PASE,
+        regate: calculation.afterAttributes.REGATE,
+        remate: calculation.afterAttributes.REMATE,
+        defensa: calculation.afterAttributes.DEFENSA,
+        fisico: calculation.afterAttributes.FISICO,
+        internalOvr: calculation.afterOvr,
+        streakDirection: calculation.streakAfter.direction,
+        streakCount: calculation.streakAfter.count,
+        processedMatchCount: performance.processedMatchCount + 1,
+        lastProcessedMatchId: match.id,
+        lastProcessedScheduledAt: match.scheduledAt,
+        updatedAt: processedAt,
+      })
+      .where(eq(playerPerformances.id, performance.id));
+    return snapshot;
   }
 
   private async requireEffectivelyClosedVoting(

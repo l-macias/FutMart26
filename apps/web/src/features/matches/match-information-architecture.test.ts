@@ -16,11 +16,21 @@ void test("Match information architecture is lifecycle-specific and capability-a
   const openManager = matchInformationArchitecture("OPEN", true);
   assert.equal(openManager.showOrganizerTools, true);
 
-  const started = matchInformationArchitecture("STARTED", false);
+  const started = matchInformationArchitecture("IN_PROGRESS", false);
   assert.equal(started.showAdmission, false);
   assert.equal(started.showOperationalRoster, false);
   assert.equal(started.showRecruitment, false);
   assert.equal(started.showStartedTeams, true);
+
+  const awaiting = matchInformationArchitecture("AWAITING_RESULT", true);
+  assert.equal(awaiting.showAdmission, false);
+  assert.equal(awaiting.showRecruitment, false);
+  assert.equal(awaiting.showStartedTeams, true);
+  assert.equal(awaiting.showOrganizerTools, true);
+
+  const voting = matchInformationArchitecture("VOTING_OPEN", true);
+  assert.equal(voting.showFinishedSummary, true);
+  assert.equal(voting.showOrganizerTools, false);
 
   const finished = matchInformationArchitecture("FINISHED", true);
   assert.equal(finished.showAdmission, false);
