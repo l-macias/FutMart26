@@ -1,111 +1,110 @@
-import Link from "next/link";
-
-import { Text } from "@football/ui";
-
+import { SettingsFrame, SettingsRow } from "./settings-visual";
 import styles from "./profile-settings.module.css";
-
-const sections = [
-  {
-    eyebrow: "PERFIL",
-    title: "Identidad deportiva",
-    description: "Nombre deportivo, foto y visibilidad.",
-    links: [{ href: "/profile/edit", label: "Editar perfil" }],
-  },
-  {
-    eyebrow: "FÚTBOL F5",
-    title: "Fútbol F5",
-    description: "Roles, fortalezas y disponibilidad para atajar.",
-    links: [{ href: "/profile/preferences", label: "Preferencias de juego" }],
-  },
-  {
-    eyebrow: "CUENTA Y SEGURIDAD",
-    title: "Acceso y sesiones",
-    description: "Contraseña y dispositivos donde tu cuenta sigue abierta.",
-    links: [{ href: "/profile/account", label: "Cuenta y seguridad" }],
-  },
-] as const;
 
 export function ProfileSettingsScreen() {
   return (
-    <main className={styles.page}>
-      <Link className={styles.back} href="/profile">
-        ← MI PERFIL
-      </Link>
-      <header className={styles.header}>
-        <Text as="span" tone="accent" variant="label">
-          MI CUENTA
-        </Text>
-        <Text as="h1" variant="heading-lg">
-          Configuración
-        </Text>
-        <Text tone="muted">
-          Estos ajustes cambian cómo te mostrás o cómo accedés. Tu carrera y
-          rendimiento se mantienen separados.
-        </Text>
-      </header>
-
-      <div className={styles.sections}>
-        {sections.map((section) => (
-          <section className={styles.section} key={section.title}>
-            <div>
-              <Text as="span" tone="accent" variant="label">
-                {section.eyebrow}
-              </Text>
-              <Text as="h2" variant="heading-lg">
-                {section.title}
-              </Text>
-              <Text tone="muted">{section.description}</Text>
-            </div>
-            {section.links.map((link) => (
-              <Link
-                className="ui-button ui-button--secondary"
-                href={link.href}
-                key={link.href}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </section>
-        ))}
-        <section className={styles.section}>
-          <div>
-            <Text as="span" tone="accent" variant="label">
-              LEGAL Y PRIVACIDAD
-            </Text>
-            <Text as="h2" variant="heading-lg">
-              Políticas y soporte
-            </Text>
-            <Text tone="muted">
-              Consultá las políticas vigentes y los canales de soporte.
-            </Text>
+    <SettingsFrame
+      active="overview"
+      description="Controlá tu identidad deportiva, tus preferencias F5 y la seguridad de tu cuenta."
+      eyebrow="MI CUENTA"
+      title="Configuración"
+    >
+      <div className={styles.dashboard}>
+        <section
+          aria-labelledby="sport-settings-title"
+          className={styles.group}
+        >
+          <header className={styles.groupHeader}>
+            <span>PERFIL Y FÚTBOL F5</span>
+            <h2 id="sport-settings-title">Tu perfil en cancha</h2>
+          </header>
+          <div className={styles.rows}>
+            <SettingsRow
+              description="Nombre deportivo, foto y visibilidad."
+              href="/profile/edit"
+              mark="ID"
+              title="Perfil"
+              value="Identidad"
+            />
+            <SettingsRow
+              description="Posiciones, fortalezas y disponibilidad para atajar."
+              href="/profile/preferences"
+              mark="F5"
+              title="Fútbol F5"
+              value="Preferencias"
+            />
           </div>
-          <nav aria-label="Legal y privacidad" className={styles.links}>
-            <Link href="/terms">Términos</Link>
-            <Link href="/privacy">Privacidad</Link>
-            <Link href="/support">Soporte</Link>
+        </section>
+
+        <section
+          aria-labelledby="account-settings-title"
+          className={styles.group}
+        >
+          <header className={styles.groupHeader}>
+            <span>CUENTA Y SEGURIDAD</span>
+            <h2 id="account-settings-title">Acceso protegido</h2>
+          </header>
+          <div className={styles.rows}>
+            <SettingsRow
+              description="Contraseña y dispositivos donde tu cuenta sigue abierta."
+              href="/profile/account"
+              mark="AC"
+              title="Cuenta y seguridad"
+              value="Sesiones"
+            />
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="legal-settings-title"
+          className={styles.group}
+        >
+          <header className={styles.groupHeader}>
+            <span>LEGAL Y PRIVACIDAD</span>
+            <h2 id="legal-settings-title">Políticas y soporte</h2>
+          </header>
+          <nav aria-label="Legal y privacidad" className={styles.rows}>
+            <SettingsRow
+              description="Condiciones vigentes de uso de FIFAR."
+              href="/terms"
+              mark="TR"
+              title="Términos"
+            />
+            <SettingsRow
+              description="Cómo se usa y protege tu información."
+              href="/privacy"
+              mark="PR"
+              title="Privacidad"
+            />
+            <SettingsRow
+              description="Ayuda y canales de contacto disponibles."
+              href="/support"
+              mark="SP"
+              title="Soporte"
+            />
           </nav>
         </section>
-        <section className={`${styles.section} ${styles.danger}`}>
-          <div>
-            <Text as="span" tone="muted" variant="label">
-              ZONA DE RIESGO
-            </Text>
-            <Text as="h2" variant="heading-lg">
-              Eliminar cuenta
-            </Text>
-            <Text tone="muted">
-              Elimina el acceso y anonimiza la identidad conservando la
-              evidencia deportiva histórica necesaria.
-            </Text>
+
+        <section
+          aria-labelledby="risk-settings-title"
+          className={`${styles.group} ${styles.risk}`}
+        >
+          <header className={styles.groupHeader}>
+            <span>ZONA DE RIESGO</span>
+            <h2 id="risk-settings-title">Acciones sensibles</h2>
+          </header>
+          <div className={styles.rows}>
+            <SettingsRow
+              danger
+              description="Elimina el acceso y anonimiza la identidad cuando corresponde."
+              href="/profile/account#delete-account"
+              mark="×"
+              title="Eliminar cuenta"
+              value="Revisar"
+            />
           </div>
-          <Link
-            className="ui-button ui-button--danger"
-            href="/profile/account#delete-account"
-          >
-            Revisar eliminación
-          </Link>
         </section>
       </div>
-    </main>
+    </SettingsFrame>
   );
 }

@@ -9,13 +9,14 @@ import {
   playerDisplayNameSchema,
   type PrivatePlayer,
 } from "@football/contracts";
-import { Button, Text } from "@football/ui";
+import { Button } from "@football/ui";
 
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { mediaContentUrl } from "@/lib/api/client";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import { refreshPlayerIdentityProjections } from "@/lib/api/player-projection-cache";
+import { SettingsFrame } from "@/features/profile-settings/settings-visual";
 
 import styles from "./profile-edit.module.css";
 
@@ -24,15 +25,15 @@ export function ProfileEditScreen() {
 
   if (player.isPending)
     return (
-      <main className={styles.page} role="status">
+      <div className={styles.page} role="status">
         Cargando tu identidad…
-      </main>
+      </div>
     );
   if (player.isError)
     return (
-      <main className={styles.page} role="alert">
+      <div className={styles.page} role="alert">
         No pudimos cargar tu identidad deportiva.
-      </main>
+      </div>
     );
 
   return <ProfileEditForm key={player.data.id} player={player.data} />;
@@ -66,72 +67,70 @@ function ProfileEditForm({ player }: Readonly<{ player: PrivatePlayer }>) {
   }
 
   return (
-    <main className={styles.page}>
-      <Link className={styles.back} href="/profile/settings">
-        ← CONFIGURACIÓN
-      </Link>
-      <header className={styles.header}>
-        <Text as="span" tone="accent" variant="label">
-          Perfil privado
-        </Text>
-        <Text as="h1" variant="heading-lg">
-          Editar identidad
-        </Text>
-        <Text tone="muted">
-          Tu nombre deportivo se muestra en rankings, búsqueda y tu ficha de
-          jugador. No modifica el nombre ni el email de tu cuenta.
-        </Text>
-      </header>
+    <SettingsFrame
+      active="profile"
+      description="Definí cómo aparece tu identidad deportiva en FIFAR."
+      eyebrow="PERFIL"
+      title="Editar identidad"
+    >
+      <div className={styles.page}>
+        <section className={styles.module} aria-labelledby="display-name-title">
+          <header className={styles.moduleHeader}>
+            <span>IDENTIDAD DEPORTIVA</span>
+            <h2 id="display-name-title">Tu nombre en cancha</h2>
+            <p>
+              Se muestra en rankings, búsqueda y tu ficha. No modifica el nombre
+              ni el email de tu cuenta.
+            </p>
+          </header>
+          <form className={styles.form} onSubmit={submit}>
+            <label className={styles.field}>
+              <span>Nombre deportivo</span>
+              <input
+                autoComplete="nickname"
+                maxLength={40}
+                minLength={2}
+                onChange={(event) => setDisplayName(event.target.value)}
+                required
+                value={displayName}
+              />
+              <small>Entre 2 y 40 caracteres. No necesita ser único.</small>
+            </label>
 
-      <form className={styles.form} onSubmit={submit}>
-        <label className={styles.field}>
-          Nombre deportivo
-          <input
-            autoComplete="nickname"
-            maxLength={40}
-            minLength={2}
-            onChange={(event) => setDisplayName(event.target.value)}
-            required
-            value={displayName}
-          />
-        </label>
-        <Text tone="muted">
-          Entre 2 y 40 caracteres. No necesita ser único.
-        </Text>
+            {validationError && (
+              <p className={styles.error} role="alert">
+                {validationError}
+              </p>
+            )}
+            {update.isError && (
+              <p className={styles.error} role="alert">
+                {update.error.message}
+              </p>
+            )}
+            {feedback && (
+              <p className={styles.feedback} role="status">
+                {feedback}
+              </p>
+            )}
 
-        {validationError && (
-          <p className={styles.error} role="alert">
-            {validationError}
-          </p>
-        )}
-        {update.isError && (
-          <p className={styles.error} role="alert">
-            {update.error.message}
-          </p>
-        )}
-        {feedback && (
-          <p className={styles.feedback} role="status">
-            {feedback}
-          </p>
-        )}
+            <div className={styles.actions}>
+              <Button disabled={update.isPending} type="submit">
+                {update.isPending ? "Guardando…" : "Guardar perfil"}
+              </Button>
+              <Link
+                className="ui-button ui-button--secondary"
+                href="/profile/settings"
+              >
+                Volver
+              </Link>
+            </div>
+          </form>
+        </section>
 
-        <div className={styles.actions}>
-          <Button disabled={update.isPending} type="submit">
-            {update.isPending ? "Guardando…" : "Guardar perfil"}
-          </Button>
-          <Link
-            className="ui-button ui-button--secondary"
-            href="/profile/settings"
-          >
-            Volver a configuración
-          </Link>
-        </div>
-      </form>
-
-      <PrivacyEditor player={player} />
-
-      <AvatarEditor player={player} />
-    </main>
+        <PrivacyEditor player={player} />
+        <AvatarEditor player={player} />
+      </div>
+    </SettingsFrame>
   );
 }
 
@@ -157,22 +156,22 @@ function PrivacyEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
     },
   });
   return (
-    <section className={styles.avatarSection}>
-      <div>
-        <Text tone="accent" variant="label">
-          VISIBILIDAD
-        </Text>
-        <Text as="h2" variant="heading-lg">
-          Perfil deportivo
-        </Text>
-        <Text tone="muted">
+    <section className={styles.module}>
+      <header className={styles.moduleHeader}>
+        <span>VISIBILIDAD</span>
+        <h2>Perfil deportivo</h2>
+        <p>
           Público aparece en búsqueda, rankings globales y discovery
           autenticado. Privado conserva tu evidencia dentro de grupos y partidos
           compartidos.
-        </Text>
-      </div>
-      <div className={styles.actions}>
+        </p>
+      </header>
+      <div
+        className={styles.privacyControl}
+        aria-label="Visibilidad del perfil"
+      >
         <Button
+          aria-pressed={player.profileVisibility === "PUBLIC"}
           disabled={privacy.isPending || player.profileVisibility === "PUBLIC"}
           onClick={() => privacy.mutate({ profileVisibility: "PUBLIC" })}
           variant="management"
@@ -180,6 +179,7 @@ function PrivacyEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
           Público
         </Button>
         <Button
+          aria-pressed={player.profileVisibility === "PRIVATE"}
           disabled={privacy.isPending || player.profileVisibility === "PRIVATE"}
           onClick={() => privacy.mutate({ profileVisibility: "PRIVATE" })}
           variant="management"
@@ -272,19 +272,15 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
   const visibleUrl = previewUrl ?? currentUrl;
 
   return (
-    <section className={styles.avatarSection} aria-labelledby="avatar-title">
-      <div>
-        <Text as="span" tone="accent" variant="label">
-          Foto del jugador
-        </Text>
-        <Text as="h2" id="avatar-title" variant="heading-lg">
-          Tu imagen en la Card
-        </Text>
-        <Text tone="muted">
+    <section className={styles.module} aria-labelledby="avatar-title">
+      <header className={styles.moduleHeader}>
+        <span>FOTO DEL JUGADOR</span>
+        <h2 id="avatar-title">Tu imagen en la Card</h2>
+        <p>
           Se publica en tu ficha deportiva autenticada. Guardamos únicamente una
           versión WebP saneada, sin EXIF ni ubicación.
-        </Text>
-      </div>
+        </p>
+      </header>
 
       <div className={styles.avatarWorkspace}>
         <div className={styles.cropPreview}>

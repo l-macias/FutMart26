@@ -1,0 +1,272 @@
+.scene {
+  position: relative;
+  min-block-size: 100dvh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 14%), rgb(4 8 16 / 70%)),
+    linear-gradient(0deg, var(--v4-canvas) 0%, transparent 44%),
+    url("/fifar-v4/backgrounds-raster/players-tunnel.webp") center / cover
+      no-repeat;
+  color: var(--v4-text);
+}
+
+.scene::before,
+.scene::after {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+}
+
+.scene::before {
+  inset: 0;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 61%,
+      rgb(216 181 100 / 12%) 61.1% 61.45%,
+      transparent 61.55%
+    ),
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 5.5rem,
+      rgb(255 255 255 / 2.5%) 5.6rem 5.7rem
+    );
+  mix-blend-mode: screen;
+}
+
+.scene::after {
+  inset: auto -8% -15% 19%;
+  block-size: 45%;
+  border-block-start: 1px solid rgb(216 181 100 / 38%);
+  background: linear-gradient(140deg, rgb(7 13 25 / 88%), rgb(15 28 48 / 48%));
+  clip-path: polygon(16% 0, 100% 20%, 86% 100%, 0 78%);
+}
+
+.brand {
+  position: absolute;
+  z-index: 3;
+  inset: clamp(1.25rem, 4vw, 3rem) auto auto clamp(1.25rem, 5vw, 4rem);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brandWord {
+  color: var(--v4-gold-light);
+  font: 700 clamp(2.35rem, 4.8vw, 4.7rem) / 0.75 var(--font-v4-display);
+  letter-spacing: 0.045em;
+  text-shadow: 0 0.25rem 1.4rem rgb(0 0 0 / 45%);
+}
+
+.brandClaim {
+  border-inline-start: 1px solid rgb(216 181 100 / 58%);
+  padding-inline-start: 1rem;
+  color: rgb(244 243 239 / 72%);
+  font: 600 0.68rem / 1.35 var(--font-v4-interface);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.copy {
+  position: absolute;
+  z-index: 3;
+  inset: clamp(8rem, 17vh, 11rem) auto auto clamp(1.25rem, 5vw, 4rem);
+  inline-size: min(34rem, 70%);
+}
+
+.serial,
+.eyebrow {
+  font-family: var(--font-v4-interface);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.serial {
+  display: inline-flex;
+  margin-block-end: 1.15rem;
+  border-block-end: 1px solid rgb(216 181 100 / 52%);
+  padding-block-end: 0.45rem;
+  color: rgb(244 243 239 / 56%);
+  font-size: 0.68rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  color: var(--v4-gold-light);
+  font-size: clamp(0.75rem, 1.2vw, 0.9rem);
+}
+
+.copy h1,
+.sceneTitle {
+  max-inline-size: 9ch;
+  margin: 0;
+  color: var(--v4-text);
+  font: 600 clamp(3.7rem, 8vw, 7.4rem) / 0.76 var(--font-v4-display);
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.sceneTitle {
+  margin-block: 0;
+}
+
+.intro {
+  max-inline-size: 26rem;
+  margin: 1.25rem 0 0;
+  color: rgb(244 243 239 / 76%);
+  font: 600 clamp(0.9rem, 1.3vw, 1.05rem) / 1.45 var(--font-v4-interface);
+}
+
+.player {
+  position: absolute;
+  z-index: 2;
+  inset: auto clamp(-5rem, -4vw, -1rem) 0 auto;
+  block-size: min(82vh, 59rem);
+  inline-size: auto;
+  object-fit: contain;
+  object-position: bottom center;
+  filter: drop-shadow(-1.2rem 1.5rem 2rem rgb(0 0 0 / 46%));
+}
+
+.competitionMark {
+  position: absolute;
+  z-index: 4;
+  inset: auto auto clamp(4.8rem, 8vh, 6rem) clamp(1.25rem, 5vw, 4rem);
+  display: grid;
+  inline-size: 4.8rem;
+  aspect-ratio: 1;
+  place-content: center;
+  border: 1px solid rgb(216 181 100 / 58%);
+  background: rgb(7 13 25 / 70%);
+  clip-path: polygon(
+    0.7rem 0,
+    100% 0,
+    100% calc(100% - 0.7rem),
+    calc(100% - 0.7rem) 100%,
+    0 100%,
+    0 0.7rem
+  );
+  text-align: center;
+  backdrop-filter: blur(0.6rem);
+}
+
+.competitionMark strong {
+  color: var(--v4-gold-light);
+  font: 600 2.2rem / 0.75 var(--font-v4-display);
+}
+
+.competitionMark span {
+  margin-block-start: 0.45rem;
+  color: rgb(244 243 239 / 68%);
+  font: 700 0.55rem / 1 var(--font-v4-interface);
+  letter-spacing: 0.11em;
+}
+
+.identityTrack {
+  position: absolute;
+  z-index: 4;
+  inset: auto clamp(1.25rem, 5vw, 4rem) clamp(1.6rem, 3vw, 2.5rem)
+    clamp(7.4rem, 12vw, 11rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block-start: 1px solid rgb(244 243 239 / 16%);
+  padding-block-start: 0.7rem;
+}
+
+.identityTrack span {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: rgb(244 243 239 / 66%);
+  font: 700 0.64rem / 1 var(--font-v4-interface);
+  letter-spacing: 0.13em;
+}
+
+.identityTrack b {
+  color: var(--v4-gold);
+  font: 600 1.05rem / 1 var(--font-v4-display);
+}
+
+.fieldLines {
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0;
+  block-size: 35%;
+  opacity: 0.18;
+  background: url("/fifar-v4/patterns/pattern-grid.svg") center / cover;
+  mask-image: linear-gradient(transparent, black);
+}
+
+.compact .sceneTitle {
+  font-size: clamp(3.5rem, 7vw, 6rem);
+}
+
+@media (max-width: 47.99rem) {
+  .scene,
+  .compact {
+    min-block-size: clamp(15.5rem, 34dvh, 19rem);
+    background-position: 53% center;
+  }
+
+  .brand {
+    inset: 1.05rem auto auto 1rem;
+    gap: 0.65rem;
+  }
+
+  .brandWord {
+    font-size: 2.35rem;
+  }
+  .brandClaim {
+    font-size: 0.52rem;
+    padding-inline-start: 0.65rem;
+  }
+
+  .copy {
+    inset: 5.2rem auto auto 1rem;
+    inline-size: 64%;
+  }
+
+  .serial,
+  .intro,
+  .identityTrack {
+    display: none;
+  }
+
+  .eyebrow {
+    margin-block-end: 0.2rem;
+    font-size: 0.66rem;
+  }
+
+  .copy h1,
+  .compact .sceneTitle {
+    max-inline-size: 8ch;
+    font-size: clamp(2.8rem, 14vw, 4.2rem);
+  }
+
+  .player {
+    inset-inline-end: -4.2rem;
+    block-size: 87%;
+  }
+
+  .competitionMark {
+    inset: auto auto 1rem 1rem;
+    inline-size: 3.6rem;
+  }
+
+  .competitionMark strong {
+    font-size: 1.65rem;
+  }
+  .competitionMark span {
+    font-size: 0.45rem;
+  }
+}
+
+@media (min-width: 48rem) and (max-width: 72rem) {
+  .player {
+    inset-inline-end: -10rem;
+  }
+}

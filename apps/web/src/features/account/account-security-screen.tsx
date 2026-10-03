@@ -4,8 +4,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-
-import { TacticalDivider } from "@football/football-ui";
 import { Button, Text } from "@football/ui";
 
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
@@ -14,6 +12,7 @@ import {
   networkAuthErrorMessage,
 } from "@/features/auth/auth-errors";
 import { authClient } from "@/lib/auth/auth-client";
+import { SettingsFrame } from "@/features/profile-settings/settings-visual";
 
 import styles from "./account-security.module.css";
 
@@ -135,196 +134,188 @@ export function AccountSecurityScreen() {
   }
 
   return (
-    <div className={styles.page}>
-      <Link className={styles.back} href="/profile/settings">
-        ← CONFIGURACIÓN
-      </Link>
-      <header className={styles.header}>
-        <Text as="span" tone="accent" variant="label">
-          Cuenta
-        </Text>
-        <Text as="h1" variant="heading-lg">
-          Seguridad
-        </Text>
-        <Text tone="muted">
-          Contraseña y sesiones pertenecen a tu cuenta, no a tu identidad
-          deportiva.
-        </Text>
-      </header>
+    <SettingsFrame
+      active="account"
+      description="Protegé el acceso, revisá tus dispositivos y controlá las acciones sensibles."
+      eyebrow="CUENTA Y SEGURIDAD"
+      title="Seguridad"
+    >
+      <div className={styles.page}>
+        <section className={styles.section} aria-labelledby="password-title">
+          <header className={styles.sectionIntro}>
+            <span>CONTRASEÑA</span>
+            <h2 id="password-title">Cambiar contraseña</h2>
+            <p>Actualizá tu clave de acceso. Las demás sesiones se cerrarán.</p>
+          </header>
+          <form action={changePassword} className={styles.form}>
+            <Field
+              autoComplete="current-password"
+              label="Contraseña actual"
+              name="currentPassword"
+            />
+            <Field
+              autoComplete="new-password"
+              label="Nueva contraseña"
+              maxLength={128}
+              minLength={8}
+              name="newPassword"
+            />
+            <Field
+              autoComplete="new-password"
+              label="Confirmar contraseña"
+              maxLength={128}
+              minLength={8}
+              name="confirmation"
+            />
+            <Button disabled={pendingAction !== null} type="submit">
+              {pendingAction === "password"
+                ? "Actualizando…"
+                : "Cambiar contraseña"}
+            </Button>
+          </form>
+        </section>
 
-      <section className={styles.section}>
-        <Text as="h2" variant="heading-lg">
-          Cambiar contraseña
-        </Text>
-        <form action={changePassword} className={styles.form}>
-          <Field
-            autoComplete="current-password"
-            label="Contraseña actual"
-            name="currentPassword"
-          />
-          <Field
-            autoComplete="new-password"
-            label="Nueva contraseña"
-            maxLength={128}
-            minLength={8}
-            name="newPassword"
-          />
-          <Field
-            autoComplete="new-password"
-            label="Confirmar contraseña"
-            maxLength={128}
-            minLength={8}
-            name="confirmation"
-          />
-          <Button disabled={pendingAction !== null} type="submit">
-            {pendingAction === "password"
-              ? "Actualizando…"
-              : "Cambiar contraseña"}
-          </Button>
-        </form>
-      </section>
-
-      <TacticalDivider />
-
-      <section className={styles.section}>
-        <div className={styles.sectionHeading}>
-          <div>
-            <Text as="h2" variant="heading-lg">
-              Sesiones activas
-            </Text>
-            <Text tone="muted">Revisá dónde permanece abierta tu cuenta.</Text>
+        <section className={styles.section} aria-labelledby="sessions-title">
+          <div className={styles.sectionHeading}>
+            <header className={styles.sectionIntro}>
+              <span>DISPOSITIVOS</span>
+              <h2 id="sessions-title">Sesiones activas</h2>
+              <p>Revisá dónde permanece abierta tu cuenta.</p>
+            </header>
+            <Button
+              disabled={pendingAction !== null || sessions.data?.length === 1}
+              onClick={() => void closeOtherSessions()}
+              variant="secondary"
+            >
+              Cerrar otras sesiones
+            </Button>
           </div>
-          <Button
-            disabled={pendingAction !== null || sessions.data?.length === 1}
-            onClick={() => void closeOtherSessions()}
-            variant="secondary"
-          >
-            Cerrar otras sesiones
-          </Button>
-        </div>
 
-        {sessions.isPending ? <p role="status">Cargando sesiones…</p> : null}
-        {sessions.isError ? (
-          <p className={styles.error} role="alert">
-            No pudimos cargar las sesiones activas.
+          {sessions.isPending ? <p role="status">Cargando sesiones…</p> : null}
+          {sessions.isError ? (
+            <p className={styles.error} role="alert">
+              No pudimos cargar las sesiones activas.
+            </p>
+          ) : null}
+          <div
+            aria-label="Lista de sesiones activas"
+            className={styles.sessions}
+            role="region"
+            tabIndex={0}
+          >
+            {sessions.data?.map((session) => {
+              const isCurrent = session.id === currentSession.data?.session.id;
+              return (
+                <article className={styles.session} key={session.id}>
+                  <span aria-hidden="true" className={styles.device}>
+                    WEB
+                  </span>
+                  <div className={styles.sessionCopy}>
+                    <Text as="h3" variant="heading-md">
+                      {summarizeUserAgent(session.userAgent)}
+                    </Text>
+                    <Text tone="muted" variant="metadata">
+                      Iniciada {formatDate(session.createdAt)} · vence{" "}
+                      {formatDate(session.expiresAt)}
+                    </Text>
+                    {isCurrent ? (
+                      <span className={styles.current}>Sesión actual</span>
+                    ) : null}
+                  </div>
+                  <Button
+                    disabled={pendingAction !== null}
+                    onClick={() => void revokeSession(session.token, isCurrent)}
+                    variant="secondary"
+                  >
+                    {isCurrent ? "Cerrar esta sesión" : "Revocar"}
+                  </Button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className={styles.danger} id="delete-account">
+          <header className={styles.sectionIntro}>
+            <span>ZONA DE RIESGO</span>
+            <h2>Eliminar cuenta</h2>
+          </header>
+          <p>
+            Se eliminan credenciales, sesiones, conexiones, invitaciones,
+            preferencias declaradas y foto. La evidencia deportiva confirmada se
+            conserva anonimizada. Si sos la única persona dueña de un grupo con
+            partidos activos, primero debés transferir la propiedad o
+            resolverlos.
+          </p>
+          <p>
+            Leé <Link href="/privacy">Privacidad</Link> antes de continuar.
+          </p>
+          <label className={styles.field}>
+            <span>Escribí ELIMINAR MI CUENTA</span>
+            <input
+              aria-describedby="delete-account-help"
+              autoComplete="off"
+              name="delete-account-confirmation"
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              value={deleteConfirmation}
+            />
+          </label>
+          <Text
+            as="span"
+            id="delete-account-help"
+            tone="muted"
+            variant="metadata"
+          >
+            Esta confirmación evita eliminar la cuenta por accidente.
+          </Text>
+          <label className={styles.field}>
+            <span>Contraseña actual</span>
+            <input
+              autoComplete="current-password"
+              onChange={(event) => setDeletePassword(event.target.value)}
+              type="password"
+              value={deletePassword}
+            />
+          </label>
+          <Button
+            disabled={
+              pendingAction !== null ||
+              deleteConfirmation !== "ELIMINAR MI CUENTA" ||
+              !deletePassword
+            }
+            onClick={() => setDeleteDialogOpen(true)}
+            variant="danger"
+          >
+            Revisar eliminación
+          </Button>
+        </section>
+
+        <ConfirmDialog
+          confirmDisabled={pendingAction !== null}
+          confirmLabel={
+            pendingAction === "delete" ? "Eliminando…" : "Eliminar cuenta"
+          }
+          eyebrow="ELIMINAR CUENTA"
+          message="Perderás el acceso inmediatamente y todas tus sesiones se cerrarán. Tu identidad quedará anonimizada donde sea necesario conservar historia deportiva."
+          onCancel={() => setDeleteDialogOpen(false)}
+          onConfirm={() => void deleteAccount()}
+          open={deleteDialogOpen}
+          tone="danger"
+          title="¿Eliminar definitivamente tu cuenta?"
+        />
+
+        {feedback ? (
+          <p className={styles.feedback} role="status">
+            {feedback}
           </p>
         ) : null}
-        <div
-          aria-label="Lista de sesiones activas"
-          className={styles.sessions}
-          role="region"
-          tabIndex={0}
-        >
-          {sessions.data?.map((session) => {
-            const isCurrent = session.id === currentSession.data?.session.id;
-            return (
-              <article className={styles.session} key={session.id}>
-                <div>
-                  <Text as="h3" variant="heading-md">
-                    {summarizeUserAgent(session.userAgent)}
-                  </Text>
-                  <Text tone="muted" variant="metadata">
-                    Iniciada {formatDate(session.createdAt)} · vence{" "}
-                    {formatDate(session.expiresAt)}
-                  </Text>
-                  {isCurrent ? (
-                    <span className={styles.current}>Sesión actual</span>
-                  ) : null}
-                </div>
-                <Button
-                  disabled={pendingAction !== null}
-                  onClick={() => void revokeSession(session.token, isCurrent)}
-                  variant="secondary"
-                >
-                  {isCurrent ? "Cerrar esta sesión" : "Revocar"}
-                </Button>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className={styles.danger} id="delete-account">
-        <Text tone="muted" variant="label">
-          ZONA DE RIESGO
-        </Text>
-        <Text as="h2" variant="heading-lg">
-          Eliminar cuenta
-        </Text>
-        <Text tone="muted">
-          Se eliminan credenciales, sesiones, conexiones, invitaciones,
-          preferencias declaradas y foto. La evidencia deportiva confirmada se
-          conserva anonimizada. Si sos la única persona dueña de un grupo con
-          partidos activos, primero debés transferir la propiedad o resolverlos.
-        </Text>
-        <Text tone="muted">
-          Leé <Link href="/privacy">Privacidad</Link> antes de continuar.
-        </Text>
-        <label className={styles.field}>
-          <span>Escribí ELIMINAR MI CUENTA</span>
-          <input
-            aria-describedby="delete-account-help"
-            autoComplete="off"
-            name="delete-account-confirmation"
-            onChange={(event) => setDeleteConfirmation(event.target.value)}
-            value={deleteConfirmation}
-          />
-        </label>
-        <Text
-          as="span"
-          id="delete-account-help"
-          tone="muted"
-          variant="metadata"
-        >
-          Esta confirmación evita eliminar la cuenta por accidente.
-        </Text>
-        <label className={styles.field}>
-          <span>Contraseña actual</span>
-          <input
-            autoComplete="current-password"
-            onChange={(event) => setDeletePassword(event.target.value)}
-            type="password"
-            value={deletePassword}
-          />
-        </label>
-        <Button
-          disabled={
-            pendingAction !== null ||
-            deleteConfirmation !== "ELIMINAR MI CUENTA" ||
-            !deletePassword
-          }
-          onClick={() => setDeleteDialogOpen(true)}
-          variant="danger"
-        >
-          Revisar eliminación
-        </Button>
-      </section>
-
-      <ConfirmDialog
-        confirmDisabled={pendingAction !== null}
-        confirmLabel={
-          pendingAction === "delete" ? "Eliminando…" : "Eliminar cuenta"
-        }
-        eyebrow="ELIMINAR CUENTA"
-        message="Perderás el acceso inmediatamente y todas tus sesiones se cerrarán. Tu identidad quedará anonimizada donde sea necesario conservar historia deportiva."
-        onCancel={() => setDeleteDialogOpen(false)}
-        onConfirm={() => void deleteAccount()}
-        open={deleteDialogOpen}
-        tone="danger"
-        title="¿Eliminar definitivamente tu cuenta?"
-      />
-
-      {feedback ? (
-        <p className={styles.feedback} role="status">
-          {feedback}
-        </p>
-      ) : null}
-      {error ? (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
+        {error ? (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </SettingsFrame>
   );
 }
 

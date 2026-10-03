@@ -12,6 +12,11 @@ import type {
 } from "@football/contracts";
 import { Button, Text } from "@football/ui";
 
+import {
+  V4Portrait,
+  V4RewardBadge,
+  V4TierPlate,
+} from "@/components/visual-v4/profile-assets";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -51,14 +56,24 @@ export function RankingsScreen(props: Readonly<Props>) {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <header className={styles.header}>
-        <Text tone="accent" variant="label">
-          COMPETENCIA F5
-        </Text>
-        <Text as="h1" variant="display-lg">
-          Rankings
-        </Text>
+        <img
+          alt=""
+          className={styles.competitionScene}
+          src="/fifar-v4/group-ranking-scenes/rankings-arena-night.webp"
+        />
+        <V4RewardBadge label="Competencia F5" seed="rankings-f5" size="large" />
+        <div className={styles.headerIdentity}>
+          <Text tone="accent" variant="label">
+            COMPETENCIA F5
+          </Text>
+          <Text as="h1" variant="display-lg">
+            Rankings
+          </Text>
+          <span>MEDÍ TU NIVEL. ENCONTRÁ TU LUGAR.</span>
+        </div>
+        <strong className={styles.competitionMark}>F5</strong>
       </header>
 
       <nav aria-label="Ámbito del ranking" className={styles.scopes}>
@@ -231,35 +246,64 @@ function RankingResult({
         .map((item) => [item.player.id, item]),
     ).values(),
   ];
+  const topPlayers = items.slice(0, 3);
+  const rankedPlayers = items.slice(3);
   return (
-    <div className={styles.rankingLayout}>
+    <div className={styles.rankingExperience}>
+      {topPlayers.length > 0 && (
+        <section className={styles.topZone} aria-labelledby="top-zone-title">
+          <div className={styles.topZoneHeading}>
+            <div>
+              <span>FIGURAS DEL ÁMBITO</span>
+              <Text as="h2" id="top-zone-title" variant="heading-lg">
+                Top 3
+              </Text>
+            </div>
+            <strong>OVR · F5</strong>
+          </div>
+          <div className={styles.topGrid}>
+            {topPlayers.map((item) => (
+              <RankingTopPlayer item={item} key={item.player.id} />
+            ))}
+          </div>
+        </section>
+      )}
       <section className={styles.positionCard} aria-labelledby="my-rank-title">
-        <span id="my-rank-title">TU POSICIÓN</span>
-        {first.me.ranked ? (
-          <strong>
-            #{first.me.position}{" "}
-            <small>· {formatOvr(first.me.overall)} OVR</small>
-          </strong>
-        ) : (
-          <p>
-            Aún no tenés evidencia suficiente para aparecer en este ranking.
-          </p>
-        )}
+        <V4Portrait name="Tu jugador" size="large" />
+        <div className={styles.positionIdentity}>
+          <span id="my-rank-title">TU POSICIÓN</span>
+          {first.me.ranked ? (
+            <>
+              <strong>#{first.me.position}</strong>
+              <small>VOS · CLASIFICACIÓN ACTUAL</small>
+            </>
+          ) : (
+            <p>
+              Aún no tenés evidencia suficiente para aparecer en este ranking.
+            </p>
+          )}
+        </div>
+        {first.me.ranked && <V4TierPlate overall={Number(first.me.overall)} />}
       </section>
       <section aria-labelledby="ranking-list-title" className={styles.ranking}>
         <div className={styles.listHeading}>
-          <Text as="h2" id="ranking-list-title" variant="heading-lg">
-            Clasificación
-          </Text>
-          <span>OVR</span>
+          <div>
+            <span>CLASIFICACIÓN COMPLETA</span>
+            <Text as="h2" id="ranking-list-title" variant="heading-lg">
+              Competidores
+            </Text>
+          </div>
+          <strong>POS · JUGADOR · OVR</strong>
         </div>
         {items.length === 0 ? (
           <p className={styles.empty}>{empty}</p>
+        ) : rankedPlayers.length === 0 ? (
+          <p className={styles.compactComplete}>Top 3 completo.</p>
         ) : (
-          <ol className={`${styles.list} ui-list`}>
-            {items.map((item) => (
+          <ol className={styles.list}>
+            {rankedPlayers.map((item) => (
               <li
-                className={`${styles.row} ui-row ${item.position <= 3 ? styles.top : ""} ${item.isCurrentPlayer ? styles.current : ""}`}
+                className={`${styles.row} ${item.isCurrentPlayer ? styles.current : ""}`}
                 key={item.player.id}
               >
                 <Link
@@ -271,11 +315,17 @@ function RankingResult({
                   }
                 >
                   <span className={styles.rank}>#{item.position}</span>
-                  <strong>{item.player.displayName}</strong>
-                  {item.isCurrentPlayer && <small>VOS</small>}
-                  <b aria-label={`${formatOvr(item.performance.overall)} OVR`}>
-                    {formatOvr(item.performance.overall)}
-                  </b>
+                  <V4Portrait name={item.player.displayName} />
+                  <span className={styles.playerIdentity}>
+                    <strong>{item.player.displayName}</strong>
+                    <small>
+                      {item.isCurrentPlayer ? "VOS · JUGADOR F5" : "JUGADOR F5"}
+                    </small>
+                  </span>
+                  <V4TierPlate
+                    compact
+                    overall={Number(item.performance.overall)}
+                  />
                 </Link>
               </li>
             ))}
@@ -292,6 +342,27 @@ function RankingResult({
         )}
       </section>
     </div>
+  );
+}
+
+function RankingTopPlayer({ item }: Readonly<{ item: RankingItem }>) {
+  return (
+    <Link
+      aria-current={item.isCurrentPlayer ? "true" : undefined}
+      className={styles.topPlayer}
+      data-rank={item.position}
+      href={item.isCurrentPlayer ? "/profile" : `/players/${item.player.id}`}
+    >
+      <span className={styles.topRank}>#{item.position}</span>
+      <div className={styles.topPortrait}>
+        <V4Portrait name={item.player.displayName} size="large" />
+      </div>
+      <span className={styles.topIdentity}>
+        <strong>{item.player.displayName}</strong>
+        <small>{item.isCurrentPlayer ? "VOS · F5" : "COMPETIDOR F5"}</small>
+      </span>
+      <V4TierPlate overall={Number(item.performance.overall)} />
+    </Link>
   );
 }
 
@@ -361,8 +432,4 @@ function State({
       <p role={alert ? "alert" : "status"}>{text}</p>
     </div>
   );
-}
-
-function formatOvr(value: string) {
-  return Math.round(Number(value));
 }

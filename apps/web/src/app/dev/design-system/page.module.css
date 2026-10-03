@@ -247,3 +247,55 @@
   transition: transform var(--motion-celebration-duration)
     var(--motion-ease-emphasized);
 }
+
+.cardShowcase {
+  display: grid;
+  grid-auto-columns: minmax(11.25rem, 1fr);
+  grid-auto-flow: column;
+  align-items: end;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-4) var(--space-7);
+  overflow-x: auto;
+  background:
+    linear-gradient(180deg, rgb(8 14 28 / 72%), rgb(5 10 20 / 96%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center / cover;
+  scrollbar-color: var(--v4-gold) transparent;
+}
+
+.cardTier {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  min-inline-size: 0;
+  scroll-snap-align: center;
+}
+
+.cardTier > div:first-child {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  color: var(--v4-text);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.cardTier > div:first-child h3 {
+  font-family: var(--font-v4-display);
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 48rem) {
+  .cardShowcase {
+    inline-size: calc(100% + (var(--space-4) * 2));
+    margin-inline: calc(var(--space-4) * -1);
+    padding-inline: var(--space-6);
+    scroll-snap-type: inline mandatory;
+  }
+}
+
+@media (min-width: 80rem) {
+  .cardShowcase {
+    grid-auto-columns: minmax(0, 1fr);
+    overflow-x: visible;
+  }
+}

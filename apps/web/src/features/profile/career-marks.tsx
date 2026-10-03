@@ -1,16 +1,25 @@
 import { Text } from "@football/ui";
 import type { OwnPlayerProfile } from "@football/contracts";
 
+import { V4RewardBadge } from "@/components/visual-v4/profile-assets";
 import styles from "./profile.module.css";
 
 export function CareerMarks({
   rewards,
 }: Readonly<{ rewards: OwnPlayerProfile["rewards"] }>) {
   return (
-    <section aria-labelledby="marks-title" className={styles.panelSection}>
-      <Text as="h2" id="marks-title" variant="heading-lg">
-        Logros y premios
-      </Text>
+    <section
+      aria-labelledby="marks-title"
+      className={`${styles.panelSection} ${styles.rewardsModule}`}
+    >
+      <div className={styles.moduleTitle}>
+        <Text tone="accent" variant="label">
+          PALMARÉS
+        </Text>
+        <Text as="h2" id="marks-title" variant="heading-lg">
+          Logros y premios
+        </Text>
+      </div>
       <div className={styles.markGroup}>
         <div>
           <Text as="h3" tone="accent" variant="heading-sm">
@@ -21,7 +30,11 @@ export function CareerMarks({
         <ul className={styles.achievementList}>
           {rewards.achievements.map((achievement) => (
             <li key={achievement.type}>
-              <span aria-hidden="true" className={styles.achievementMark} />
+              <V4RewardBadge
+                label={achievement.title}
+                seed={achievement.type}
+                size="large"
+              />
               <Text as="span" variant="label">
                 {achievement.title}
               </Text>
@@ -47,7 +60,11 @@ export function CareerMarks({
         <ul className={styles.awardList}>
           {rewards.awardSummary.map((award) => (
             <li key={award.type}>
-              <span aria-hidden="true" />
+              <V4RewardBadge
+                label={award.title}
+                seed={award.type}
+                size="large"
+              />
               <span>
                 <Text as="span" variant="heading-md">
                   {award.title}

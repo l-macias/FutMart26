@@ -4,10 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { OverallDisplay } from "@football/football-ui";
 import { Badge, Text } from "@football/ui";
 
 import { PlayerCard } from "@/components/player-card/player-card";
+import {
+  V4GroupCrest,
+  V4RewardBadge,
+} from "@/components/visual-v4/profile-assets";
+import { V4PlayIdentity } from "@/components/visual-v4/play-identity";
+import { OvrPlate } from "@/components/visual-v3/ovr-plate";
 import { ReportControl } from "@/components/report-control/report-control";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { api } from "@/lib/api/resources";
@@ -36,12 +41,13 @@ export function PublicPlayerProfileScreen({
   const data = profile.data;
   if (data.visibility === "PRIVATE")
     return (
-      <div className={styles.page}>
+      <div className={`${styles.page} ui-visual-v3 ui-visual-v4`}>
         <Link className={styles.back} href="/search">
           ← BUSCAR
         </Link>
-        <header className={styles.header}>
-          <div>
+        <header className={styles.privateIdentity}>
+          <div className={styles.privateBackdrop} aria-hidden="true" />
+          <div className={styles.privateContent}>
             <Badge kind="state">PERFIL PRIVADO</Badge>
             <Text as="h1" variant="display-lg">
               {data.player.displayName}
@@ -50,52 +56,38 @@ export function PublicPlayerProfileScreen({
               Este jugador no aparece en la búsqueda global. Su evidencia
               deportiva sigue visible sólo en contextos compartidos autorizados.
             </Text>
+            <div className={styles.privateActions}>
+              {data.isCurrentPlayer ? (
+                <Link
+                  className="ui-button ui-button--secondary"
+                  href="/profile"
+                >
+                  Ver mi perfil completo
+                </Link>
+              ) : null}
+              {!data.isCurrentPlayer ? (
+                <ReportControl targetId={playerId} targetType="PLAYER" />
+              ) : null}
+            </div>
           </div>
-          {data.isCurrentPlayer ? (
-            <Link className="ui-button ui-button--secondary" href="/profile">
-              Ver mi perfil completo
-            </Link>
-          ) : null}
         </header>
-        {!data.isCurrentPlayer ? (
-          <ReportControl targetId={playerId} targetType="PLAYER" />
-        ) : null}
       </div>
     );
+  const primaryGroup = data.groups[0] ?? null;
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ui-visual-v3 ui-visual-v4`}>
       <Link className={styles.back} href="/search">
         ← BUSCAR
       </Link>
-      <header className={styles.header}>
-        <div>
-          <Text as="span" tone="accent" variant="label">
-            FICHA DE JUGADOR · F5
-          </Text>
-          <Text as="h1" variant="display-lg">
-            {data.player.displayName}
-          </Text>
-          <Text tone="muted">
-            {data.performance.initialized
-              ? `${data.performance.processedMatchCount} partidos procesados`
-              : "Todavía no tiene partidos procesados"}
-          </Text>
-        </div>
-        <div className={styles.profileActions}>
-          {data.isCurrentPlayer ? (
-            <Link className="ui-button ui-button--secondary" href="/profile">
-              Ver mi perfil completo
-            </Link>
-          ) : (
-            <>
-              <ConnectionControls playerId={playerId} />
-              <ReportControl targetId={playerId} targetType="PLAYER" />
-            </>
-          )}
-        </div>
-      </header>
-
-      <div className={styles.layout}>
+      <section
+        className={styles.publicIdentity}
+        aria-labelledby="public-player-name"
+      >
+        <div className={styles.identityPitch} aria-hidden="true" />
+        <div className={styles.identityIllustration} aria-hidden="true" />
+        <span className={styles.profileSerial} aria-hidden="true">
+          FIFAR / PLAYER / {playerId.slice(0, 4).toUpperCase()}
+        </span>
         <aside className={styles.cardArea}>
           <PlayerCard
             attributes={data.performance.attributes}
@@ -109,60 +101,92 @@ export function PublicPlayerProfileScreen({
               data.player.image ? mediaContentUrl(data.player.image.url) : null
             }
           />
-          {!data.performance.initialized && (
-            <Text tone="muted">
-              La card inicial permanece en 60 hasta procesar su primer partido.
-            </Text>
-          )}
         </aside>
+        <header className={styles.header}>
+          <span className={styles.identityBadge}>IDENTIDAD F5</span>
+          <Text as="h1" id="public-player-name" variant="display-lg">
+            {data.player.displayName}
+          </Text>
+          <Text tone="muted">
+            {data.performance.initialized
+              ? `${data.performance.processedMatchCount} partidos procesados`
+              : "Todavía no tiene partidos procesados"}
+          </Text>
+          <OvrPlate
+            detail={`${data.performance.processedMatchCount} partidos`}
+            size="large"
+            value={Math.round(data.performance.overall)}
+          />
+          <div className={styles.profileActions}>
+            {data.isCurrentPlayer ? (
+              <Link className="ui-button ui-button--secondary" href="/profile">
+                Ver mi perfil completo
+              </Link>
+            ) : (
+              <>
+                <ConnectionControls playerId={playerId} />
+                <ReportControl targetId={playerId} targetType="PLAYER" />
+              </>
+            )}
+          </div>
+        </header>
+      </section>
 
-        <main className={styles.content}>
-          <section className={styles.section}>
-            <div className={styles.profileSummary}>
-              <div>
-                <Text as="h2" variant="heading-lg">
-                  Perfil futbolístico
-                </Text>
-                <Text tone="muted">Identidad deportiva F5</Text>
-              </div>
-              <OverallDisplay value={Math.round(data.performance.overall)} />
+      <div className={styles.layout}>
+        <div className={styles.content}>
+          <section className={`${styles.section} ${styles.footballModule}`}>
+            <div className={styles.visualModuleHeading}>
+              <span>IDENTIDAD DE JUEGO</span>
+              <Text as="h2" variant="heading-lg">
+                Zona y atributos
+              </Text>
             </div>
             {data.footballProfile ? (
-              <>
-                <TagList
-                  empty="Sin roles declarados"
-                  items={data.footballProfile.preferredRoles}
-                />
-                {data.footballProfile.willingToPlayGoalkeeper && (
-                  <Text tone="accent" variant="label">
-                    PUEDE ATAJAR
-                  </Text>
-                )}
-                <div>
-                  <Text as="h3" variant="heading-md">
-                    Fortalezas declaradas
-                  </Text>
-                  <TagList
-                    empty="Sin fortalezas declaradas"
-                    items={data.footballProfile.strengths}
-                  />
-                </div>
-              </>
+              <V4PlayIdentity
+                attributes={data.performance.attributes}
+                roles={data.footballProfile.preferredRoles}
+                strengths={data.footballProfile.strengths}
+                willingToPlayGoalkeeper={
+                  data.footballProfile.willingToPlayGoalkeeper
+                }
+              />
             ) : (
-              <Text tone="muted">Todavía no completó sus preferencias F5.</Text>
+              <V4PlayIdentity
+                attributes={data.performance.attributes}
+                roles={[]}
+                strengths={[]}
+                willingToPlayGoalkeeper={false}
+              />
             )}
           </section>
 
-          <section className={styles.section}>
-            <Text as="h2" variant="heading-lg">
-              Resumen deportivo
-            </Text>
+          <section className={`${styles.section} ${styles.statsModule}`}>
+            <div className={styles.statsIdentity}>
+              {primaryGroup ? (
+                <V4GroupCrest
+                  name={primaryGroup.name}
+                  seed={primaryGroup.id}
+                  size="large"
+                />
+              ) : (
+                <span className={styles.statsF5Mark}>F5</span>
+              )}
+              <div>
+                <span>PERFORMANCE / CARRERA TOTAL</span>
+                <Text as="h2" variant="heading-lg">
+                  Resumen deportivo
+                </Text>
+                <small>{primaryGroup?.name ?? "Trayectoria FIFAR"}</small>
+              </div>
+            </div>
             <dl className={styles.metrics}>
               <Metric
+                mark="01"
                 label="Partidos"
                 value={data.performance.processedMatchCount}
               />
               <Metric
+                mark="02"
                 label="Promedio"
                 value={
                   data.summary.averageRating === null
@@ -170,19 +194,32 @@ export function PublicPlayerProfileScreen({
                     : Number(data.summary.averageRating).toFixed(1)
                 }
               />
-              <Metric label="Goles" value={data.summary.totalGoals} />
-              <Metric label="Asistencias" value={data.summary.totalAssists} />
+              <Metric mark="03" label="Goles" value={data.summary.totalGoals} />
+              <Metric
+                mark="04"
+                label="Asistencias"
+                value={data.summary.totalAssists}
+              />
             </dl>
           </section>
 
-          <section className={styles.section}>
-            <Text as="h2" variant="heading-lg">
-              Grupos
-            </Text>
+          <section className={`${styles.section} ${styles.groupsModule}`}>
+            <div className={styles.moduleHeader}>
+              <Text as="h2" variant="heading-lg">
+                Grupos
+              </Text>
+              <span>{data.groups.length.toString().padStart(2, "0")}</span>
+            </div>
             <ul className={styles.contextList}>
               {data.groups.map((group) => (
                 <li key={group.id}>
+                  <V4GroupCrest
+                    name={group.name}
+                    seed={group.id}
+                    size="large"
+                  />
                   <Link href={`/groups/${group.id}`}>{group.name}</Link>
+                  <small>GRUPO PÚBLICO</small>
                   <span aria-hidden="true">→</span>
                 </li>
               ))}
@@ -194,15 +231,27 @@ export function PublicPlayerProfileScreen({
             </ul>
           </section>
 
-          <section className={styles.section}>
-            <Text as="h2" variant="heading-lg">
-              Logros
-            </Text>
+          <section
+            className={`${styles.section} ${styles.rewardsModule} ${styles.achievementModule}`}
+          >
+            <div className={styles.moduleHeader}>
+              <Text as="h2" variant="heading-lg">
+                Logros
+              </Text>
+              <span>COLLECTION</span>
+            </div>
             <ul className={styles.rewardList}>
               {data.rewards.achievements.map((achievement) => (
                 <li key={achievement.type}>
-                  <strong>{achievement.title}</strong>
-                  <small>{achievement.description}</small>
+                  <V4RewardBadge
+                    label={achievement.title}
+                    seed={achievement.type}
+                    size="large"
+                  />
+                  <span>
+                    <strong>{achievement.title}</strong>
+                    <small>{achievement.description}</small>
+                  </span>
                 </li>
               ))}
               {data.rewards.achievements.length === 0 && (
@@ -213,18 +262,30 @@ export function PublicPlayerProfileScreen({
             </ul>
           </section>
 
-          <section className={styles.section}>
-            <Text as="h2" variant="heading-lg">
-              Premios
-            </Text>
+          <section
+            className={`${styles.section} ${styles.rewardsModule} ${styles.awardModule}`}
+          >
+            <div className={styles.moduleHeader}>
+              <Text as="h2" variant="heading-lg">
+                Premios
+              </Text>
+              <span>HONOURS</span>
+            </div>
             <ul className={styles.rewardList}>
               {data.rewards.awardSummary.map((award) => (
                 <li key={award.type}>
-                  <strong>
-                    {award.title}
-                    {award.count > 1 ? ` ×${award.count}` : ""}
-                  </strong>
-                  <small>{award.description}</small>
+                  <V4RewardBadge
+                    label={award.title}
+                    seed={award.type}
+                    size="large"
+                  />
+                  <span>
+                    <strong>
+                      {award.title}
+                      {award.count > 1 ? ` ×${award.count}` : ""}
+                    </strong>
+                    <small>{award.description}</small>
+                  </span>
                 </li>
               ))}
               {data.rewards.awardSummary.length === 0 && (
@@ -234,7 +295,7 @@ export function PublicPlayerProfileScreen({
               )}
             </ul>
           </section>
-        </main>
+        </div>
       </div>
     </div>
   );
@@ -448,26 +509,14 @@ function publicProfileErrorMessage(error: unknown) {
   return "No pudimos cargar este perfil deportivo.";
 }
 
-function TagList({
-  items,
-  empty,
-}: Readonly<{ items: string[]; empty: string }>) {
-  if (items.length === 0) return <Text tone="muted">{empty}</Text>;
-  return (
-    <ul className={styles.tags}>
-      {items.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  );
-}
-
 function Metric({
   label,
   value,
-}: Readonly<{ label: string; value: number | string }>) {
+  mark,
+}: Readonly<{ label: string; value: number | string; mark: string }>) {
   return (
     <div>
+      <span aria-hidden="true">{mark}</span>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>

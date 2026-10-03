@@ -97,17 +97,17 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
 
   if (match.isPending)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p role="status">Cargando datos del partido…</p>
-      </main>
+      </div>
     );
   if (match.isError)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p className={styles.error} role="alert">
           {match.error.message}
         </p>
-      </main>
+      </div>
     );
 
   const editable =
@@ -115,7 +115,7 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
     (match.data.status === "DRAFT" || match.data.status === "OPEN");
   if (!editable)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <Link className={styles.back} href={`/play/matches/${matchId}`}>
           ← PARTIDO
         </Link>
@@ -129,11 +129,11 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
           Sólo una persona autorizada puede cambiar un partido en borrador o
           abierto.
         </Text>
-      </main>
+      </div>
     );
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/play/matches/${matchId}`}>
         ← PARTIDO
       </Link>
@@ -300,7 +300,7 @@ export function MatchEditScreen({ matchId }: Readonly<{ matchId: string }>) {
           {update.isPending ? "Guardando…" : "Guardar cambios"}
         </Button>
       </div>
-    </main>
+    </div>
   );
 }
 

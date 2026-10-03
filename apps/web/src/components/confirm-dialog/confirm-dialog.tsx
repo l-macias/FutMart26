@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 import { Button, Text } from "@football/ui";
 
@@ -32,6 +32,7 @@ export function ConfirmDialog({
   onCancel,
 }: Readonly<ConfirmDialogProps>) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -43,7 +44,9 @@ export function ConfirmDialog({
 
   return (
     <dialog
+      aria-labelledby={titleId}
       className={styles.dialog}
+      data-tone={tone}
       onCancel={(event) => {
         event.preventDefault();
         onCancel();
@@ -54,7 +57,7 @@ export function ConfirmDialog({
         <Text tone="accent" variant="label">
           {eyebrow}
         </Text>
-        <Text as="h2" variant="heading-lg">
+        <Text as="h2" id={titleId} variant="heading-lg">
           {title}
         </Text>
         <Text tone="muted">{message}</Text>

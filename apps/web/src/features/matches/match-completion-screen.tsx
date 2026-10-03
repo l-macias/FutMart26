@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Badge, Button, Surface, Text } from "@football/ui";
 
@@ -74,6 +74,7 @@ export function MatchCompletionScreen({
 }: Readonly<{ matchId: string }>) {
   const queryClient = useQueryClient();
   const confirmDialog = useRef<HTMLDialogElement>(null);
+  const closureDialogTitleId = useId();
   const match = useQuery({
     queryKey: queryKeys.match(matchId),
     queryFn: () => api.match(matchId),
@@ -237,20 +238,20 @@ export function MatchCompletionScreen({
     result.isPending
   )
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p role="status">Preparando cierre del partido…</p>
-      </main>
+      </div>
     );
   if (match.isError || teams.isError || roster.isError || result.isError)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p className={styles.error} role="alert">
           {match.error?.message ??
             teams.error?.message ??
             roster.error?.message ??
             result.error?.message}
         </p>
-      </main>
+      </div>
     );
 
   if (match.data.status === "FINISHED" && !roster.data.closureEditable)
@@ -264,7 +265,7 @@ export function MatchCompletionScreen({
     );
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <header className={styles.header}>
         <Link href={`/play/matches/${matchId}`}>← PARTIDO</Link>
         <div>
@@ -446,12 +447,16 @@ export function MatchCompletionScreen({
         </section>
       )}
 
-      <dialog className={styles.dialog} ref={confirmDialog}>
+      <dialog
+        aria-labelledby={closureDialogTitleId}
+        className={styles.dialog}
+        ref={confirmDialog}
+      >
         <form method="dialog">
           <Text tone="accent" variant="label">
             FINALIZAR PARTIDO
           </Text>
-          <Text as="h2" variant="heading-lg">
+          <Text as="h2" id={closureDialogTitleId} variant="heading-lg">
             Confirmar cierre deportivo.
           </Text>
           <p>
@@ -482,7 +487,7 @@ export function MatchCompletionScreen({
           </div>
         </form>
       </dialog>
-    </main>
+    </div>
   );
 
   function hydrateDraft() {
@@ -555,7 +560,7 @@ function ReadOnlyClosure({
   }));
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <header className={styles.header}>
         <Link href={`/play/matches/${matchId}`}>← PARTIDO</Link>
         <div>
@@ -633,7 +638,7 @@ function ReadOnlyClosure({
           </Surface>
         ))}
       </div>
-    </main>
+    </div>
   );
 }
 

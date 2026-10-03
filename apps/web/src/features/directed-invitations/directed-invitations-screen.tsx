@@ -65,7 +65,7 @@ export function DirectedInvitationsScreen() {
       </div>
     );
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
       <header className={styles.header}>
         <Text as="span" tone="accent" variant="label">
           PROPUESTAS DE JUEGO
@@ -182,7 +182,7 @@ export function DirectedInvitationsScreen() {
           {feedback}
         </p>
       ) : null}
-    </main>
+    </div>
   );
 }
 

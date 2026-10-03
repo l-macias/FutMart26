@@ -130,14 +130,14 @@ export function GroupSettingsScreen({
   );
 
   if (group.isPending || me.isPending || members.isPending)
-    return <main className={styles.page}>Cargando configuración…</main>;
+    return <div className={styles.page}>Cargando configuración…</div>;
   if (group.isError || me.isError || members.isError)
     return (
-      <main className={styles.page}>
+      <div className={styles.page}>
         <p className={styles.error} role="alert">
           {group.error?.message ?? me.error?.message ?? members.error?.message}
         </p>
-      </main>
+      </div>
     );
 
   const isOwner = group.data.role === "OWNER";
@@ -170,7 +170,7 @@ export function GroupSettingsScreen({
   }
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/groups/${groupId}`}>
         ← VOLVER AL GRUPO
       </Link>
@@ -733,7 +733,7 @@ export function GroupSettingsScreen({
         tone={confirm?.tone}
         title={confirm?.title ?? "Confirmar"}
       />
-    </main>
+    </div>
   );
 }
 

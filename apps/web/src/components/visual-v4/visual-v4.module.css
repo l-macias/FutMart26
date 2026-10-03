@@ -1,0 +1,323 @@
+.crest,
+.portrait,
+.rewardBadge {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  isolation: isolate;
+}
+.crest {
+  inline-size: 3.25rem;
+  filter: drop-shadow(0 0.55rem 0.8rem rgb(2 5 12 / 42%));
+}
+.crestdefault {
+  inline-size: 3.25rem;
+}
+.crestcompact {
+  inline-size: 2.6rem;
+}
+.crestlarge {
+  inline-size: 5.5rem;
+}
+.crest img,
+.rewardBadge img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+.portrait {
+  inline-size: 4rem;
+  aspect-ratio: 4/5;
+  overflow: hidden;
+  clip-path: polygon(12% 0, 100% 0, 100% 86%, 86% 100%, 0 100%, 0 12%);
+  background: var(--v4-surface-raised);
+  box-shadow: 0 0.8rem 1.4rem rgb(0 0 0 / 34%);
+}
+.portraitdefault {
+  inline-size: 4rem;
+}
+.portraitlarge {
+  inline-size: 8rem;
+}
+.portrait img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: 50% 18%;
+}
+.rewardBadge {
+  filter: drop-shadow(0 0.5rem 0.8rem rgb(0 0 0 / 38%));
+}
+.rewardBadgedefault {
+  inline-size: 3.8rem;
+}
+.rewardBadgelarge {
+  inline-size: clamp(5.5rem, 20vw, 7.5rem);
+}
+
+.tierPlate {
+  --tier-metal: var(--v4-gold);
+  --tier-light: var(--v4-gold-light);
+  display: grid;
+  min-inline-size: 4rem;
+  min-block-size: 4.5rem;
+  place-content: center;
+  justify-items: center;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--tier-light) 62%, transparent);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--tier-light) 18%, transparent),
+      transparent 48%
+    ),
+    color-mix(in srgb, var(--tier-metal) 22%, var(--v4-canvas));
+  color: var(--tier-light);
+  box-shadow: inset 0 0 1.1rem
+    color-mix(in srgb, var(--tier-light) 10%, transparent);
+  clip-path: polygon(
+    0.55rem 0,
+    100% 0,
+    100% calc(100% - 0.55rem),
+    calc(100% - 0.55rem) 100%,
+    0 100%,
+    0 0.55rem
+  );
+}
+
+.tierPlate[data-tier="bronze"] {
+  --tier-metal: #8b5a3c;
+  --tier-light: #d4a47d;
+}
+
+.tierPlate[data-tier="silver"] {
+  --tier-metal: #6d7a8d;
+  --tier-light: #d7e1ed;
+}
+
+.tierPlate[data-tier="elite"] {
+  --tier-metal: #1f705e;
+  --tier-light: #e1c978;
+}
+
+.tierPlate[data-tier="legend"] {
+  --tier-metal: #d9d3bd;
+  --tier-light: #fff6d8;
+  color: var(--v4-canvas);
+}
+
+.tierPlate strong {
+  font: 600 2.25rem/0.72 var(--font-v4-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.tierPlate small {
+  font: 700 0.55rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
+}
+
+.tierPlateCompact {
+  min-inline-size: 3.25rem;
+  min-block-size: 3.25rem;
+  padding: 0.3rem 0.45rem;
+}
+
+.tierPlateCompact strong {
+  font-size: 1.75rem;
+}
+
+.playIdentity {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 0.72fr) minmax(0, 1.28fr);
+  min-inline-size: 0;
+  gap: clamp(1rem, 4vw, 2rem);
+  align-items: center;
+}
+
+.miniPitch {
+  position: relative;
+  display: block;
+  min-inline-size: 0;
+  aspect-ratio: 0.72;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--v4-gold) 34%, transparent);
+  background:
+    linear-gradient(180deg, rgb(9 35 30 / 24%), rgb(6 17 27 / 76%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center/cover;
+  box-shadow:
+    inset 0 0 2.5rem rgb(0 0 0 / 54%),
+    0 1rem 2rem rgb(0 0 0 / 26%);
+  clip-path: polygon(
+    0.8rem 0,
+    100% 0,
+    100% calc(100% - 0.8rem),
+    calc(100% - 0.8rem) 100%,
+    0 100%,
+    0 0.8rem
+  );
+}
+
+.miniPitch::before {
+  position: absolute;
+  inset: 7%;
+  border: 1px solid rgb(240 213 140 / 42%);
+  content: "";
+}
+
+.pitchHalfway,
+.pitchCircle,
+.pitchAreaTop,
+.pitchAreaBottom {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  border-color: rgb(240 213 140 / 42%);
+}
+
+.pitchHalfway {
+  inset-block-start: 50%;
+  inset-inline: 7%;
+  border-block-start: 1px solid rgb(240 213 140 / 42%);
+}
+
+.pitchCircle {
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 34%;
+  aspect-ratio: 1;
+  border: 1px solid rgb(240 213 140 / 42%);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.pitchAreaTop,
+.pitchAreaBottom {
+  inset-inline-start: 31%;
+  inline-size: 38%;
+  block-size: 16%;
+  border: 1px solid rgb(240 213 140 / 42%);
+}
+
+.pitchAreaTop {
+  inset-block-start: 7%;
+  border-block-start: 0;
+}
+
+.pitchAreaBottom {
+  inset-block-end: 7%;
+  border-block-end: 0;
+}
+
+.positionMarker {
+  --marker-offset: 0;
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  inline-size: 2.6rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid var(--v4-gold-light);
+  border-radius: 50%;
+  background: var(--v4-canvas);
+  color: var(--v4-gold-light);
+  font: 700 0.68rem/1 var(--font-v4-interface);
+  letter-spacing: 0.05em;
+  box-shadow: 0 0.55rem 1.1rem rgb(0 0 0 / 48%);
+  transform: translateX(calc((var(--marker-offset) - 0.5) * 2.1rem));
+}
+
+.positionPORTERO {
+  inset-block-end: 10%;
+  inset-inline-start: calc(50% - 1.3rem);
+}
+
+.positionDEFENSIVO {
+  inset-block-end: 29%;
+  inset-inline-start: calc(50% - 1.3rem);
+}
+
+.positionMEDIO,
+.positionLIBRE {
+  inset-block-start: calc(50% - 1.3rem);
+  inset-inline-start: calc(50% - 1.3rem);
+}
+
+.positionOFENSIVO {
+  inset-block-start: 15%;
+  inset-inline-start: calc(50% - 1.3rem);
+}
+
+.playIdentityData {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.35rem;
+}
+
+.playIdentityData > span {
+  color: var(--v4-gold-light);
+  font: 700 0.67rem/1 var(--font-v4-interface);
+  letter-spacing: 0.14em;
+}
+
+.playIdentityData > strong {
+  color: var(--v4-text);
+  font: 600 clamp(2rem, 8vw, 3.65rem) / 0.82 var(--font-v4-display);
+  text-transform: uppercase;
+}
+
+.playIdentityData > small {
+  color: var(--v4-muted);
+  font: 600 0.78rem/1.35 var(--font-v4-interface);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.keyAttributes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0;
+  margin: 0.8rem 0 0;
+}
+
+.keyAttributes > div {
+  display: grid;
+  gap: 0.1rem;
+  min-inline-size: 0;
+  padding: 0.6rem 0.45rem;
+  background: color-mix(in srgb, var(--v4-canvas) 72%, transparent);
+  text-align: center;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.45rem) 0,
+    100% 0.45rem,
+    100% 100%,
+    0 100%
+  );
+}
+
+.keyAttributes dt {
+  color: var(--v4-muted);
+  font: 700 0.6rem/1 var(--font-v4-interface);
+  letter-spacing: 0.08em;
+}
+
+.keyAttributes dd {
+  margin: 0;
+  color: var(--v4-gold-light);
+  font: 600 1.7rem/0.9 var(--font-v4-display);
+}
+
+@media (max-width: 27rem) {
+  .playIdentity {
+    grid-template-columns: minmax(7.5rem, 0.68fr) minmax(0, 1.32fr);
+    gap: 0.8rem;
+  }
+
+  .positionMarker {
+    inline-size: 2.25rem;
+    font-size: 0.58rem;
+  }
+}

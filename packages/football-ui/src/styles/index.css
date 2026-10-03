@@ -9,6 +9,24 @@
   color: var(--foreground-primary);
 }
 
+.ui-visual-v3 .football-overall {
+  border-block-color: color-mix(
+    in srgb,
+    var(--accent-primary) 62%,
+    transparent
+  );
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--accent-primary) 8%, transparent),
+    var(--background-elevated) 52%
+  );
+}
+
+.ui-visual-v3 .football-overall__value,
+.ui-visual-v3 .football-overall__label {
+  color: var(--accent-primary);
+}
+
 .football-overall__value {
   font: 800 var(--overall-value-size) / var(--type-leading-tight)
     var(--font-display, var(--font-display-fallback));

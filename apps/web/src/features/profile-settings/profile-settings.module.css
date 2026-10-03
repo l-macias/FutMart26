@@ -1,73 +1,57 @@
-.page,
-.header,
-.sections,
-.section,
-.section > div {
+.dashboard,
+.group,
+.groupHeader,
+.rows {
   display: grid;
   min-inline-size: 0;
 }
 
-.page {
-  gap: var(--space-5);
-  max-inline-size: var(--content-settings);
-  margin-inline: auto;
-  padding-block-end: var(--space-7);
+.dashboard {
+  gap: var(--space-6);
 }
 
-.header,
-.section > div {
-  gap: var(--space-2);
-}
-
-.sections {
-  gap: 0;
-  border-block-start: var(--border-width-thin) solid var(--border-subtle);
-}
-
-.section {
+.group {
   gap: var(--space-3);
-  min-block-size: var(--row-min-height-default);
-  padding-block: var(--space-4);
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
 }
 
-.section > a {
-  justify-self: start;
-}
-.danger {
-  margin-block-start: var(--space-5);
-  padding-inline: var(--space-4);
-  border-inline-start: var(--border-width-strong) solid var(--state-negative);
-  background: color-mix(
-    in srgb,
-    var(--state-negative) 4%,
-    var(--background-surface)
-  );
+.groupHeader {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+  padding-inline: var(--space-1);
 }
 
-.back,
-.links a {
-  color: var(--foreground-muted);
-  font: 700 var(--type-label-size) / 1
-    var(--font-interface, var(--font-interface-fallback));
-  letter-spacing: var(--type-tracking-label);
+.groupHeader span {
+  grid-column: 1 / -1;
+  color: var(--v4-gold-light);
+  font: 700 0.58rem/1 var(--font-v4-interface);
+  letter-spacing: 0.17em;
+}
+
+.groupHeader h2 {
+  margin: 0;
+  color: var(--v4-text);
+  font: 600 1.75rem/0.9 var(--font-v4-display);
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
-.links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
+.rows {
+  overflow: hidden;
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 15%);
 }
 
-@media (min-width: 48rem) {
-  .section {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    padding-inline: var(--space-3);
+.risk .groupHeader span,
+.risk .groupHeader h2 {
+  color: var(--state-negative);
+}
+
+@media (max-width: 47.99rem) {
+  .dashboard {
+    gap: var(--space-5);
   }
 
-  .section:last-child {
-    grid-template-columns: minmax(0, 1fr);
+  .groupHeader h2 {
+    font-size: 1.55rem;
   }
 }

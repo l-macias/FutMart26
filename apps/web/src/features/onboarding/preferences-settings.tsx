@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
+import { SettingsFrame } from "@/features/profile-settings/settings-visual";
 import { FootballOnboarding } from "./football-onboarding";
 
 export function PreferencesSettings() {
@@ -16,9 +17,16 @@ export function PreferencesSettings() {
   if (player.isError || preferences.isError)
     return <p role="alert">No pudimos cargar tus preferencias.</p>;
   return (
-    <FootballOnboarding
-      playerName={player.data.displayName}
-      initial={preferences.data}
-    />
+    <SettingsFrame
+      active="football"
+      description="Ajustá cómo jugás y qué señales ayudan a armar los equipos."
+      eyebrow="FÚTBOL F5"
+      title="Preferencias de juego"
+    >
+      <FootballOnboarding
+        playerName={player.data.displayName}
+        initial={preferences.data}
+      />
+    </SettingsFrame>
   );
 }

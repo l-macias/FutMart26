@@ -25,7 +25,7 @@ const playStyles = readFileSync(
 
 void test("Home prioritizes personal attention without restoring global discovery", () => {
   assert.ok(
-    home.indexOf("<CompactMatch") < home.indexOf("Necesita tu atención"),
+    home.indexOf("<HomeMatchFeature") < home.indexOf("Necesita tu atención"),
   );
   assert.ok(
     home.indexOf("Necesita tu atención") <
@@ -48,15 +48,36 @@ void test("Play separates opportunities, upcoming and history without duplicates
   assert.equal(play.includes("/play/matches/${match.id}"), true);
 });
 
-void test("Home and Play apply one sports feature and compact row collections", () => {
-  assert.equal(compactMatch.includes('elevation="feature"'), true);
+void test("Home and Play V4 preserve distinct sports collection contracts", () => {
+  assert.equal(compactMatch.includes("home-feature-night.webp"), true);
+  assert.equal(compactMatch.includes("V4GroupCrest"), true);
   assert.equal(compactMatch.includes("ui-button--primary"), true);
-  assert.equal(home.includes("ui-list"), true);
-  assert.equal(home.includes("ui-row"), true);
-  assert.equal(play.includes("ui-list"), true);
-  assert.equal(play.includes("ui-row"), true);
+  assert.equal(home.includes("<HomeMatchFeature"), true);
+  assert.equal(home.includes("attentionDeck"), true);
+  assert.equal(home.includes("opportunityRail"), true);
+  assert.equal(homeStyles.includes("home-feature-night.webp"), true);
+  assert.equal(homeStyles.includes("home-empty-pitch.webp"), true);
+  assert.equal(home.includes("V4GroupCrest"), true);
+  assert.equal(home.includes("V4Portrait"), true);
+  assert.equal(play.includes("OpportunityCard"), true);
+  assert.equal(play.includes("opportunityGrid"), true);
+  assert.equal(play.includes("MatchDeck"), true);
+  assert.equal(play.includes("V4GroupCrest"), true);
+  assert.equal(playStyles.includes("match-open-night.webp"), true);
+  assert.equal(playStyles.includes("grid-auto-flow: column"), true);
+  assert.equal(playStyles.includes('data-view="history"'), true);
   assert.equal(homeStyles.includes("var(--density-feature-padding)"), false);
   assert.equal(playStyles.includes("200px"), false);
+});
+
+void test("Play V4 varies opportunities without inventing missing domain data", () => {
+  assert.equal(play.includes("matchesMyProfile"), true);
+  assert.equal(play.includes("item.needs.slice(0, 2)"), true);
+  assert.equal(play.includes("item.openSpots"), true);
+  assert.equal(play.includes("item.capacity"), false);
+  assert.equal(play.includes("item.participants"), false);
+  assert.equal(play.includes("item.overall"), false);
+  assert.equal(play.includes("ui-visual-v4"), true);
 });
 
 void test("Play tabs expose accessible selected state without changing views", () => {

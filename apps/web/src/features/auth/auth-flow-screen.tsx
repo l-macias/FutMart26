@@ -9,6 +9,7 @@ import { Button, Text } from "@football/ui";
 import { authClient } from "@/lib/auth/auth-client";
 
 import { authErrorMessage, networkAuthErrorMessage } from "./auth-errors";
+import { AuthVisualScene } from "./auth-visual-scene";
 import styles from "./auth-flow.module.css";
 
 export function ForgotPasswordScreen() {
@@ -209,18 +210,20 @@ function AuthFlowLayout({
   title,
 }: Readonly<{ children: React.ReactNode; eyebrow: string; title: string }>) {
   return (
-    <main className={styles.page}>
-      <section className={styles.panel}>
-        <span aria-hidden="true" className={styles.mark}>
-          F5
-        </span>
-        <Text tone="accent" variant="label">
-          {eyebrow}
-        </Text>
-        <Text as="h1" variant="display-lg">
-          {title}
-        </Text>
-        {children}
+    <main className={`${styles.page} ui-visual-v4`}>
+      <AuthVisualScene
+        compact
+        eyebrow="Seguridad FIFAR"
+        title="Tu acceso sigue en juego."
+      />
+      <section className={styles.access}>
+        <div className={styles.panel}>
+          <header className={styles.panelHeader}>
+            <span>{eyebrow}</span>
+            <h1>{title}</h1>
+          </header>
+          {children}
+        </div>
       </section>
     </main>
   );
@@ -265,7 +268,12 @@ function Field({
   return (
     <label className={styles.field}>
       <span>{label}</span>
-      <input {...input} aria-label={label} required />
+      <span className={styles.inputShell}>
+        <span aria-hidden="true" className={styles.fieldIndex}>
+          {input.name === "confirmation" ? "02" : "01"}
+        </span>
+        <input {...input} aria-label={label} required />
+      </span>
     </label>
   );
 }

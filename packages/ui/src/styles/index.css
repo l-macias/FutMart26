@@ -125,6 +125,148 @@
   --z-header: 30;
 }
 
+/* Visual Foundation V3 is intentionally opt-in while the pilot is reviewed.
+   It remaps the existing semantic contract instead of creating feature colors. */
+:root:has(.ui-visual-v3),
+.ui-visual-v3 {
+  color-scheme: dark;
+
+  --background-canvas: #0b1020;
+  --background-surface: #121a2c;
+  --background-elevated: #19243b;
+  --background-surface-raised: var(--background-elevated);
+  --foreground-primary: #f2f3f5;
+  --foreground-muted: #a2abba;
+  --accent-primary: #d6b15f;
+  --accent-muted: #b9944a;
+  --pitch-surface: #28564a;
+  --state-positive: #66bd91;
+  --state-negative: #eb7479;
+  --state-warning: #d9a94f;
+  --status-negative: var(--state-negative);
+  --color-text-muted: var(--foreground-muted);
+
+  --color-accent: var(--accent-primary);
+  --color-success: var(--state-positive);
+  --color-warning: var(--state-warning);
+  --color-danger: var(--state-negative);
+  --color-info: #7f9fc5;
+  --color-text: var(--foreground-primary);
+  --color-muted: var(--foreground-muted);
+  --color-border: color-mix(
+    in srgb,
+    var(--foreground-primary) 13%,
+    transparent
+  );
+  --color-surface: var(--background-surface);
+  --color-surface-raised: var(--background-elevated);
+  --color-surface-feature: color-mix(
+    in srgb,
+    var(--background-elevated) 84%,
+    var(--accent-primary)
+  );
+  --color-overlay: color-mix(
+    in srgb,
+    var(--background-elevated) 97%,
+    transparent
+  );
+
+  --border-subtle: color-mix(
+    in srgb,
+    var(--foreground-primary) 13%,
+    transparent
+  );
+  --border-strong: color-mix(
+    in srgb,
+    var(--foreground-primary) 24%,
+    transparent
+  );
+  --border-accent: color-mix(in srgb, var(--accent-primary) 62%, transparent);
+  --elevation-raised: 0 1rem 2.5rem rgb(2 5 12 / 34%);
+  --elevation-overlay: 0 1.5rem 4rem rgb(2 5 12 / 52%);
+  --v3-cut: 0.75rem;
+  --v3-pitch-line: color-mix(
+    in srgb,
+    var(--foreground-primary) 12%,
+    transparent
+  );
+  --v3-gold-line: color-mix(in srgb, var(--accent-primary) 46%, transparent);
+  --content-max: 88rem;
+  --content-wide: 72rem;
+}
+
+.ui-visual-v3 .ui-button--primary {
+  border-color: color-mix(in srgb, var(--accent-primary) 78%, white);
+  background: var(--accent-primary);
+  color: var(--background-canvas);
+  clip-path: polygon(
+    var(--v3-cut) 0,
+    100% 0,
+    calc(100% - var(--v3-cut)) 100%,
+    0 100%
+  );
+}
+
+.ui-visual-v3 .ui-button--secondary {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--background-elevated) 78%, transparent);
+}
+
+.ui-visual-v3 .ui-icon-button {
+  background: color-mix(in srgb, var(--background-surface) 82%, transparent);
+}
+
+.ui-visual-v3 .ui-surface--feature {
+  border-color: color-mix(in srgb, var(--accent-primary) 34%, transparent);
+}
+
+.ui-visual-v3 .ui-row + .ui-row {
+  border-block-start-color: var(--color-border);
+}
+
+/* FIFAR V4 is the user-facing visual scope. Admin keeps its own operational
+   density and only consumes the shared semantic primitives above. */
+:root:has(.ui-visual-v4),
+.ui-visual-v4,
+.ui-notification-v4 {
+  --font-display: var(--font-v4-display), "Arial Narrow", sans-serif;
+  --font-interface: var(--font-v4-interface), Arial, sans-serif;
+  --v4-canvas: #070d19;
+  --v4-surface: #111b2e;
+  --v4-surface-raised: #1a2942;
+  --v4-gold: #d8b564;
+  --v4-gold-light: #f1d995;
+  --v4-pitch: #285b4c;
+  --v4-text: #f4f3ef;
+  --v4-muted: #aeb6c3;
+  --background-canvas: var(--v4-canvas);
+  --background-surface: var(--v4-surface);
+  --background-elevated: var(--v4-surface-raised);
+  --foreground-primary: var(--v4-text);
+  --foreground-muted: var(--v4-muted);
+  --accent-primary: var(--v4-gold);
+  --pitch-surface: var(--v4-pitch);
+  --color-accent: var(--v4-gold);
+  --color-text: var(--v4-text);
+  --color-muted: var(--v4-muted);
+  --color-border: color-mix(in srgb, var(--v4-text) 13%, transparent);
+  --border-subtle: color-mix(in srgb, var(--v4-text) 13%, transparent);
+  --border-strong: color-mix(in srgb, var(--v4-text) 24%, transparent);
+  --border-accent: color-mix(in srgb, var(--v4-gold) 62%, transparent);
+}
+
+.ui-visual-v4 .ui-button {
+  font-family: var(--font-interface);
+  border-radius: 0.35rem;
+}
+
+.ui-visual-v4 .ui-button--primary {
+  border-color: color-mix(in srgb, var(--v4-gold) 78%, white);
+  background: linear-gradient(135deg, var(--v4-gold-light), var(--v4-gold));
+  color: var(--v4-canvas);
+  clip-path: polygon(0.65rem 0, 100% 0, calc(100% - 0.65rem) 100%, 0 100%);
+}
+
 .ui-button,
 .ui-icon-button {
   min-block-size: var(--touch-target-min);

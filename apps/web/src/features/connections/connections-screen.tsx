@@ -27,7 +27,7 @@ export function ConnectionsScreen() {
   const outgoing = useConnectionRequests("outgoing");
 
   return (
-    <main className={styles.page}>
+    <div className={styles.page}>
       <header className={styles.header}>
         <Text as="span" tone="accent" variant="label">
           RED DE JUEGO
@@ -94,7 +94,7 @@ export function ConnectionsScreen() {
           </button>
         )}
       </section>
-    </main>
+    </div>
   );
 }
 

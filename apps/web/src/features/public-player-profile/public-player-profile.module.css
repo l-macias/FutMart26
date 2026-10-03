@@ -1,10 +1,9 @@
 .page,
-.header,
-.cardArea,
 .content,
 .section,
-.profileSummary > div,
-.rewardList li,
+.header,
+.privateContent,
+.connectionActions,
 .groupInviteControl,
 .groupInviteOptions {
   display: grid;
@@ -12,115 +11,344 @@
 }
 
 .page {
-  gap: var(--space-5);
-  padding-block-end: var(--space-7);
+  position: relative;
+  gap: clamp(1rem, 3vw, 2rem);
+  padding-block-end: var(--space-8);
+  color: var(--v4-text);
+  isolation: isolate;
+}
+
+.page::before {
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(5 10 20 / 88%), rgb(5 10 20 / 97%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center top/cover fixed,
+    var(--v4-canvas);
+  content: "";
 }
 
 .back {
-  justify-self: start;
-  min-block-size: var(--touch-target-min);
-  align-content: center;
-  color: var(--foreground-muted);
-  font: 700 var(--type-label-size) / 1
-    var(--font-interface, var(--font-interface-fallback));
-  letter-spacing: var(--type-tracking-label);
-  text-transform: uppercase;
+  inline-size: fit-content;
+  color: var(--v4-muted);
+  font: 700 0.72rem/1 var(--font-v4-interface);
+  letter-spacing: 0.16em;
+}
+
+.publicIdentity,
+.privateIdentity {
+  position: relative;
+  isolation: isolate;
+  min-inline-size: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--v4-gold) 25%, transparent);
+  background: var(--v4-surface);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 1.4rem) 0,
+    100% 1.4rem,
+    100% 100%,
+    0 100%
+  );
+}
+
+.publicIdentity {
+  display: grid;
+  min-block-size: 39rem;
+}
+
+.identityPitch,
+.privateBackdrop {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgb(7 13 25 / 8%), var(--v4-canvas) 94%),
+    linear-gradient(90deg, rgb(5 10 20 / 20%), rgb(5 10 20 / 62%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center/cover;
+}
+
+.identityIllustration {
+  position: absolute;
+  z-index: -1;
+  inset: 4% -10% auto auto;
+  inline-size: min(34rem, 88vw);
+  aspect-ratio: 1;
+  background: url("/fifar-v4/illustrations/identity-slash.svg") center/contain
+    no-repeat;
+  opacity: 0.52;
+  pointer-events: none;
+}
+
+.profileSerial {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 0.85rem;
+  inset-inline-end: 1.15rem;
+  color: color-mix(in srgb, var(--v4-gold-light) 68%, transparent);
+  font: 600 0.62rem/1 var(--font-v4-interface);
+  letter-spacing: 0.18em;
+}
+
+.cardArea {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  align-self: start;
+  padding: 2.75rem 1rem 0;
+}
+
+.cardArea > figure {
+  inline-size: min(100%, 18rem);
+  filter: drop-shadow(0 1.4rem 2rem rgba(0, 0, 0, 0.4));
 }
 
 .header {
-  gap: var(--space-3);
-  padding-block-end: var(--space-4);
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+  position: relative;
+  z-index: 2;
+  align-content: end;
+  gap: 0.65rem;
+  padding: 1.25rem;
+  background: linear-gradient(180deg, transparent, rgba(7, 13, 25, 0.97) 24%);
 }
 
-.header > div:first-child,
-.section,
-.profileSummary > div {
-  display: grid;
-  gap: var(--space-2);
+.identityBadge {
+  inline-size: fit-content;
+  padding: 0.35rem 0.6rem;
+  border-inline-start: 2px solid var(--v4-gold);
+  background: color-mix(in srgb, var(--v4-gold) 11%, transparent);
+  color: var(--v4-gold-light);
+  font: 700 0.68rem/1 var(--font-v4-interface);
+  letter-spacing: 0.15em;
+}
+
+.header h1 {
+  max-inline-size: 11ch;
+  margin: 0;
+  font-family: var(--font-v4-display);
+  font-size: clamp(3.5rem, 15vw, 6.6rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 0.78;
+  text-wrap: balance;
+  text-transform: uppercase;
+}
+
+.header > :global([class*="ovrPlate"]) {
+  margin-block-start: 0.5rem;
 }
 
 .profileActions,
-.connectionActions {
+.privateActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0.65rem;
+  margin-block-start: 0.6rem;
 }
 
 .layout {
   display: grid;
   min-inline-size: 0;
-  gap: var(--space-6);
-}
-
-.cardArea {
-  justify-items: center;
-  align-content: start;
-  gap: var(--space-3);
-  text-align: center;
-}
-
-.cardArea > figure {
-  inline-size: min(100%, 17.5rem);
+  inline-size: min(100%, 72rem);
+  margin-inline: auto;
 }
 
 .content {
-  align-content: start;
-  gap: var(--space-5);
+  gap: clamp(0.8rem, 2vw, 1.35rem);
 }
 
 .section {
-  padding-block-end: var(--space-4);
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+  position: relative;
+  gap: 1rem;
+  overflow: hidden;
+  padding: 1.25rem;
+  background: linear-gradient(
+    145deg,
+    var(--v4-surface-raised),
+    var(--v4-surface)
+  );
+  box-shadow: 0 0.85rem 2rem rgb(0 0 0 / 22%);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.9rem) 0,
+    100% 0.9rem,
+    100% 100%,
+    0 100%
+  );
 }
 
+.section h2 {
+  font-family: var(--font-v4-display);
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.moduleHeader,
 .profileSummary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-4);
+  gap: 1rem;
+}
+
+.visualModuleHeading {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 0;
+}
+
+.visualModuleHeading > span {
+  color: var(--v4-gold-light);
+  font: 700 0.67rem/1 var(--font-v4-interface);
+  letter-spacing: 0.14em;
+}
+
+.moduleHeader {
+  padding-block-start: 0.9rem;
+}
+
+.moduleHeader > span {
+  color: var(--v4-gold);
+  font: 600 0.65rem/1 var(--font-v4-interface);
+  letter-spacing: 0.15em;
+}
+
+.footballModule {
+  min-block-size: 20rem;
+  background:
+    linear-gradient(105deg, rgb(7 18 28 / 94%), rgb(9 17 32 / 72%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center/cover;
+}
+
+.groupsModule {
+  min-inline-size: 0;
+}
+
+.profileSummary > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.f5Mark {
+  color: color-mix(in srgb, var(--v4-gold) 25%, transparent);
+  font: 600 clamp(5.5rem, 22vw, 9rem)/0.65 var(--font-v4-display);
 }
 
 .metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: var(--space-3) 0;
+  padding: 0;
   margin: 0;
-  border-block: var(--border-width-thin) solid var(--border-subtle);
+  gap: 0.45rem;
+  background: transparent;
 }
 
 .metrics > div {
+  position: relative;
   display: grid;
-  min-inline-size: 0;
-  gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
+  gap: 0.25rem;
+  min-block-size: 7rem;
+  align-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--v4-canvas) 74%, transparent);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.55rem) 0,
+    100% 0.55rem,
+    100% 100%,
+    0 100%
+  );
 }
 
 .metrics > div:nth-child(2n) {
-  border-inline-start: var(--border-width-thin) solid var(--border-subtle);
+  border-inline-start: 0;
+}
+
+.metrics > div > span {
+  position: absolute;
+  inset-block-start: 0.5rem;
+  inset-inline-end: 0.6rem;
+  color: color-mix(in srgb, var(--v4-gold-light) 34%, transparent);
+  font: 600 1.55rem/1 var(--font-v4-display);
 }
 
 .metrics dt,
 .rewardList small {
-  color: var(--foreground-muted);
-  font: 700 var(--type-metadata-size) / 1.2
-    var(--font-interface, var(--font-interface-fallback));
-  letter-spacing: var(--type-tracking-label);
+  color: var(--v4-muted);
+  font: 600 0.65rem/1.25 var(--font-v4-interface);
+  letter-spacing: 0.11em;
   text-transform: uppercase;
 }
 
 .metrics dd {
   margin: 0;
-  font: 900 var(--type-heading-lg-size) / 1
-    var(--font-display, var(--font-display-fallback));
+  color: var(--v4-text);
+  font: 600 clamp(2.8rem, 10vw, 4.3rem)/0.75 var(--font-v4-display);
   font-variant-numeric: tabular-nums;
+}
+
+.metrics > div:first-child dd {
+  color: var(--v4-gold-light);
+}
+
+.statsModule {
+  background:
+    linear-gradient(110deg, rgb(8 15 28 / 88%), rgb(8 15 28 / 96%)),
+    url("/fifar-v4/backgrounds-raster/players-tunnel.webp") center/cover;
+}
+
+.statsIdentity {
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+  gap: 1rem;
+}
+
+.statsIdentity > div {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0;
+}
+
+.statsIdentity > div > span {
+  color: var(--v4-gold-light);
+  font: 700 0.65rem/1 var(--font-v4-interface);
+  letter-spacing: 0.12em;
+}
+
+.statsIdentity small {
+  color: var(--v4-muted);
+  font: 600 0.72rem/1.2 var(--font-v4-interface);
+}
+
+.statsF5Mark {
+  display: grid;
+  inline-size: 5rem;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  place-items: center;
+  background: linear-gradient(145deg, var(--v4-gold-light), var(--v4-gold));
+  color: var(--v4-canvas);
+  font: 700 2.4rem/1 var(--font-v4-display);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.65rem) 0,
+    100% 0.65rem,
+    100% 100%,
+    0 100%
+  );
 }
 
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
+  gap: 0.45rem 1rem;
   padding: 0;
   margin: 0;
   list-style: none;
@@ -128,19 +356,20 @@
 
 .tags li {
   position: relative;
-  padding-inline-start: var(--space-3);
+  padding-inline-start: 0.85rem;
+  font-family: var(--font-v4-interface);
   font-weight: 700;
 }
 
 .tags li::before {
   position: absolute;
-  inset-block-start: 0.55em;
+  inset-block-start: 0.48em;
   inset-inline-start: 0;
-  inline-size: var(--space-1);
-  block-size: var(--space-1);
-  border-radius: var(--radius-round);
-  background: var(--accent-primary);
+  inline-size: 0.34rem;
+  block-size: 0.34rem;
+  background: var(--v4-gold);
   content: "";
+  transform: rotate(45deg);
 }
 
 .contextList,
@@ -150,74 +379,198 @@
   list-style: none;
 }
 
+.contextList {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(15rem, 82%);
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-block-end: 0.45rem;
+  scroll-snap-type: x mandatory;
+}
+
 .contextList li {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  min-block-size: var(--row-min-height-compact);
-  padding: var(--space-3) 0;
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+  align-content: end;
+  align-items: end;
+  gap: 0.8rem;
+  min-block-size: 14rem;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, rgb(6 12 23 / 8%) 8%, rgb(6 12 23 / 94%) 74%),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center/cover;
+  scroll-snap-align: start;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.7rem) 0,
+    100% 0.7rem,
+    100% 100%,
+    0 100%
+  );
+}
+
+.contextList li:nth-child(even) {
+  background:
+    linear-gradient(180deg, rgb(6 12 23 / 8%) 8%, rgb(6 12 23 / 94%) 74%),
+    url("/fifar-v4/backgrounds-raster/players-tunnel.webp") center/cover;
+}
+
+.contextList li > span:first-child {
+  position: absolute;
+  inset-block-start: 0.9rem;
+  inset-inline-start: 1rem;
 }
 
 .contextList a {
+  grid-column: 1;
   min-inline-size: 0;
   color: inherit;
-  font-weight: 700;
+  font: 600 1.65rem/0.95 var(--font-v4-display);
   overflow-wrap: anywhere;
-  text-decoration: none;
+  text-transform: uppercase;
 }
 
-.contextList span {
-  color: var(--foreground-muted);
+.contextList li > small {
+  grid-column: 1;
+  color: var(--v4-muted);
+  font: 700 0.62rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
+}
+
+.contextList > li > span:last-child {
+  color: var(--v4-gold);
+  font-size: 1.2rem;
+}
+
+.rewardList {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(17rem, 84%);
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-block-end: 0.5rem;
+  scroll-snap-type: x mandatory;
 }
 
 .rewardList li {
-  gap: var(--space-1);
-  padding: var(--space-3) 0;
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(6.5rem, auto) auto;
+  align-content: end;
+  justify-items: start;
+  gap: 0.9rem;
+  min-block-size: 14rem;
+  padding: 1rem;
+  background:
+    linear-gradient(110deg, rgba(25, 36, 59, 0.95), rgba(11, 17, 30, 0.9)),
+    url("/fifar-v4/patterns/pattern-chevrons.svg") right/auto 100%;
+  scroll-snap-align: start;
+}
+
+.rewardList li > span:first-child {
+  align-self: center;
+  justify-self: center;
+}
+
+.rewardList li > span {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rewardList strong {
+  font-family: var(--font-v4-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.privateIdentity {
+  min-block-size: min(33rem, 72vh);
+}
+
+.privateBackdrop {
+  background:
+    linear-gradient(90deg, rgba(7, 13, 25, 0.96), rgba(7, 13, 25, 0.55)),
+    url("/fifar-v4/backgrounds-raster/players-tunnel.webp") center/cover;
+  filter: saturate(0.55);
+}
+
+.privateContent {
+  align-content: end;
+  gap: 0.85rem;
+  min-block-size: inherit;
+  max-inline-size: 42rem;
+  padding: clamp(1.5rem, 7vw, 4rem);
+}
+
+.privateContent h1 {
+  max-inline-size: 10ch;
+  font-family: var(--font-v4-display);
+  font-size: clamp(3.5rem, 12vw, 6.8rem);
+  font-weight: 600;
+  line-height: 0.8;
+  text-transform: uppercase;
 }
 
 .state {
   padding: var(--space-5) 0;
-  border-block: var(--border-width-thin) solid var(--border-subtle);
+  border-block: 1px solid var(--color-border);
 }
 
+.connectionActions,
 .groupInviteControl,
 .groupInviteOptions {
-  gap: var(--space-2);
+  gap: 0.55rem;
+}
+
+.connectionActions {
+  grid-auto-flow: row;
 }
 
 .groupInviteOptions {
   min-inline-size: min(22rem, 100%);
-  padding: var(--space-3);
-  border: var(--border-width-thin) solid var(--border-strong);
-  border-radius: var(--radius-overlay);
-  background: var(--color-surface-raised);
+  padding: 0.8rem;
+  border: 1px solid rgba(214, 177, 95, 0.24);
+  background: var(--v4-surface-raised);
   box-shadow: var(--elevation-overlay);
 }
 
 .groupInviteOptions > button {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: 0.75rem;
   min-block-size: var(--row-min-height-compact);
-  padding: var(--space-3);
+  padding: 0.75rem;
   border: 0;
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
-  color: inherit;
+  border-block-end: 1px solid rgba(255, 255, 255, 0.09);
   background: transparent;
+  color: inherit;
   text-align: start;
 }
 
 @media (min-width: 48rem) {
-  .header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
+  .publicIdentity {
+    grid-template-columns: minmax(21rem, 0.88fr) minmax(0, 1.12fr);
+    min-block-size: 39rem;
+  }
+
+  .cardArea {
+    align-self: center;
+    padding: 2.5rem 1.5rem 1.5rem;
   }
 
   .cardArea > figure {
-    inline-size: min(100%, 20rem);
+    inline-size: min(100%, 23rem);
+  }
+
+  .header {
+    align-content: center;
+    padding: clamp(2rem, 5vw, 4rem);
+    background: linear-gradient(90deg, transparent, rgba(7, 13, 25, 0.94) 17%);
   }
 
   .metrics {
@@ -229,22 +582,131 @@
   }
 
   .metrics > div:not(:first-child) {
-    border-inline-start: var(--border-width-thin) solid var(--border-subtle);
+    border-inline-start: 0;
+  }
+
+  .contextList {
+    grid-auto-columns: minmax(17rem, 1fr);
+  }
+
+  .rewardList {
+    grid-auto-columns: minmax(18rem, 1fr);
   }
 }
 
-@media (min-width: 80rem) {
-  .layout {
-    grid-template-columns: minmax(18rem, 0.72fr) minmax(0, 1.28fr);
+@media (min-width: 70rem) {
+  .content {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     align-items: start;
   }
 
+  .statsModule {
+    grid-column: 6 / -1;
+    grid-row: 1;
+  }
+
+  .footballModule {
+    grid-column: 1 / span 5;
+    grid-row: 1;
+  }
+
+  .groupsModule {
+    grid-column: 1 / span 5;
+    grid-row: 2;
+  }
+
+  .achievementModule {
+    grid-column: 6 / -1;
+    grid-row: 2;
+  }
+
+  .awardModule {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  .page {
+    margin-inline: calc(var(--page-gutter) * -1);
+  }
+
+  .back,
+  .layout {
+    margin-inline: var(--page-gutter);
+  }
+
+  .layout {
+    inline-size: auto;
+  }
+
+  .publicIdentity,
+  .privateIdentity {
+    border-inline: 0;
+    clip-path: none;
+  }
+
+  .publicIdentity {
+    min-block-size: 39rem;
+  }
+
   .cardArea {
-    position: sticky;
-    inset-block-start: calc(var(--touch-target-min) + var(--space-6));
+    padding-block-start: 1rem;
   }
 
   .cardArea > figure {
-    inline-size: min(100%, 22rem);
+    inline-size: min(100%, 15rem);
+  }
+
+  .header {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 1rem 1rem 1.25rem;
+  }
+
+  .identityBadge,
+  .header h1,
+  .header > p {
+    grid-column: 1 / -1;
+  }
+
+  .header > :global([class*="ovrPlate"]) {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .profileActions {
+    grid-column: 2;
+    align-self: end;
+    margin-block-start: 0;
+  }
+
+  .header h1 {
+    font-size: clamp(3.2rem, 16vw, 4.5rem);
+  }
+
+  .section {
+    padding: 1rem;
+  }
+
+  .statsIdentity {
+    gap: 0.75rem;
+  }
+
+  .statsIdentity > :first-child {
+    max-inline-size: 4rem;
+  }
+
+  .contextList {
+    grid-auto-columns: minmax(14rem, 82%);
+  }
+
+  .rewardList {
+    grid-auto-columns: minmax(14rem, 82%);
+  }
+
+  .profileActions > :global(.ui-button),
+  .connectionActions > :global(.ui-button),
+  .privateActions > :global(.ui-button) {
+    flex: 1 1 auto;
   }
 }

@@ -3,9 +3,18 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import type { GroupOverviewResponse } from "@football/contracts";
+import type {
+  GroupActivityResponse,
+  GroupOverviewResponse,
+} from "@football/contracts";
 import { Badge, Text } from "@football/ui";
 import { ReportControl } from "@/components/report-control/report-control";
+import {
+  V4GroupCrest,
+  V4Portrait,
+  V4RewardBadge,
+  V4TierPlate,
+} from "@/components/visual-v4/profile-assets";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import styles from "./groups.module.css";
@@ -70,35 +79,51 @@ export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
       : overview.data.historyMatches;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href="/groups">
         ← GRUPOS
       </Link>
       <header
         className={`${styles.groupHeader} ${group.status === "ARCHIVED" ? styles.groupHeaderArchived : ""}`}
       >
-        <div>
+        <img
+          alt=""
+          className={styles.groupHeroScene}
+          src="/fifar-v4/group-ranking-scenes/group-club-night.webp"
+        />
+        <div className={styles.groupCrestStage}>
+          <V4GroupCrest name={group.name} seed={group.id} size="large" />
+          <span>FIFAR F5</span>
+        </div>
+        <div className={styles.groupIdentity}>
           <Text tone="accent" variant="label">
-            {overview.data.memberCount} JUGADORES
+            ESPACIO DE GRUPO
           </Text>
           <Text as="h1" className={styles.groupTitle} variant="display-lg">
             {group.name}
           </Text>
+          <div className={styles.headerMeta} aria-label="Estado del grupo">
+            {group.visibility === "PRIVATE" ? (
+              <Badge kind="state">PRIVADO</Badge>
+            ) : (
+              <span>PÚBLICO</span>
+            )}
+            {group.role !== "MEMBER" && (
+              <Badge kind="role">{roleLabel(group.role)}</Badge>
+            )}
+            {group.status === "ARCHIVED" && (
+              <Badge className={styles.archivedBadge} kind="state">
+                ARCHIVADO
+              </Badge>
+            )}
+          </div>
         </div>
-        <div className={styles.headerMeta} aria-label="Estado del grupo">
-          {group.visibility === "PRIVATE" ? (
-            <Badge kind="state">PRIVADO</Badge>
-          ) : (
-            <span>PÚBLICO</span>
-          )}
-          {group.role !== "MEMBER" && (
-            <Badge kind="role">{roleLabel(group.role)}</Badge>
-          )}
-          {group.status === "ARCHIVED" && (
-            <Badge className={styles.archivedBadge} kind="state">
-              ARCHIVADO
-            </Badge>
-          )}
+        <div
+          className={styles.memberCount}
+          aria-label={`${overview.data.memberCount} jugadores`}
+        >
+          <strong>{overview.data.memberCount}</strong>
+          <span>JUGADORES</span>
         </div>
       </header>
 
@@ -112,10 +137,11 @@ export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
       <div
         className={`${styles.overviewGrid} ${group.status === "ARCHIVED" ? styles.overviewGridArchived : ""}`}
       >
-        <main className={styles.overviewMain}>
+        <div className={styles.overviewMain}>
           <NextMatch
             canCreate={overview.data.canCreateMatch}
             groupId={groupId}
+            groupName={group.name}
             match={overview.data.nextMatch}
           />
 
@@ -212,12 +238,17 @@ export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
             ) : (
               <div className={styles.matchList}>
                 {selectedMatches.map((match) => (
-                  <MatchRow key={match.id} match={match} />
+                  <MatchRow
+                    groupId={groupId}
+                    groupName={group.name}
+                    key={match.id}
+                    match={match}
+                  />
                 ))}
               </div>
             )}
           </section>
-        </main>
+        </div>
 
         <aside className={styles.overviewAside}>
           <section className={styles.compactSection}>
@@ -244,20 +275,23 @@ export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
                 Todavía no hay jugadores rankeados.
               </p>
             ) : (
-              <div className={`${styles.topThree} ui-list`}>
+              <div className={styles.topThree}>
                 {ranking.data.items.map((item) => (
                   <Link
-                    className={`${styles.rankPreview} ui-row`}
+                    className={styles.rankPreview}
                     href={`/players/${item.player.id}`}
                     key={item.player.id}
                   >
-                    <strong>#{item.position}</strong>
-                    <span>{item.player.displayName}</span>
-                    <b
-                      aria-label={`${Math.round(Number(item.performance.overall))} OVR`}
-                    >
-                      {Math.round(Number(item.performance.overall))}
-                    </b>
+                    <span className={styles.rankNumber}>#{item.position}</span>
+                    <V4Portrait name={item.player.displayName} />
+                    <span className={styles.rankIdentity}>
+                      <strong>{item.player.displayName}</strong>
+                      <small>F5 · NIVEL ACTUAL</small>
+                    </span>
+                    <V4TierPlate
+                      compact
+                      overall={Number(item.performance.overall)}
+                    />
                   </Link>
                 ))}
               </div>
@@ -321,8 +355,12 @@ export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
                     href={event.target.href}
                     key={event.stableId}
                   >
+                    <ActivityVisual event={event} group={group} />
+                    <span>
+                      <strong>{event.title}</strong>
+                      <small>{event.body}</small>
+                    </span>
                     <time>{formatDate(event.occurredAt)}</time>
-                    <span>{event.title}</span>
                   </Link>
                 ))}
               </div>
@@ -368,29 +406,38 @@ export function GroupDetailScreen({ groupId }: Readonly<{ groupId: string }>) {
 function NextMatch({
   canCreate,
   groupId,
+  groupName,
   match,
 }: Readonly<{
   canCreate: boolean;
   groupId: string;
+  groupName: string;
   match: MatchPreview | null;
 }>) {
   return (
-    <section
-      className={`${styles.nextMatch} ui-surface ui-surface--feature`}
-      aria-labelledby="next-match-title"
-    >
-      <Text tone="accent" variant="label">
-        {match?.effectivePhase === "IN_PROGRESS"
-          ? "EN JUEGO"
-          : "PRÓXIMO PARTIDO"}
-      </Text>
+    <section className={styles.nextMatch} aria-labelledby="next-match-title">
+      <img
+        alt=""
+        className={styles.nextMatchScene}
+        src="/fifar-v4/match-scenes/match-open-night.webp"
+      />
       {match ? (
         <>
+          <div className={styles.nextMatchStrip}>
+            <Text tone="accent" variant="label">
+              {match.effectivePhase === "IN_PROGRESS"
+                ? "EN JUEGO"
+                : "PRÓXIMO PARTIDO"}
+            </Text>
+            <span>{statusLabel(match.effectivePhase)}</span>
+          </div>
           <div className={styles.nextMatchHeader}>
-            <div>
+            <V4GroupCrest name={groupName} seed={groupId} size="large" />
+            <div className={styles.nextMatchIdentity}>
               <Text as="h2" id="next-match-title" variant="heading-lg">
                 {formatLongDate(match.scheduledAt)}
               </Text>
+              <strong>{groupName}</strong>
               <Text tone="muted">{match.locationText}</Text>
             </div>
             <strong className={styles.capacity}>
@@ -414,6 +461,7 @@ function NextMatch({
         </>
       ) : (
         <div className={styles.compactEmpty}>
+          <V4GroupCrest name={groupName} seed={groupId} size="large" />
           <Text as="h2" id="next-match-title" variant="heading-md">
             No hay próximos partidos.
           </Text>
@@ -435,31 +483,47 @@ function Roster({
   members,
 }: Readonly<{ members: GroupOverviewResponse["rosterPreview"] }>) {
   return (
-    <div className={`${styles.memberList} ui-list`}>
-      {members.map((membership) => (
+    <div className={styles.memberList}>
+      {members.map((membership, index) => (
         <Link
-          className={`${styles.member} ui-row`}
+          className={styles.member}
           href={`/players/${membership.player.id}`}
           key={membership.id}
         >
-          <strong>{membership.player.displayName}</strong>
-          {membership.role !== "MEMBER" && (
-            <Badge kind="role">
-              {membership.role === "OWNER" ? "PROPIETARIO" : "MOD"}
-            </Badge>
-          )}
+          <span className={styles.squadNumber}>{index + 1}</span>
+          <V4Portrait name={membership.player.displayName} />
+          <span className={styles.memberIdentity}>
+            <strong>{membership.player.displayName}</strong>
+            <small>JUGADOR F5</small>
+          </span>
+          <span className={styles.memberRole}>
+            {membership.role !== "MEMBER" && (
+              <Badge kind="role">
+                {membership.role === "OWNER" ? "PROPIETARIO" : "MOD"}
+              </Badge>
+            )}
+          </span>
         </Link>
       ))}
     </div>
   );
 }
 
-function MatchRow({ match }: Readonly<{ match: MatchPreview }>) {
+function MatchRow({
+  groupId,
+  groupName,
+  match,
+}: Readonly<{
+  groupId: string;
+  groupName: string;
+  match: MatchPreview;
+}>) {
   return (
     <Link
       className={`${styles.matchRow} ui-row`}
       href={`/play/matches/${match.id}`}
     >
+      <V4GroupCrest name={groupName} seed={groupId} size="compact" />
       <span className={styles.matchDate}>
         {formatShortDate(match.scheduledAt)}
       </span>
@@ -476,6 +540,32 @@ function MatchRow({ match }: Readonly<{ match: MatchPreview }>) {
       </strong>
     </Link>
   );
+}
+
+function ActivityVisual({
+  event,
+  group,
+}: Readonly<{
+  event: GroupActivityResponse["items"][number];
+  group: GroupOverviewResponse["group"];
+}>) {
+  if (
+    event.eventType === "ACHIEVEMENT_EARNED" ||
+    event.eventType === "AWARD_EARNED"
+  )
+    return (
+      <V4RewardBadge
+        label={event.title}
+        seed={
+          event.eventType === "ACHIEVEMENT_EARNED"
+            ? event.achievementType
+            : event.awardType
+        }
+      />
+    );
+  if (event.eventType === "PROGRESSION_APPLIED")
+    return <V4Portrait name={event.player.displayName} />;
+  return <V4GroupCrest name={group.name} seed={group.id} size="compact" />;
 }
 
 function Stat({

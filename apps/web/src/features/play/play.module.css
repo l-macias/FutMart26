@@ -1,167 +1,793 @@
-.page,
-.intro,
-.intro > div,
-.section,
+.page {
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  max-inline-size: 92rem;
+  gap: clamp(1.15rem, 3vw, 2.4rem);
+  overflow-x: clip;
+  padding-block-end: var(--space-8);
+  font-family: var(--font-v4-interface);
+}
+
+.page::before {
+  position: absolute;
+  z-index: -1;
+  inset: -4rem calc(var(--page-gutter) * -1) auto;
+  block-size: 70rem;
+  background:
+    linear-gradient(
+      112deg,
+      transparent 0 72%,
+      rgb(216 181 100 / 7%) 72% 72.18%,
+      transparent 72.18%
+    ),
+    radial-gradient(circle at 82% 4%, rgb(216 181 100 / 11%), transparent 38%);
+  content: "";
+  pointer-events: none;
+}
+
+.intro {
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: 10.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  overflow: hidden;
+  padding: 2.6rem 1rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--v4-gold) 24%, transparent);
+  background: var(--v4-canvas);
+  clip-path: polygon(0 0, calc(100% - 1rem) 0, 100% 1rem, 100% 100%, 0 100%);
+}
+
+.intro::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 94%), rgb(4 8 16 / 46%) 76%),
+    linear-gradient(0deg, var(--v4-canvas), transparent 64%);
+  content: "";
+}
+
+.intro::after {
+  position: absolute;
+  z-index: 2;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 0.22rem;
+  background: linear-gradient(var(--v4-gold-light), var(--v4-gold));
+  content: "";
+}
+
+.introScene {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: center 54%;
+}
+
+.introCopy,
+.playMark {
+  position: relative;
+  z-index: 3;
+}
+
+.introCopy {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.1rem;
+}
+
+.introCopy h1 {
+  color: var(--v4-text);
+  font: 600 clamp(3.8rem, 15vw, 6.8rem) / 0.72 var(--font-v4-display);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.context {
+  max-inline-size: 34rem;
+  font-family: var(--font-v4-interface);
+}
+
+.playMark {
+  color: color-mix(in srgb, var(--v4-gold-light) 76%, transparent);
+  font: 600 clamp(4.5rem, 13vw, 7rem) / 0.7 var(--font-v4-display);
+}
+
+.playGrid,
+.discoveryColumn,
+.scheduleColumn,
+.opportunitySection,
+.scheduleSection,
 .sectionHeader > div,
-.rows,
-.compactEmpty {
+.scheduleHeading > div,
+.matchDeck {
   display: grid;
   min-inline-size: 0;
 }
 
-.page {
-  max-inline-size: var(--content-wide);
-  gap: var(--section-gap);
-  padding-block-end: var(--space-8);
+.playGrid {
+  gap: clamp(1.4rem, 3vw, 2.4rem);
 }
 
-.intro {
-  gap: var(--space-1);
-  padding-block-start: var(--space-2);
+.discoveryColumn,
+.scheduleColumn {
+  align-content: start;
 }
 
-.intro > div {
-  gap: 0;
+.opportunitySection,
+.scheduleSection {
+  gap: 0.9rem;
 }
 
-.context {
-  max-inline-size: 42rem;
-}
-
-.section {
-  gap: var(--space-4);
-}
-
-.sectionHeader {
+.sectionHeader,
+.scheduleHeading {
   display: flex;
-  align-items: baseline;
+  min-inline-size: 0;
+  align-items: end;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding-block-end: var(--space-2);
-  border-block-end: var(--border-width-thin) solid var(--border-subtle);
+  gap: 1rem;
 }
 
-.sectionHeader > div {
-  gap: var(--space-1);
+.sectionHeader > div,
+.scheduleHeading > div {
+  gap: 0.05rem;
 }
 
-.sectionHeader > a,
-.loadMore {
-  color: var(--accent-primary);
-  font: 800 var(--type-label-size) / 1
-    var(--font-interface, var(--font-interface-fallback));
-  letter-spacing: var(--type-tracking-label);
+.sectionHeader h2,
+.scheduleHeading h2 {
+  color: var(--v4-text);
+  font: 600 clamp(2.35rem, 8vw, 3.75rem) / 0.8 var(--font-v4-display);
   text-transform: uppercase;
 }
 
-.rows {
+.sectionHeader > a {
+  flex: 0 0 auto;
+  min-block-size: 2.75rem;
+  align-content: center;
+  color: var(--v4-muted);
+  font: 700 0.62rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
+}
+
+.opportunityGrid,
+.matchDeck {
   padding: 0;
   margin: 0;
   list-style: none;
 }
 
-.rows li {
-  padding-block: 0;
+.opportunityGrid {
+  display: grid;
+  grid-auto-columns: minmax(17.5rem, 86vw);
+  grid-auto-flow: column;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-block-end: 0.5rem;
+  scroll-snap-type: inline mandatory;
+  scrollbar-color: color-mix(in srgb, var(--v4-gold) 44%, transparent)
+    transparent;
 }
 
-.rowLink {
+.opportunityItem {
+  min-inline-size: 0;
+  scroll-snap-align: start;
+}
+
+.opportunityCard {
+  position: relative;
   display: grid;
-  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 15.25rem;
+  grid-template-rows: auto 1fr auto auto;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--v4-text) 12%, transparent);
+  background: var(--v4-surface);
+  color: inherit;
+  box-shadow: 0 1.2rem 2.5rem rgb(0 0 0 / 30%);
+  clip-path: polygon(
+    0.7rem 0,
+    100% 0,
+    100% calc(100% - 0.7rem),
+    calc(100% - 0.7rem) 100%,
+    0 100%,
+    0 0.7rem
+  );
+}
+
+.opportunityItem[data-featured="true"] .opportunityCard {
+  min-block-size: 17.25rem;
+  border-color: color-mix(in srgb, var(--v4-gold) 38%, transparent);
+}
+
+.opportunityItem[data-profile-match="true"] .opportunityCard {
+  border-inline-start: 0.24rem solid var(--v4-gold);
+}
+
+.opportunityScene,
+.personalMatchScene {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 92%), rgb(4 8 16 / 54%)),
+    url("/fifar-v4/match-scenes/match-open-night.webp") center 58% / cover;
+}
+
+.opportunityItem:nth-child(3n + 2) .opportunityScene {
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 93%), rgb(4 8 16 / 50%)),
+    url("/fifar-v4/group-ranking-scenes/group-club-night.webp") center / cover;
+}
+
+.opportunityItem:nth-child(3n) .opportunityScene {
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 93%), rgb(4 8 16 / 48%)),
+    url("/fifar-v4/backgrounds-raster/players-tunnel.webp") center / cover;
+}
+
+.opportunityCard::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(0deg, var(--v4-canvas) 0, transparent 70%),
+    radial-gradient(circle at 86% 8%, rgb(240 213 140 / 14%), transparent 30%);
+  content: "";
+}
+
+.opportunityTopline {
+  display: grid;
+  min-inline-size: 0;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-3);
-  min-block-size: var(--row-min-height-default);
-  color: inherit;
+  gap: 0.55rem;
 }
 
-.rowLink :global(.ui-row__content) {
+.opportunityTopline > span,
+.opportunityTopline time {
+  color: var(--v4-muted);
+  font: 700 0.56rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
+}
+
+.opportunityItem[data-profile-match="true"] .opportunityTopline > span,
+.opportunityItem[data-featured="true"] .opportunityTopline > span {
+  color: var(--v4-gold-light);
+}
+
+.opportunityTopline time {
+  color: var(--v4-text);
+  text-align: end;
+}
+
+.opportunityIdentity {
   display: grid;
-  gap: var(--space-1);
+  min-inline-size: 0;
+  align-content: end;
+  gap: 0.12rem;
+  padding-block: 1rem 0.7rem;
 }
 
-.matchDate {
-  inline-size: 2.75rem;
-  color: var(--foreground-muted);
-  font: 800 var(--type-label-size) / 1
-    var(--font-display, var(--font-display-fallback));
-  letter-spacing: var(--type-tracking-label);
-  text-align: center;
+.opportunityIdentity strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--v4-text);
+  font: 600 clamp(1.9rem, 7vw, 3rem) / 0.82 var(--font-v4-display);
+  text-transform: uppercase;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.spots,
-.score {
-  font: 800 var(--type-label-size) / 1
-    var(--font-interface, var(--font-interface-fallback));
-  font-variant-numeric: tabular-nums;
+.opportunityIdentity > span {
+  color: var(--v4-gold-light);
+  font: 600 1.25rem/0.95 var(--font-v4-display);
+  text-transform: uppercase;
 }
 
-.spots {
-  color: var(--state-positive);
+.opportunityIdentity small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--v4-muted);
+  font-size: 0.72rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
-.score {
-  color: var(--foreground-primary);
-  font-family: var(--font-display, var(--font-display-fallback));
-  font-size: var(--type-heading-md-size);
-}
-
-.tabs {
+.needList {
   display: flex;
-  gap: var(--space-2);
-  border-block-end: var(--border-width-thin) solid var(--border-strong);
+  min-inline-size: 0;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-block-end: 0.65rem;
 }
 
-.tabs button {
-  min-block-size: var(--touch-target-min);
-  padding-inline: var(--space-3);
-  border: 0;
-  border-block-end: var(--border-width-strong) solid transparent;
-  background: transparent;
-  color: var(--foreground-muted);
-  cursor: pointer;
-  font: 800 var(--type-label-size) / 1
-    var(--font-interface, var(--font-interface-fallback));
-  letter-spacing: var(--type-tracking-label);
+.needList span {
+  padding: 0.3rem 0.5rem;
+  border-inline-start: 0.16rem solid var(--v4-gold);
+  background: color-mix(in srgb, var(--v4-canvas) 76%, transparent);
+  color: var(--v4-text);
+  font: 700 0.56rem/1 var(--font-v4-interface);
+  letter-spacing: 0.08em;
 }
 
-.tabs button:hover {
-  background: color-mix(in srgb, var(--background-elevated) 72%, transparent);
-  color: var(--foreground-primary);
+.opportunityFooter {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding-block-start: 0.65rem;
+  border-block-start: 1px solid
+    color-mix(in srgb, var(--v4-gold) 18%, transparent);
 }
 
-.tabs button[aria-selected="true"] {
-  border-block-end-color: var(--accent-primary);
-  color: var(--foreground-primary);
+.opportunityFooter > strong {
+  display: flex;
+  align-items: end;
+  gap: 0.35rem;
+  color: var(--v4-gold-light);
+  font: 600 2.5rem/0.72 var(--font-v4-display);
 }
 
-.compactEmpty {
-  justify-items: start;
-  gap: var(--space-2);
-  padding-block: var(--space-4);
-  border-block: var(--border-width-thin) solid var(--border-strong);
+.opportunityFooter small,
+.opportunityFooter > span {
+  color: var(--v4-muted);
+  font: 700 0.56rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
+}
+
+.opportunityFooter small {
+  padding-block-end: 0.12rem;
+}
+
+.opportunityFooter > span {
+  color: var(--v4-text);
 }
 
 .loadMore {
   inline-size: fit-content;
   min-block-size: var(--touch-target-min);
+  padding-inline: 0;
+  border: 0;
+  background: transparent;
+  color: var(--v4-gold-light);
+  cursor: pointer;
+  font: 700 0.62rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
 }
 
-.inlineEmpty {
-  padding-block: var(--space-3);
+.loadMore:disabled {
+  color: var(--v4-muted);
+  cursor: wait;
+}
+
+.scheduleSection {
+  overflow: hidden;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--v4-text) 10%, transparent);
+  background: linear-gradient(145deg, rgb(26 41 66 / 80%), rgb(7 13 25 / 94%));
+  box-shadow: 0 1.2rem 2.8rem rgb(0 0 0 / 26%);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 0.75rem) 0,
+    100% 0.75rem,
+    100% 100%,
+    0 100%
+  );
+}
+
+.scheduleHeading {
+  align-items: start;
+  flex-direction: column;
+}
+
+.tabs {
+  display: grid;
+  inline-size: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--v4-text) 10%, transparent);
+  background: color-mix(in srgb, var(--v4-canvas) 70%, transparent);
+  clip-path: polygon(
+    0.45rem 0,
+    100% 0,
+    100% calc(100% - 0.45rem),
+    calc(100% - 0.45rem) 100%,
+    0 100%,
+    0 0.45rem
+  );
+}
+
+.tabs button {
+  min-block-size: var(--touch-target-min);
+  padding-inline: 0.65rem;
+  border: 0;
+  background: transparent;
+  color: var(--v4-muted);
+  cursor: pointer;
+  font: 700 0.61rem/1 var(--font-v4-interface);
+  letter-spacing: 0.09em;
+}
+
+.tabs button:hover {
+  background: rgb(244 243 239 / 5%);
+  color: var(--v4-text);
+}
+
+.tabs button[aria-selected="true"] {
+  background: linear-gradient(135deg, var(--v4-gold-light), var(--v4-gold));
+  color: var(--v4-canvas);
+  clip-path: polygon(0.4rem 0, 100% 0, calc(100% - 0.4rem) 100%, 0 100%);
+}
+
+.matchDeck {
+  gap: 0.5rem;
+}
+
+.personalMatch {
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: 6rem;
+  grid-template-columns: auto 3.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--v4-text) 9%, transparent);
+  background: color-mix(in srgb, var(--v4-surface) 86%, transparent);
+  color: inherit;
+  clip-path: polygon(
+    0.45rem 0,
+    100% 0,
+    100% calc(100% - 0.45rem),
+    calc(100% - 0.45rem) 100%,
+    0 100%,
+    0 0.45rem
+  );
+}
+
+.personalMatch:hover {
+  border-color: color-mix(in srgb, var(--v4-gold) 30%, transparent);
+}
+
+.personalMatchScene {
+  opacity: 0.3;
+}
+
+.personalMatch::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, var(--v4-surface), rgb(7 13 25 / 82%));
+  content: "";
+}
+
+.personalMatch > time {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+}
+
+.personalMatch > time strong {
+  color: var(--v4-gold-light);
+  font: 600 1.25rem/0.9 var(--font-v4-display);
+}
+
+.personalMatch > time small {
+  color: var(--v4-muted);
+  font: 700 0.58rem/1 var(--font-v4-interface);
+}
+
+.personalMatchIdentity {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.12rem;
+}
+
+.personalMatchIdentity strong {
+  overflow: hidden;
+  color: var(--v4-text);
+  font: 600 1.45rem/0.9 var(--font-v4-display);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.personalMatchIdentity small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--v4-muted);
+  font-size: 0.68rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 0.22rem;
+  color: var(--v4-text);
+  font: 600 2.05rem/0.8 var(--font-v4-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.score span {
+  color: var(--v4-gold);
+  font-size: 1.2rem;
+}
+
+.matchDeck[data-view="history"] .personalMatch {
+  min-block-size: 4.9rem;
+  background: color-mix(in srgb, var(--v4-canvas) 78%, transparent);
+}
+
+.matchDeck[data-view="history"] .personalMatchScene {
+  opacity: 0.13;
+}
+
+.matchDeck[data-view="history"] .personalMatch::after {
+  background: linear-gradient(90deg, rgb(7 13 25 / 96%), rgb(17 27 46 / 90%));
+}
+
+.emptyFeature {
+  position: relative;
+  display: grid;
+  min-block-size: 25rem;
+  align-content: end;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1.2rem;
+  border: 1px solid color-mix(in srgb, var(--v4-gold) 28%, transparent);
+  background: var(--v4-canvas);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 1.2rem) 0,
+    100% 1.2rem,
+    100% 100%,
+    0 100%
+  );
+}
+
+.emptyFeature > span {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(0deg, var(--v4-canvas) 3%, transparent 80%),
+    linear-gradient(90deg, rgb(4 8 16 / 70%), transparent),
+    url("/fifar-v4/match-scenes/home-empty-pitch.webp") center / cover;
+}
+
+.emptyFeature > div {
+  display: grid;
+  max-inline-size: 36rem;
+  justify-items: start;
+  gap: 0.55rem;
+}
+
+.emptyFeature h2 {
+  max-inline-size: 10ch;
+  color: var(--v4-text);
+  font: 600 clamp(3rem, 11vw, 5.2rem) / 0.78 var(--font-v4-display);
+  text-transform: uppercase;
+}
+
+.opportunityEmpty,
+.localState {
+  min-block-size: 10rem;
+}
+
+.opportunityEmpty {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-content: end;
+  align-items: end;
+  gap: 1rem;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1rem;
+  background: var(--v4-surface);
+  clip-path: polygon(
+    0.65rem 0,
+    100% 0,
+    100% calc(100% - 0.65rem),
+    calc(100% - 0.65rem) 100%,
+    0 100%,
+    0 0.65rem
+  );
+}
+
+.opportunityEmpty > span {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 94%), rgb(4 8 16 / 44%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center / cover;
+}
+
+.opportunityEmpty > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.opportunityEmpty strong {
+  color: var(--v4-text);
+  font: 600 1.8rem/0.9 var(--font-v4-display);
+  text-transform: uppercase;
+}
+
+.opportunityEmpty small {
+  color: var(--v4-muted);
+}
+
+.opportunityEmpty > a {
+  color: var(--v4-gold-light);
+  font: 700 0.62rem/1 var(--font-v4-interface);
+  letter-spacing: 0.1em;
+}
+
+.opportunityLoading {
+  position: relative;
+  display: grid;
+  min-block-size: 12rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  overflow: hidden;
+}
+
+.opportunityLoading > span {
+  background:
+    linear-gradient(
+      115deg,
+      transparent 30%,
+      rgb(244 243 239 / 6%) 45%,
+      transparent 60%
+    ),
+    var(--v4-surface);
+  clip-path: polygon(
+    0.55rem 0,
+    100% 0,
+    100% calc(100% - 0.55rem),
+    calc(100% - 0.55rem) 100%,
+    0 100%,
+    0 0.55rem
+  );
+}
+
+.opportunityLoading p {
+  position: absolute;
+  inset: auto auto 0.8rem 0.8rem;
+  margin: 0;
+  color: var(--v4-muted);
+}
+
+.scheduleEmpty {
+  display: grid;
+  min-block-size: 9rem;
+  align-content: end;
+  margin: 0;
+  padding: 1rem;
+  background:
+    linear-gradient(90deg, rgb(7 13 25 / 94%), rgb(7 13 25 / 54%)),
+    url("/fifar-v4/backgrounds-raster/players-tunnel.webp") center / cover;
+  color: var(--v4-muted);
+  clip-path: polygon(
+    0.55rem 0,
+    100% 0,
+    100% calc(100% - 0.55rem),
+    calc(100% - 0.55rem) 100%,
+    0 100%,
+    0 0.55rem
+  );
 }
 
 @media (max-width: 30rem) {
+  .playMark {
+    display: none;
+  }
+
+  .intro {
+    grid-template-columns: 1fr;
+  }
+
   .sectionHeader {
     align-items: start;
   }
 
   .sectionHeader > a {
-    max-inline-size: 7rem;
+    max-inline-size: 6rem;
     text-align: end;
   }
 
-  .spots {
-    max-inline-size: 3.25rem;
-    text-align: end;
+  .personalMatch {
+    grid-template-columns: 2.75rem 2.75rem minmax(0, 1fr) auto;
+  }
+
+  .personalMatch > :global([class*="crestcompact"]) {
+    inline-size: 2.75rem;
+  }
+
+  .personalMatch > :global([class*="stateMark"]) {
+    max-inline-size: 5.5rem;
+    text-align: center;
+  }
+
+  .opportunityEmpty {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 48rem) {
+  .intro {
+    min-block-size: 13rem;
+    padding: 3.5rem 1.6rem 1.4rem;
+  }
+
+  .scheduleHeading {
+    align-items: end;
+    flex-direction: row;
+  }
+
+  .tabs {
+    inline-size: auto;
+    min-inline-size: 16rem;
+  }
+
+  .opportunityGrid {
+    grid-auto-columns: minmax(20rem, 46%);
+  }
+}
+
+@media (min-width: 64rem) {
+  .playGrid {
+    grid-template-columns: minmax(0, 1.62fr) minmax(21rem, 0.72fr);
+    align-items: start;
+  }
+
+  .opportunityGrid {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+    padding: 0;
+  }
+
+  .opportunityItem[data-featured="true"] {
+    grid-column: 1 / -1;
+  }
+
+  .opportunityItem[data-featured="true"] .opportunityCard {
+    min-block-size: 19rem;
+  }
+
+  .scheduleColumn {
+    position: sticky;
+    inset-block-start: 1rem;
+  }
+
+  .scheduleHeading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .tabs {
+    inline-size: 100%;
+  }
+}
+
+@media (min-width: 80rem) {
+  .playGrid {
+    grid-template-columns: minmax(0, 1.75fr) minmax(22rem, 0.58fr);
   }
 }

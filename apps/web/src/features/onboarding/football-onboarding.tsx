@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useState } from "react";
 
 import { Button, Text } from "@football/ui";
@@ -67,6 +66,7 @@ export function FootballOnboarding({
   const keeperPreferred = preferredRoles.includes("PORTERO");
   const totalSteps = keeperPreferred ? 2 : 3;
   const visibleStep = step === 0 ? 1 : step === 1 ? 2 : totalSteps;
+  const Root = initial ? "div" : "main";
 
   function toggleRole(role: Role) {
     setPreferredRoles((current) => {
@@ -89,12 +89,7 @@ export function FootballOnboarding({
   }
 
   return (
-    <main className={`${styles.page} ${initial ? styles.settingsPage : ""}`}>
-      {initial ? (
-        <Link className={styles.back} href="/profile/settings">
-          ← CONFIGURACIÓN
-        </Link>
-      ) : null}
+    <Root className={`${styles.page} ${initial ? styles.settingsPage : ""}`}>
       <header className={styles.header}>
         <Text tone="accent" variant="label">
           FÚTBOL F5 · {visibleStep}/{totalSteps}
@@ -231,6 +226,6 @@ export function FootballOnboarding({
           </Button>
         )}
       </footer>
-    </main>
+    </Root>
   );
 }

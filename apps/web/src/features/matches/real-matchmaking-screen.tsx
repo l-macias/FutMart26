@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { MatchStateMark } from "@football/football-ui";
 import { Button, Surface, Text } from "@football/ui";
@@ -22,6 +22,7 @@ export function RealMatchmakingScreen({
 }: Readonly<{ matchId: string }>) {
   const queryClient = useQueryClient();
   const confirmDialog = useRef<HTMLDialogElement>(null);
+  const startDialogTitleId = useId();
   const match = useQuery({
     queryKey: queryKeys.match(matchId),
     queryFn: () => api.match(matchId),
@@ -140,17 +141,17 @@ export function RealMatchmakingScreen({
 
   if (match.isPending || teams.isPending)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p role="status">Preparando equipos…</p>
-      </main>
+      </div>
     );
   if (match.isError || teams.isError)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p className={styles.error} role="alert">
           {match.error?.message ?? teams.error?.message}
         </p>
-      </main>
+      </div>
     );
 
   const locked = match.data.status === "STARTED" || teams.data.locked;
@@ -158,7 +159,7 @@ export function RealMatchmakingScreen({
   const hasTeams = teams.data.assignedCount > 0;
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <header className={styles.header}>
         <Link className={styles.back} href={`/play/matches/${matchId}`}>
           ← PARTIDO
@@ -370,12 +371,16 @@ export function RealMatchmakingScreen({
         title="¿Generar equipos nuevamente?"
       />
 
-      <dialog className={styles.dialog} ref={confirmDialog}>
+      <dialog
+        aria-labelledby={startDialogTitleId}
+        className={styles.dialog}
+        ref={confirmDialog}
+      >
         <form method="dialog">
           <Text tone="accent" variant="label">
             INICIAR PARTIDO
           </Text>
-          <Text as="h2" variant="heading-lg">
+          <Text as="h2" id={startDialogTitleId} variant="heading-lg">
             {teams.data.confirmedCount} jugadores
           </Text>
           <p>
@@ -400,7 +405,7 @@ export function RealMatchmakingScreen({
           </div>
         </form>
       </dialog>
-    </main>
+    </div>
   );
 }
 

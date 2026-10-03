@@ -11,18 +11,17 @@
   min-block-size: 0;
   align-content: start;
   gap: var(--space-5);
-  max-inline-size: var(--content-settings);
-  padding-block-end: var(--space-7);
-}
-.back {
-  inline-size: fit-content;
-  min-block-size: var(--touch-target-min);
-  display: inline-flex;
-  align-items: center;
-  color: var(--foreground-muted);
-  font-size: var(--type-label-size);
-  font-weight: 800;
-  letter-spacing: var(--type-tracking-label);
+  max-inline-size: none;
+  padding: var(--space-5);
+  background: var(--v4-surface);
+  clip-path: polygon(
+    0.75rem 0,
+    100% 0,
+    100% calc(100% - 0.75rem),
+    calc(100% - 0.75rem) 100%,
+    0 100%,
+    0 0.75rem
+  );
 }
 .header,
 .step {
@@ -39,6 +38,36 @@
   background: var(--accent-primary);
   transition: inline-size var(--motion-transition-duration)
     var(--motion-ease-standard);
+}
+
+.settingsPage .header > span:first-child {
+  color: var(--v4-gold-light);
+  font: 700 0.6rem/1 var(--font-v4-interface);
+  letter-spacing: 0.17em;
+}
+
+.settingsPage .header h1,
+.settingsPage .step h2 {
+  color: var(--v4-text);
+  font-family: var(--font-v4-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.settingsPage .header h1 {
+  font-size: clamp(2.2rem, 7vw, 3.25rem);
+  line-height: 0.82;
+}
+
+.settingsPage .step h2 {
+  font-size: clamp(1.8rem, 6vw, 2.5rem);
+  line-height: 0.85;
+}
+
+.settingsPage .progress {
+  block-size: 0.2rem;
+  background: rgb(244 243 239 / 10%);
 }
 .options,
 .binary {
@@ -60,6 +89,24 @@
   color: var(--foreground-primary);
   text-align: start;
   cursor: pointer;
+}
+
+.settingsPage .option {
+  min-block-size: 4rem;
+  border-color: rgb(244 243 239 / 12%);
+  border-radius: 0.35rem;
+  background:
+    linear-gradient(120deg, transparent, rgb(244 243 239 / 2%)),
+    var(--v4-canvas);
+  color: var(--v4-text);
+  font: 600 1rem/1.15 var(--font-v4-interface);
+}
+
+.settingsPage .option[aria-pressed="true"] {
+  border-color: rgb(216 181 100 / 52%);
+  border-inline-start: 0.22rem solid var(--v4-gold);
+  background: rgb(216 181 100 / 9%);
+  color: var(--v4-gold-light);
 }
 .option[aria-pressed="true"] {
   border-color: var(--accent-primary);
@@ -90,5 +137,9 @@
   }
   .page {
     align-content: start;
+  }
+
+  .settingsPage {
+    padding: var(--space-4);
   }
 }

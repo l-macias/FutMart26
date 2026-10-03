@@ -8,6 +8,11 @@ import {
 } from "@football/football-ui";
 import { Badge, Button, IconButton, Surface, Text } from "@football/ui";
 
+import {
+  PlayerCard,
+  type PlayerCardTier,
+} from "../../../components/player-card/player-card";
+
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +29,25 @@ const palette = [
   ["Warning", "state.warning", styles.warning!],
   ["Negative", "state.negative", styles.negative!],
 ] as const;
+
+const playerCardTiers: ReadonlyArray<
+  readonly [PlayerCardTier, string, string]
+> = [
+  ["bronze", "Bronze", "0–59"],
+  ["silver", "Silver", "60–69"],
+  ["gold", "Gold", "70–79"],
+  ["elite", "Elite", "80–89"],
+  ["legend", "Legend", "90+"],
+];
+
+const showcaseAttributes = {
+  VELOCIDAD: 78,
+  PASE: 74,
+  REGATE: 81,
+  REMATE: 76,
+  DEFENSA: 63,
+  FISICO: 72,
+} as const;
 
 export default function DesignSystemPreviewPage() {
   if (process.env.NODE_ENV === "production") {
@@ -163,6 +187,41 @@ export default function DesignSystemPreviewPage() {
           </div>
         </div>
         <TacticalDivider />
+      </PreviewSection>
+
+      <PreviewSection title="Player Card V4.2 · collectible tiers">
+        <Text tone="muted" variant="body">
+          Mismo jugador, OVR y atributos. El override de nivel existe sólo en
+          esta vista de desarrollo para comparar el arte; el producto deriva el
+          nivel automáticamente desde el OVR.
+        </Text>
+        <div className={`${styles.cardShowcase} ui-visual-v3 ui-visual-v4`}>
+          {playerCardTiers.map(([tier, label, range]) => (
+            <article
+              className={styles.cardTier}
+              data-card-tier={tier}
+              key={tier}
+            >
+              <div>
+                <Text as="h3" variant="heading-md">
+                  {label}
+                </Text>
+                <Text as="span" tone="muted" variant="metadata">
+                  OVR {range}
+                </Text>
+              </div>
+              <PlayerCard
+                attributes={showcaseAttributes}
+                displaySize="showcase"
+                footer="Mediocampista"
+                name="Luca Ferreyra"
+                overall={76}
+                photoSrc="/fifar-v4/players-raster/player-portrait-01.webp"
+                visualTier={tier}
+              />
+            </article>
+          ))}
+        </div>
       </PreviewSection>
 
       <PreviewSection title="Spacing, radius & border">

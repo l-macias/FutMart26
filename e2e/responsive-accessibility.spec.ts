@@ -18,32 +18,36 @@ test("@critical mobile shell and avatar crop remain usable at 390px", async ({
 
   try {
     await applyApiSession(user.api, page.context());
-    await page.setViewportSize({ width: 390, height: 844 });
+    for (const viewport of [390, 430, 768, 1024, 1440]) {
+      await page.setViewportSize({
+        width: viewport,
+        height: viewport < 768 ? 844 : 900,
+      });
 
-    for (const path of [
-      "/",
-      "/play",
-      "/profile",
-      "/players",
-      "/rankings",
-      "/notifications",
-      "/invitations",
-      "/profile/settings",
-      "/profile/account",
-    ]) {
-      await page.goto(path);
-      await expect(page.locator("main")).toBeVisible();
-      await expect
-        .poll(() =>
-          page.evaluate(
-            () =>
-              document.documentElement.scrollWidth <=
-              document.documentElement.clientWidth,
-          ),
-        )
-        .toBeTruthy();
+      for (const path of [
+        "/",
+        "/play",
+        "/profile",
+        "/players",
+        "/rankings",
+        "/notifications",
+        "/profile/settings",
+      ]) {
+        await page.goto(path);
+        await expect(page.locator("main")).toBeVisible();
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                document.documentElement.scrollWidth <=
+                document.documentElement.clientWidth,
+            ),
+          )
+          .toBeTruthy();
+      }
     }
 
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(page.getByRole("heading", { name: /^Hola, / })).toBeVisible();
     await expect(

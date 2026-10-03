@@ -21,9 +21,9 @@ const notificationStyles = read("./notifications/notifications.module.css");
 const dropdown = read("./notifications/notification-dropdown.tsx");
 const dropdownStyles = read("./notifications/notification-dropdown.module.css");
 
-void test("Profile integrates the existing Player Card with compact career hierarchy", () => {
+void test("Profile V4 integrates a visual identity object with compact career hierarchy", () => {
   assert.match(ownProfile, /<ProfilePlayerCard/);
-  assert.match(ownProfile, /<OverallDisplay/);
+  assert.match(ownProfile, /<OvrPlate/);
   assert.ok(
     ownProfile.indexOf("Tu carrera") < ownProfile.indexOf("Tu progreso"),
   );
@@ -31,50 +31,62 @@ void test("Profile integrates the existing Player Card with compact career hiera
     ownProfile.indexOf("Tu progreso") < ownProfile.indexOf("<CareerMarks"),
   );
   assert.match(ownProfile, /ui-button ui-button--management/);
-  assert.match(ownProfileStyles, /\.identity > figure/);
+  assert.match(ownProfileStyles, /\.identityStage/);
+  assert.match(ownProfile, /ui-visual-v4/);
+  assert.match(ownProfile, /V4GroupCrest/);
+  assert.match(ownProfile, /V4PlayIdentity/);
+  assert.doesNotMatch(ownProfile, /TacticalDivider/);
+  assert.match(ownProfileStyles, /players-tunnel\.webp/);
+  assert.match(ownProfileStyles, /night-pitch\.webp/);
   assert.match(ownProfileStyles, /@media \(min-width: 80rem\)/);
+  assert.doesNotMatch(ownProfile, /<main|<\/main>/);
 });
 
 void test("Public Profile keeps public identity distinct and awards authoritative", () => {
   assert.match(publicProfile, /<PlayerCard/);
-  assert.match(publicProfile, /<OverallDisplay/);
+  assert.match(publicProfile, /<OvrPlate/);
   assert.match(publicProfile, /data\.rewards\.awardSummary\.map/);
   assert.doesNotMatch(publicProfile, /recentAwards\.map/);
   assert.match(publicProfile, /data\.visibility === "PRIVATE"/);
-  assert.match(publicProfileStyles, /\.rewardList li[\s\S]*border-block-end/);
+  assert.match(publicProfile, /ui-visual-v4/);
+  assert.match(publicProfile, /V4GroupCrest/);
+  assert.match(publicProfile, /V4RewardBadge/);
+  assert.match(publicProfile, /V4PlayIdentity/);
+  assert.match(publicProfileStyles, /\.rewardList li[\s\S]*scroll-snap-align/);
+  assert.match(publicProfileStyles, /\.publicIdentity/);
+  assert.match(publicProfileStyles, /night-pitch\.webp/);
+  assert.match(publicProfileStyles, /players-tunnel\.webp/);
+  assert.doesNotMatch(publicProfile, /<main|<\/main>/);
 });
 
-void test("Search remains bounded to Players and Groups and renders shared rows", () => {
+void test("Search V4 keeps bounded discovery and gives Players and Groups distinct identity", () => {
   assert.match(search, /api\.globalSearch\(query, 5, signal\)/);
-  assert.equal(
-    search.includes("className={`${styles.results} ui-list`}"),
-    true,
-  );
-  assert.match(search, /className="ui-row"/);
+  assert.match(search, /V4Portrait/);
+  assert.match(search, /V4TierPlate/);
+  assert.match(search, /V4GroupCrest/);
+  assert.match(search, /playerGrid/);
+  assert.match(search, /groupGrid/);
+  assert.match(search, /ui-visual-v4/);
   assert.doesNotMatch(search, /Partidos encontrados|Sedes encontradas/);
-  assert.match(
-    searchStyles,
-    /inline-size: min\(100%, var\(--content-reading\)\)/,
-  );
-  assert.match(
-    searchStyles,
-    /grid-template-columns: var\(--touch-target-min\)/,
-  );
+  assert.match(searchStyles, /players-tunnel\.webp/);
+  assert.match(searchStyles, /group-club-night\.webp/);
+  assert.match(searchStyles, /@media \(min-width: 72rem\)/);
+  assert.doesNotMatch(search, /className="ui-row"/);
 });
 
-void test("Notifications use dense full-row navigation and a bounded overlay", () => {
-  assert.equal(
-    notifications.includes("className={`${styles.notificationRow} ui-row`}"),
-    true,
-  );
+void test("Notifications V4 use contextual entities, material unread state and a bounded overlay", () => {
+  assert.match(notifications, /NotificationVisual/);
+  assert.match(notifications, /notificationVisualKind/);
+  assert.match(notifications, /ui-visual-v4/);
   assert.doesNotMatch(notifications, /<Surface/);
   assert.match(notifications, /variant="quiet"/);
-  assert.match(
-    notificationStyles,
-    /color-mix\(in srgb, var\(--accent-primary\) 4%/,
-  );
+  assert.match(notificationStyles, /border-inline-start: 0\.25rem solid/);
+  assert.match(notificationStyles, /home-empty-pitch\.webp/);
+  assert.doesNotMatch(notifications, /className=.*ui-row/);
   assert.match(dropdown, /api\.notifications\(undefined, 5\)/);
   assert.match(dropdown, /unreadCount > 99 \? "99\+"/);
-  assert.match(dropdownStyles, /max-block-size: min\(23rem/);
+  assert.match(dropdown, /ui-notification-v4/);
+  assert.match(dropdown, /<NotificationVisual compact item=\{item\}/);
+  assert.match(dropdownStyles, /max-block-size: min\(26rem/);
   assert.match(dropdownStyles, /overflow-y: auto/);
 });

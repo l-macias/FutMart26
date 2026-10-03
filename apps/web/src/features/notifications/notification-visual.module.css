@@ -1,0 +1,98 @@
+.visual {
+  position: relative;
+  display: grid;
+  inline-size: 4.5rem;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  place-items: center;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--v4-text) 13%, transparent);
+  background: var(--v4-surface-raised);
+  clip-path: polygon(
+    0.55rem 0,
+    100% 0,
+    100% calc(100% - 0.55rem),
+    calc(100% - 0.55rem) 100%,
+    0 100%,
+    0 0.55rem
+  );
+}
+
+.scene {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(145deg, rgb(7 13 25 / 32%), rgb(7 13 25 / 88%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center / cover;
+}
+
+.visual[data-kind="player"] {
+  align-items: end;
+}
+
+.visual[data-kind="player"] :global([class*="portraitdefault"]) {
+  inline-size: 100%;
+  block-size: 100%;
+  box-shadow: none;
+  clip-path: none;
+}
+
+.visual[data-kind="group"] .scene {
+  background:
+    linear-gradient(145deg, rgb(7 13 25 / 45%), rgb(7 13 25 / 91%)),
+    url("/fifar-v4/group-ranking-scenes/group-club-night.webp") center / cover;
+}
+
+.visual[data-kind="match"] {
+  border-color: color-mix(in srgb, var(--v4-gold) 28%, transparent);
+}
+
+.visual[data-kind="match"] .scene {
+  background:
+    linear-gradient(145deg, rgb(7 13 25 / 38%), rgb(7 13 25 / 91%)),
+    url("/fifar-v4/match-scenes/match-open-night.webp") center / cover;
+}
+
+.visual[data-kind="match"] small {
+  position: absolute;
+  inset-inline-end: 0.2rem;
+  inset-block-end: 0.2rem;
+  display: grid;
+  inline-size: 1.25rem;
+  aspect-ratio: 1;
+  place-items: center;
+  background: var(--v4-gold);
+  color: var(--v4-canvas);
+  font: 700 0.45rem/1 var(--font-v4-interface);
+}
+
+.visual[data-kind="reward"] {
+  background: linear-gradient(145deg, #19243b, #080e1b);
+}
+
+.visual[data-kind="reward"] :global([class*="rewardBadgedefault"]) {
+  inline-size: 3.4rem;
+}
+
+.compact {
+  inline-size: 3rem;
+  clip-path: polygon(
+    0.38rem 0,
+    100% 0,
+    100% calc(100% - 0.38rem),
+    calc(100% - 0.38rem) 100%,
+    0 100%,
+    0 0.38rem
+  );
+}
+
+.compact[data-kind="reward"] :global([class*="rewardBadgedefault"]) {
+  inline-size: 2.35rem;
+}
+
+.compact[data-kind="group"] :global([class*="crestcompact"]),
+.compact[data-kind="match"] :global([class*="crestcompact"]) {
+  inline-size: 2.2rem;
+}

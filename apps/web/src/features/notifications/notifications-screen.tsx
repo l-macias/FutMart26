@@ -10,7 +10,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type MouseEvent } from "react";
 
-import { TacticalDivider } from "@football/football-ui";
 import { Button, Text } from "@football/ui";
 
 import { api } from "@/lib/api/resources";
@@ -22,6 +21,10 @@ import {
   type NotificationItem,
 } from "./notification-copy";
 import { refreshNotificationState } from "./notification-state";
+import {
+  NotificationVisual,
+  notificationVisualKind,
+} from "./notification-visual";
 
 import styles from "./notifications.module.css";
 
@@ -55,7 +58,7 @@ export function NotificationsScreen() {
     onSuccess: () => refreshNotificationState(queryClient),
   });
 
-  if (inbox.isPending) return <PageState title="Buscando novedades…" />;
+  if (inbox.isPending) return <PageState title="Preparando tu actividad…" />;
   if (inbox.isError)
     return <PageState alert title="No pudimos cargar tus notificaciones." />;
 
@@ -76,33 +79,51 @@ export function NotificationsScreen() {
     markRead.mutate({ id: item.id, href: item.target.href });
   }
 
+  const unreadCount = unread.data?.count ?? 0;
+
   return (
-    <div className={styles.page}>
-      <header className={styles.pageHeader}>
-        <div>
+    <div className={`${styles.page} ui-visual-v4`}>
+      <header className={styles.activityHeader}>
+        <img
+          alt=""
+          className={styles.headerScene}
+          src="/fifar-v4/backgrounds-raster/night-pitch.webp"
+        />
+        <div className={styles.headerCopy}>
           <Text as="span" tone="accent" variant="label">
-            Tu historial
+            ACTIVIDAD FIFAR
           </Text>
           <Text as="h1" variant="display-lg">
             Notificaciones
           </Text>
           <Text tone="muted">
-            Todo lo que pasó y lo que todavía requiere tu atención.
+            Partidos, grupos, conexiones y reconocimientos.
           </Text>
         </div>
-        {(unread.data?.count ?? 0) > 0 ? (
+        <div className={styles.unreadSummary} data-empty={unreadCount === 0}>
+          <strong>{String(unreadCount).padStart(2, "0")}</strong>
+          <span>{unreadCount === 1 ? "PENDIENTE" : "PENDIENTES"}</span>
+        </div>
+        {unreadCount > 0 ? (
           <Button
             disabled={markAll.isPending}
             onClick={() => markAll.mutate()}
             variant="quiet"
           >
-            {markAll.isPending ? "Marcando…" : "Marcar todas como leídas"}
+            {markAll.isPending ? "MARCANDO…" : "MARCAR TODO COMO LEÍDO"}
           </Button>
         ) : null}
       </header>
-      <TacticalDivider />
 
-      <div className={styles.toolbar}>
+      <div className={styles.activityToolbar}>
+        <div className={styles.toolbarCopy}>
+          <Text tone="accent" variant="label">
+            TU ACTIVIDAD
+          </Text>
+          <Text as="h2" variant="heading-lg">
+            Últimos movimientos
+          </Text>
+        </div>
         <div
           aria-label="Filtrar notificaciones"
           className={styles.filters}
@@ -126,40 +147,30 @@ export function NotificationsScreen() {
       </div>
 
       {items.length === 0 ? (
-        <div className={styles.emptyState}>
-          <Text as="h2" variant="heading-lg">
-            {unreadOnly
-              ? "No tenés notificaciones sin leer"
-              : "No tenés notificaciones"}
-          </Text>
-          <Text tone="muted">
-            {unreadOnly
-              ? "Todo está al día. Las notificaciones informativas siguen disponibles en Todas."
-              : "Cuando haya novedades importantes las vas a encontrar acá."}
-          </Text>
-        </div>
+        <NotificationEmpty unreadOnly={unreadOnly} />
       ) : (
-        <section className={styles.inbox}>
-          <ol className={`${styles.notificationList} ui-list`}>
+        <section className={styles.inbox} aria-label="Historial de actividad">
+          <ol className={styles.notificationList}>
             {items.map((item) => (
               <li
                 className={item.readAt ? styles.read : styles.unread}
+                data-kind={notificationVisualKind(item.type)}
                 key={item.id}
               >
                 <Link
                   aria-label={`${item.title}. Abrir destino`}
-                  className={`${styles.notificationRow} ui-row`}
+                  className={styles.notificationRow}
                   href={item.target.href}
                   onClick={(event) => openNotification(event, item)}
                 >
-                  <span aria-hidden="true" className={styles.eventMark} />
+                  <NotificationVisual item={item} />
                   <span className={styles.notificationContent}>
-                    <Text as="span" tone="muted" variant="metadata">
-                      {notificationEventLabel(item.type)} ·{" "}
+                    <span className={styles.notificationMeta}>
+                      <strong>{notificationEventLabel(item.type)}</strong>
                       <time dateTime={item.createdAt}>
                         {formatNotificationTimestamp(item.createdAt)}
                       </time>
-                    </Text>
+                    </span>
                     <Text as="span" variant="heading-md">
                       {item.title}
                     </Text>
@@ -170,8 +181,11 @@ export function NotificationsScreen() {
                   <span aria-hidden="true" className={styles.rowAction}>
                     {markRead.isPending && markRead.variables?.id === item.id
                       ? "…"
-                      : "→"}
+                      : "›"}
                   </span>
+                  {!item.readAt ? (
+                    <span className={styles.unreadLabel}>NUEVA</span>
+                  ) : null}
                 </Link>
               </li>
             ))}
@@ -182,7 +196,7 @@ export function NotificationsScreen() {
               onClick={() => void inbox.fetchNextPage()}
               variant="secondary"
             >
-              {inbox.isFetchingNextPage ? "Cargando…" : "Cargar más"}
+              {inbox.isFetchingNextPage ? "CARGANDO…" : "CARGAR MÁS ACTIVIDAD"}
             </Button>
           ) : null}
           {inbox.isFetchNextPageError ? (
@@ -201,15 +215,42 @@ export function NotificationsScreen() {
   );
 }
 
+function NotificationEmpty({ unreadOnly }: Readonly<{ unreadOnly: boolean }>) {
+  return (
+    <section className={styles.emptyState}>
+      <span aria-hidden="true" className={styles.emptyScene} />
+      <span aria-hidden="true" className={styles.emptyBall}>
+        F5
+      </span>
+      <div>
+        <Text tone="accent" variant="label">
+          TODO AL DÍA
+        </Text>
+        <Text as="h2" variant="display-lg">
+          {unreadOnly ? "Sin pendientes" : "Todavía no pasó nada"}
+        </Text>
+        <Text tone="muted">
+          {unreadOnly
+            ? "Las notificaciones informativas siguen disponibles en Todas."
+            : "Cuando haya actividad deportiva importante va a aparecer acá."}
+        </Text>
+      </div>
+    </section>
+  );
+}
+
 function PageState({
   alert,
   title,
 }: Readonly<{ alert?: boolean; title: string }>) {
   return (
-    <div className={styles.page}>
-      <Text as="h1" role={alert ? "alert" : "status"} variant="heading-lg">
-        {title}
-      </Text>
+    <div className={`${styles.page} ui-visual-v4`}>
+      <section className={styles.pageState}>
+        <span aria-hidden="true">F5</span>
+        <Text as="h1" role={alert ? "alert" : "status"} variant="heading-lg">
+          {title}
+        </Text>
+      </section>
     </div>
   );
 }

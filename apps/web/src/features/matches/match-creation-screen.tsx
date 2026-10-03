@@ -131,22 +131,22 @@ export function MatchCreationScreen({
 
   if (defaults.isPending)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p role="status">Preparando el próximo partido…</p>
-      </main>
+      </div>
     );
   if (defaults.isError)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p className={styles.error} role="alert">
           {defaults.error.message}
         </p>
-      </main>
+      </div>
     );
 
   if (step === "REVIEW")
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <Link className={styles.back} href={`/groups/${groupId}`}>
           ← GRUPO
         </Link>
@@ -199,11 +199,11 @@ export function MatchCreationScreen({
             Crear borrador
           </Button>
         </div>
-      </main>
+      </div>
     );
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/groups/${groupId}`}>
         ← GRUPO
       </Link>
@@ -416,7 +416,7 @@ export function MatchCreationScreen({
           Revisar borrador
         </Button>
       </div>
-    </main>
+    </div>
   );
 }
 

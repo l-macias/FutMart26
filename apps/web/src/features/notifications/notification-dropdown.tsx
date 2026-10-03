@@ -12,9 +12,11 @@ import { queryKeys } from "@/lib/api/query-keys";
 import { queryPolicy } from "@/lib/api/query-policy";
 import {
   formatNotificationTimestamp,
+  notificationEventLabel,
   type NotificationItem,
 } from "./notification-copy";
 import { refreshNotificationState } from "./notification-state";
+import { NotificationVisual } from "./notification-visual";
 
 import styles from "./notification-dropdown.module.css";
 
@@ -71,7 +73,7 @@ export function NotificationDropdown({ unreadCount }: { unreadCount: number }) {
   }
 
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div className={`${styles.root} ui-notification-v4`} ref={rootRef}>
       <button
         aria-controls="notification-preview"
         aria-expanded={open}
@@ -100,9 +102,14 @@ export function NotificationDropdown({ unreadCount }: { unreadCount: number }) {
           id="notification-preview"
         >
           <div className={styles.header}>
-            <Text as="h2" variant="heading-md">
-              Notificaciones
-            </Text>
+            <div>
+              <Text tone="accent" variant="label">
+                ACTIVIDAD
+              </Text>
+              <Text as="h2" variant="heading-md">
+                Notificaciones
+              </Text>
+            </div>
             {unreadCount > 0 ? (
               <button
                 className={styles.textAction}
@@ -137,14 +144,23 @@ export function NotificationDropdown({ unreadCount }: { unreadCount: number }) {
                     onClick={() => openItem(item)}
                     type="button"
                   >
-                    <span aria-hidden="true" className={styles.statusMark} />
-                    <span>
+                    <NotificationVisual compact item={item} />
+                    <span className={styles.itemContent}>
+                      <span className={styles.itemMeta}>
+                        <small>{notificationEventLabel(item.type)}</small>
+                        <time dateTime={item.createdAt}>
+                          {formatNotificationTimestamp(item.createdAt)}
+                        </time>
+                      </span>
                       <strong>{item.title}</strong>
                       <small>{item.body}</small>
-                      <time dateTime={item.createdAt}>
-                        {formatNotificationTimestamp(item.createdAt)}
-                      </time>
                     </span>
+                    <span aria-hidden="true" className={styles.itemAction}>
+                      ›
+                    </span>
+                    {!item.readAt ? (
+                      <span aria-hidden="true" className={styles.statusMark} />
+                    ) : null}
                   </button>
                 </li>
               ))}

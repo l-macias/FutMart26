@@ -8,6 +8,11 @@ import { Badge, Button, Text } from "@football/ui";
 import { MatchStateMark } from "@football/football-ui";
 
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
+import { PlayerAvatar } from "@/components/visual-v3/player-avatar";
+import {
+  V4GroupCrest,
+  V4Portrait,
+} from "@/components/visual-v4/profile-assets";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import { queryPolicy } from "@/lib/api/query-policy";
@@ -259,17 +264,17 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
 
   if (match.isPending || roster.isPending)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p role="status">Cargando partido…</p>
-      </main>
+      </div>
     );
   if (match.isError || roster.isError)
     return (
-      <main className={styles.page}>
+      <div className={`${styles.page} ui-visual-v4`}>
         <p className={styles.error} role="alert">
           {match.error?.message ?? roster.error?.message}
         </p>
-      </main>
+      </div>
     );
 
   const current = roster.data.currentParticipation;
@@ -332,24 +337,48 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     );
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/groups/${match.data.groupId}`}>
         ← GRUPO
       </Link>
       <header
         className={`${styles.matchHero} ${isOpen ? styles.openHero : styles.draftHero}`}
       >
-        <div>
+        {isOpen ? (
+          <img
+            alt=""
+            className={styles.openPitch}
+            src="/fifar-v4/match-scenes/match-open-night.webp"
+          />
+        ) : null}
+        {isOpen ? (
+          <div className={styles.matchEmblem}>
+            <V4GroupCrest
+              name="Partido F5"
+              seed={match.data.groupId}
+              size="large"
+            />
+            <span>FIFAR MATCH</span>
+          </div>
+        ) : null}
+        <div className={isOpen ? styles.openIdentity : undefined}>
           <div className={styles.heroState}>
             <MatchStateMark tone={isOpen ? "positive" : "neutral"}>
               {isOpen ? "ABIERTO" : "BORRADOR"}
             </MatchStateMark>
             <span>F5</span>
           </div>
+          {isOpen ? (
+            <Text tone="muted" variant="label">
+              PARTIDO F5
+            </Text>
+          ) : null}
           <Text as="h1" variant="display-lg">
             {formatMatchDate(date)}
           </Text>
-          <Text variant="heading-lg">{location}</Text>
+          <Text className={styles.venueName} variant="heading-lg">
+            {location}
+          </Text>
           {isOpen && (
             <Text className={styles.heroStatus} tone="muted" variant="metadata">
               {match.data.recruitment.effectiveStatus === "CLOSED"
@@ -377,6 +406,18 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
             </small>
           )}
         </div>
+        {isOpen ? (
+          <div className={styles.heroMatchStrip}>
+            <span>CONVOCATORIA</span>
+            <strong>
+              {match.data.recruitment.effectiveStatus === "OPEN"
+                ? "ABIERTA"
+                : match.data.recruitment.effectiveStatus === "FULL"
+                  ? "COMPLETA"
+                  : "CERRADA"}
+            </strong>
+          </div>
+        ) : null}
       </header>
       {match.data.scheduleChange && (
         <div className={styles.scheduleNotice}>
@@ -389,6 +430,12 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
       )}
       {composition.showAdmission && (
         <section className={styles.personalState}>
+          {isOpen ? (
+            <span className={styles.actorStateMark} aria-hidden="true">
+              <strong>{current ? current.admissionNumber : "+"}</strong>
+              <small>{current ? "TU LUGAR" : "SUMATE"}</small>
+            </span>
+          ) : null}
           <div>
             <Text tone="accent" variant="label">
               TU ESTADO
@@ -492,6 +539,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
           roster={roster.data}
           showActions={false}
           swapPending={false}
+          visualV4={isOpen}
         />
       )}
 
@@ -589,6 +637,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
                   roster={roster.data}
                   showActions
                   swapPending={swap.isPending}
+                  visualV4
                 />
                 {(guests.isError || policy.isError) && (
                   <p className={styles.auxiliaryError} role="status">
@@ -656,7 +705,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
         </details>
       )}
       <ReportControl targetId={matchId} targetType="MATCH" />
-    </main>
+    </div>
   );
 }
 
@@ -696,7 +745,7 @@ function StartedMatchView({
   const awaitingResult = effectivePhase === "AWAITING_RESULT";
   const canLoadClosure = persistedStatus === "STARTED" && canClose;
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/groups/${groupId}`}>
         ← GRUPO
       </Link>
@@ -801,7 +850,7 @@ function StartedMatchView({
         </details>
       )}
       <ReportControl targetId={matchId} targetType="MATCH" />
-    </main>
+    </div>
   );
 }
 
@@ -853,7 +902,7 @@ function CancelledMatchView({
   scheduledAt: string;
 }>) {
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/groups/${groupId}`}>
         ← GRUPO
       </Link>
@@ -887,7 +936,7 @@ function CancelledMatchView({
         title={`CONFIRMADOS · ${roster.confirmed.length}`}
       />
       <ReportControl targetId={matchId} targetType="MATCH" />
-    </main>
+    </div>
   );
 }
 
@@ -935,7 +984,7 @@ function FinishedMatchView({
   );
 
   return (
-    <main className={styles.page}>
+    <div className={`${styles.page} ui-visual-v4`}>
       <Link className={styles.back} href={`/groups/${match.groupId}`}>
         ← {groupName ? groupName.toLocaleUpperCase("es-AR") : "GRUPO"}
       </Link>
@@ -1070,7 +1119,7 @@ function FinishedMatchView({
         </details>
       ) : null}
       <ReportControl targetId={matchId} targetType="MATCH" />
-    </main>
+    </div>
   );
 }
 
@@ -1350,6 +1399,7 @@ function MatchRoster({
   roster,
   showActions,
   swapPending,
+  visualV4 = false,
 }: Readonly<{
   canManageGuests: boolean;
   canManageParticipants: boolean;
@@ -1363,6 +1413,7 @@ function MatchRoster({
   roster: RosterRead;
   showActions: boolean;
   swapPending: boolean;
+  visualV4?: boolean;
 }>) {
   return (
     <div className={styles.rosterGrid}>
@@ -1374,6 +1425,7 @@ function MatchRoster({
         rows={roster.confirmed}
         showActions={showActions}
         title={`CONFIRMADOS · ${roster.confirmed.length}`}
+        visualV4={visualV4}
       />
       <section className={styles.rosterSection}>
         <Text as="h2" variant="heading-lg">
@@ -1390,6 +1442,14 @@ function MatchRoster({
                 role="listitem"
               >
                 <span>#{participant.position}</span>
+                {visualV4 ? (
+                  <V4Portrait name={participant.displayName ?? "Jugador"} />
+                ) : (
+                  <PlayerAvatar
+                    name={participant.displayName ?? "Jugador"}
+                    size="compact"
+                  />
+                )}
                 <strong>{participant.displayName}</strong>
                 <small className={styles.rosterMeta}>
                   {index + 1}.º suplente
@@ -1462,6 +1522,7 @@ function Roster({
   onCancel,
   onRemoveGuest,
   showActions,
+  visualV4 = false,
 }: Readonly<{
   title: string;
   rows: Awaited<ReturnType<typeof api.roster>>["confirmed"];
@@ -1470,6 +1531,7 @@ function Roster({
   onCancel: (id: string) => void;
   onRemoveGuest: (id: string) => void;
   showActions: boolean;
+  visualV4?: boolean;
 }>) {
   return (
     <section className={styles.rosterSection}>
@@ -1487,6 +1549,14 @@ function Roster({
               role="listitem"
             >
               <span>#{participant.position}</span>
+              {visualV4 ? (
+                <V4Portrait name={participant.displayName ?? "Jugador"} />
+              ) : (
+                <PlayerAvatar
+                  name={participant.displayName ?? "Jugador"}
+                  size="compact"
+                />
+              )}
               <strong>{participant.displayName}</strong>
               <small className={styles.rosterMeta}>
                 {participant.kind === "GUEST" ? (

@@ -3,9 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
-import { OverallDisplay, TacticalDivider } from "@football/football-ui";
 import { Badge, Text } from "@football/ui";
 
+import { OvrPlate } from "@/components/visual-v3/ovr-plate";
+import { V4GroupCrest } from "@/components/visual-v4/profile-assets";
+import { V4PlayIdentity } from "@/components/visual-v4/play-identity";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import { CareerMarks } from "./career-marks";
@@ -32,69 +34,126 @@ export function ProfileScreen() {
     );
 
   const data = profile.data;
+  const primaryGroup = data.groups[0] ?? null;
   return (
-    <div className={styles.page}>
-      <header className={styles.pageHeader}>
-        <Text as="span" tone="accent" variant="label">
-          MI IDENTIDAD · F5
-        </Text>
-        <Text as="h1" variant="display-lg">
-          {data.player.displayName}
-        </Text>
-        <Text tone="muted">Tu identidad futbolística y tu evolución.</Text>
-      </header>
-
-      <div className={styles.profileLayout}>
-        <aside className={styles.identity}>
+    <div className={`${styles.page} ui-visual-v3 ui-visual-v4`}>
+      <section className={styles.identityStage} aria-labelledby="profile-name">
+        <div className={styles.identityPitch} aria-hidden="true" />
+        <div className={styles.identityIllustration} aria-hidden="true" />
+        <span className={styles.profileSerial}>FIFAR / PLAYER IDENTITY</span>
+        <aside className={styles.identityCard}>
           <ProfilePlayerCard
             image={data.player.image}
             name={data.player.displayName}
             performance={data.performance}
           />
         </aside>
-
-        <main className={styles.profileContent}>
-          <section className={styles.panelSection}>
-            <div className={styles.profileSummary}>
-              <div>
-                <Text as="h2" variant="heading-lg">
-                  Perfil futbolístico
-                </Text>
-                <Text tone="accent" variant="label">
-                  {data.footballProfile?.preferredRoles.join(" · ") ||
-                    "SIN ROLES CONFIGURADOS"}
-                </Text>
-                <Text tone="muted">
-                  {data.footballProfile
-                    ? `${data.footballProfile.strengths.join(" · ") || "Sin fortalezas declaradas"}${data.footballProfile.willingToPlayGoalkeeper ? " · Puede atajar" : ""}`
-                    : "Completá tus preferencias para definir tu perfil F5."}
-                </Text>
-              </div>
-              <OverallDisplay value={Math.round(data.performance.overall)} />
+        <header className={styles.pageHeader}>
+          <span className={styles.identityBadge}>MI PERFIL · F5</span>
+          <Text as="h1" id="profile-name" variant="display-lg">
+            {data.player.displayName}
+          </Text>
+          <Text tone="muted">Tu carrera, tu forma de jugar, tu historia.</Text>
+          <div className={styles.identityMeta}>
+            <OvrPlate
+              detail={data.performance.ratingProfile}
+              size="large"
+              value={Math.round(data.performance.overall)}
+            />
+            <div>
+              <small>POSICIONES</small>
+              <strong>
+                {data.footballProfile?.preferredRoles.join(" · ") ||
+                  "POR DEFINIR"}
+              </strong>
+              <span>
+                {data.footballProfile?.willingToPlayGoalkeeper
+                  ? "DISPONIBLE COMO PORTERO"
+                  : "PERFIL F5"}
+              </span>
             </div>
+          </div>
+          <div className={styles.heroActions}>
+            <Link href="/profile/progression">Ver progresión</Link>
+            <Link href="/profile/settings">Editar perfil</Link>
+          </div>
+        </header>
+      </section>
+
+      <div className={styles.profileLayout}>
+        <div className={styles.profileContent}>
+          <section
+            className={`${styles.panelSection} ${styles.footballModule}`}
+          >
+            <div className={styles.visualModuleHeading}>
+              <span>F5 / PERFIL DE JUEGO</span>
+              <Text as="h2" variant="heading-lg">
+                Tu zona en la cancha
+              </Text>
+            </div>
+            <V4PlayIdentity
+              attributes={data.performance.attributes}
+              roles={data.footballProfile?.preferredRoles ?? []}
+              strengths={data.footballProfile?.strengths ?? []}
+              willingToPlayGoalkeeper={
+                data.footballProfile?.willingToPlayGoalkeeper ?? false
+              }
+            />
           </section>
 
-          <TacticalDivider />
-          <section className={styles.panelSection}>
-            <Text as="h2" variant="heading-lg">
-              Tu carrera
-            </Text>
+          <section className={`${styles.panelSection} ${styles.careerModule}`}>
+            <div className={styles.careerHeading}>
+              <div className={styles.careerIdentity}>
+                {primaryGroup ? (
+                  <V4GroupCrest
+                    name={primaryGroup.name}
+                    seed={primaryGroup.id}
+                    size="large"
+                  />
+                ) : (
+                  <span className={styles.careerF5Mark}>F5</span>
+                )}
+                <div>
+                  <Text tone="accent" variant="label">
+                    CARRERA TOTAL · FIFAR
+                  </Text>
+                  <Text as="h2" variant="heading-lg">
+                    Tu carrera
+                  </Text>
+                  <small>
+                    {primaryGroup?.name ?? "Identidad independiente"}
+                  </small>
+                </div>
+              </div>
+              <div className={styles.careerOvr}>
+                <span>{Math.round(data.performance.overall)}</span>
+                <small>OVR ACTUAL</small>
+              </div>
+            </div>
             <dl className={styles.careerMetrics}>
               <Metric
+                mark="01"
                 label="Partidos"
                 value={data.performance.processedMatchCount}
               />
               <Metric
+                mark="02"
                 label="Promedio"
                 value={formatRating(data.summary.averageRating)}
               />
-              <Metric label="Goles" value={data.summary.totalGoals} />
-              <Metric label="Asistencias" value={data.summary.totalAssists} />
+              <Metric mark="03" label="Goles" value={data.summary.totalGoals} />
+              <Metric
+                mark="04"
+                label="Asistencias"
+                value={data.summary.totalAssists}
+              />
             </dl>
           </section>
 
-          <TacticalDivider />
-          <section className={styles.panelSection}>
+          <section
+            className={`${styles.panelSection} ${styles.progressionModule}`}
+          >
+            <div className={styles.progressionArtwork} aria-hidden="true" />
             <div className={styles.sectionHeading}>
               <div>
                 <Text as="h2" variant="heading-lg">
@@ -106,30 +165,43 @@ export function ProfileScreen() {
               </div>
             </div>
             <Link
-              className="ui-button ui-button--secondary"
+              className="ui-button ui-button--primary"
               href="/profile/progression"
             >
               Ver historial de progreso
             </Link>
           </section>
 
-          <TacticalDivider />
           <CareerMarks rewards={data.rewards} />
 
-          <TacticalDivider />
-          <section className={styles.panelSection}>
-            <Text as="h2" variant="heading-lg">
-              Tus grupos
-            </Text>
-            <ul className={styles.linkList}>
+          <section className={`${styles.panelSection} ${styles.groupsModule}`}>
+            <div className={styles.moduleTitle}>
+              <Text tone="accent" variant="label">
+                VESTUARIO
+              </Text>
+              <Text as="h2" variant="heading-lg">
+                Tus grupos
+              </Text>
+            </div>
+            <ul className={styles.groupCarousel}>
               {data.groups.map((group) => (
                 <li key={group.id}>
+                  <V4GroupCrest
+                    name={group.name}
+                    seed={group.id}
+                    size="large"
+                  />
                   <Link href={`/groups/${group.id}`}>{group.name}</Link>
+                  <small>
+                    {group.visibility === "PRIVATE"
+                      ? "GRUPO PRIVADO"
+                      : "GRUPO PÚBLICO"}
+                  </small>
                   {group.visibility === "PRIVATE" ? (
                     <Badge kind="state">PRIVADO</Badge>
                   ) : null}
                   <span aria-hidden="true" className={styles.rowArrow}>
-                    →
+                    ›
                   </span>
                 </li>
               ))}
@@ -141,41 +213,43 @@ export function ProfileScreen() {
                 </li>
               ) : null}
             </ul>
-            <Link className="ui-button ui-button--secondary" href="/groups">
+            <Link className={styles.textAction} href="/groups">
               Ver grupos
             </Link>
           </section>
 
-          <TacticalDivider />
-          <section className={styles.panelSection}>
-            <Text as="h2" variant="heading-lg">
-              Tu red
-            </Text>
-            <div className={styles.inlineActions}>
-              <Link
-                className="ui-button ui-button--secondary"
-                href="/connections"
-              >
-                Conexiones
+          <section className={`${styles.panelSection} ${styles.networkModule}`}>
+            <div className={styles.moduleTitle}>
+              <Text tone="accent" variant="label">
+                COMUNIDAD
+              </Text>
+              <Text as="h2" variant="heading-lg">
+                Tu red
+              </Text>
+            </div>
+            <div className={styles.appActions}>
+              <Link href="/connections">
+                <span aria-hidden="true">◎</span>
+                <strong>Conexiones</strong>
+                <small>Jugadores vinculados</small>
               </Link>
-              <Link
-                className="ui-button ui-button--secondary"
-                href="/invitations"
-              >
-                Invitaciones
+              <Link href="/invitations">
+                <span aria-hidden="true">↗</span>
+                <strong>Invitaciones</strong>
+                <small>Solicitudes pendientes</small>
               </Link>
             </div>
           </section>
 
-          <TacticalDivider />
-          <section className={styles.panelSection}>
-            <Text as="h2" variant="heading-lg">
-              Configuración
-            </Text>
-            <Text tone="muted">
-              Identidad, preferencias, privacidad y seguridad viven fuera de tu
-              carrera deportiva.
-            </Text>
+          <section
+            className={`${styles.panelSection} ${styles.settingsModule}`}
+          >
+            <div>
+              <Text as="h2" variant="heading-lg">
+                Configuración
+              </Text>
+              <Text tone="muted">Perfil, privacidad y seguridad.</Text>
+            </div>
             <Link
               className="ui-button ui-button--management"
               href="/profile/settings"
@@ -183,7 +257,7 @@ export function ProfileScreen() {
               Configuración
             </Link>
           </section>
-        </main>
+        </div>
       </div>
     </div>
   );
@@ -192,9 +266,11 @@ export function ProfileScreen() {
 function Metric({
   label,
   value,
-}: Readonly<{ label: string; value: string | number }>) {
+  mark,
+}: Readonly<{ label: string; value: string | number; mark: string }>) {
   return (
     <div>
+      <span aria-hidden="true">{mark}</span>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
