@@ -305,6 +305,39 @@ void test(
       (error: unknown) =>
         error instanceof ApplicationError && error.code === "player_not_found",
     );
+    await assert.rejects(
+      service.get(actor.id, randomUUID()),
+      (error: unknown) =>
+        error instanceof ApplicationError && error.code === "player_not_found",
+    );
+
+    const anonymized = await player("Original personal name");
+    await connection.db
+      .update(players)
+      .set({
+        accountStatus: "ANONYMIZED",
+        profileVisibility: "PRIVATE",
+      })
+      .where(eq(players.id, anonymized.id));
+    const anonymizedProfile = publicPlayerProfileSchema.parse(
+      await service.get(actor.id, anonymized.id),
+    );
+    assert.deepEqual(anonymizedProfile, {
+      visibility: "ANONYMIZED",
+      player: {
+        id: anonymized.id,
+        displayName: "Jugador eliminado",
+        image: null,
+      },
+      isCurrentPlayer: false,
+    });
+    const anonymizedPayload = JSON.stringify(anonymizedProfile);
+    for (const privateValue of [
+      "Original personal name",
+      anonymized.authUserId,
+      anonymized.email,
+    ])
+      assert.equal(anonymizedPayload.includes(privateValue), false);
 
     const search = await service.search(actor.id, {
       q: targetName.toLocaleLowerCase("es-AR"),
@@ -345,6 +378,14 @@ void test(
     });
     assert.equal(
       hiddenSearch.items.some((item) => item.player.id === target.id),
+      false,
+    );
+    const anonymizedSearch = await service.search(actor.id, {
+      q: "Original personal name",
+      limit: 10,
+    });
+    assert.equal(
+      anonymizedSearch.items.some((item) => item.player.id === anonymized.id),
       false,
     );
   },

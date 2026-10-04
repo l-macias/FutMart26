@@ -240,16 +240,22 @@ void test(
     assert.equal(anonymized?.accountStatus, "ANONYMIZED");
     assert.equal(anonymized?.profileVisibility, "PRIVATE");
     assert.equal(anonymized?.dateOfBirth, null);
-    await assert.rejects(
-      new PublicPlayerProfileService(
-        connection.db,
-        {} as never,
-        {} as never,
-        {} as never,
-      ).get(target.id, reporter.id),
-      (error: unknown) =>
-        error instanceof ApplicationError && error.code === "player_not_found",
+    const publicProfiles = new PublicPlayerProfileService(
+      connection.db,
+      {} as never,
+      {} as never,
+      {} as never,
     );
+    const historicalProfile = await publicProfiles.get(target.id, reporter.id);
+    assert.deepEqual(historicalProfile, {
+      visibility: "ANONYMIZED",
+      player: {
+        id: reporter.id,
+        displayName: "Jugador eliminado",
+        image: null,
+      },
+      isCurrentPlayer: false,
+    });
     assert.equal(
       (
         await connection.db
@@ -274,6 +280,10 @@ void test(
       .from(players)
       .where(eq(players.id, reporter.id));
     assert.equal(detached?.authUserId, null);
+    assert.deepEqual(
+      await publicProfiles.get(target.id, reporter.id),
+      historicalProfile,
+    );
     assert.equal(
       (
         await connection.db

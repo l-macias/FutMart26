@@ -58,7 +58,17 @@ export class PublicPlayerProfileService {
       .limit(1);
     if (!player)
       throw new ApplicationError("player_not_found", "Player not found", 404);
-    if (player.accountStatus === "ANONYMIZED" || player.suspensionId)
+    if (player.accountStatus === "ANONYMIZED")
+      return {
+        visibility: "ANONYMIZED",
+        player: {
+          id: player.id,
+          displayName: "Jugador eliminado",
+          image: null,
+        },
+        isCurrentPlayer: false,
+      };
+    if (player.suspensionId)
       throw new ApplicationError("player_not_found", "Player not found", 404);
     if (player.profileVisibility === "PRIVATE")
       return {

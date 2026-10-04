@@ -499,6 +499,16 @@
   filter: saturate(0.55);
 }
 
+.anonymizedBackdrop {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background:
+    linear-gradient(105deg, rgb(7 13 25 / 97%), rgb(7 13 25 / 68%)),
+    url("/fifar-v4/backgrounds-raster/night-pitch.webp") center/cover;
+  filter: grayscale(0.72) saturate(0.42);
+}
+
 .privateContent {
   align-content: end;
   gap: 0.85rem;
@@ -514,6 +524,25 @@
   font-weight: 600;
   line-height: 0.8;
   text-transform: uppercase;
+}
+
+.anonymizedContent {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+  max-inline-size: 52rem;
+}
+
+.anonymizedContent > :global([class*="avatar"]) {
+  inline-size: clamp(6rem, 14vw, 9rem);
+  border: 1px solid color-mix(in srgb, var(--v4-gold) 20%, transparent);
+  background: color-mix(in srgb, var(--v4-surface-raised) 88%, transparent);
+  filter: grayscale(1);
+}
+
+.anonymizedCopy {
+  display: grid;
+  gap: 0.85rem;
+  min-inline-size: 0;
 }
 
 .state {
@@ -648,6 +677,11 @@
 
   .publicIdentity {
     min-block-size: 39rem;
+  }
+
+  .anonymizedContent {
+    grid-template-columns: 1fr;
+    align-content: end;
   }
 
   .cardArea {

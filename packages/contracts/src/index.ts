@@ -409,9 +409,19 @@ const privatePublicPlayerProfileSchema = z.object({
   player: playerSchema,
   isCurrentPlayer: z.boolean(),
 });
+const anonymizedPublicPlayerProfileSchema = z.object({
+  visibility: z.literal("ANONYMIZED"),
+  player: z.object({
+    id: idSchema,
+    displayName: z.literal("Jugador eliminado"),
+    image: z.null(),
+  }),
+  isCurrentPlayer: z.literal(false),
+});
 export const publicPlayerProfileSchema = z.discriminatedUnion("visibility", [
   visiblePublicPlayerProfileSchema,
   privatePublicPlayerProfileSchema,
+  anonymizedPublicPlayerProfileSchema,
 ]);
 export type PublicPlayerProfile = z.infer<typeof publicPlayerProfileSchema>;
 export const ownPlayerProfileSchema = z.object({

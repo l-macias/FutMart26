@@ -13,6 +13,7 @@ import {
 } from "@/components/visual-v4/profile-assets";
 import { V4PlayIdentity } from "@/components/visual-v4/play-identity";
 import { OvrPlate } from "@/components/visual-v3/ovr-plate";
+import { PlayerAvatar } from "@/components/visual-v3/player-avatar";
 import { ReportControl } from "@/components/report-control/report-control";
 import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { api } from "@/lib/api/resources";
@@ -39,6 +40,36 @@ export function PublicPlayerProfileScreen({
     );
 
   const data = profile.data;
+  if (data.visibility === "ANONYMIZED")
+    return (
+      <div className={`${styles.page} ui-visual-v3 ui-visual-v4`}>
+        <Link className={styles.back} href="/search">
+          ← BUSCAR
+        </Link>
+        <header className={styles.privateIdentity}>
+          <div className={styles.anonymizedBackdrop} aria-hidden="true" />
+          <div
+            className={`${styles.privateContent} ${styles.anonymizedContent}`}
+          >
+            <PlayerAvatar
+              name={data.player.displayName}
+              photoSrc={data.player.image}
+              size="large"
+            />
+            <div className={styles.anonymizedCopy}>
+              <Badge kind="state">PERFIL HISTÓRICO</Badge>
+              <Text as="h1" variant="display-lg">
+                {data.player.displayName}
+              </Text>
+              <Text tone="muted">
+                Esta cuenta fue eliminada. Su evidencia deportiva histórica se
+                conserva sin datos personales.
+              </Text>
+            </div>
+          </div>
+        </header>
+      </div>
+    );
   if (data.visibility === "PRIVATE")
     return (
       <div className={`${styles.page} ui-visual-v3 ui-visual-v4`}>

@@ -48,6 +48,14 @@ void test("Public Profile keeps public identity distinct and awards authoritativ
   assert.match(publicProfile, /data\.rewards\.awardSummary\.map/);
   assert.doesNotMatch(publicProfile, /recentAwards\.map/);
   assert.match(publicProfile, /data\.visibility === "PRIVATE"/);
+  assert.match(publicProfile, /data\.visibility === "ANONYMIZED"/);
+  assert.match(publicProfile, /PERFIL HISTÓRICO/);
+  assert.match(publicProfile, /Esta cuenta fue eliminada/);
+  assert.match(publicProfile, /<PlayerAvatar/);
+  assert.ok(
+    publicProfile.indexOf('data.visibility === "ANONYMIZED"') <
+      publicProfile.indexOf("<ConnectionControls"),
+  );
   assert.match(publicProfile, /ui-visual-v4/);
   assert.match(publicProfile, /V4GroupCrest/);
   assert.match(publicProfile, /V4RewardBadge/);
