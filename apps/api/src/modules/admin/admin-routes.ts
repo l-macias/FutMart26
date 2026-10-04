@@ -9,6 +9,7 @@ import {
   adminMutationSchema,
   adminRevokeInvitationSchema,
   adminSearchQuerySchema,
+  effectiveMatchPhaseSchema,
 } from "@football/contracts";
 import type { Database } from "@football/database";
 
@@ -70,6 +71,7 @@ export function createAdminRoutes(
         limit?: string;
         offset?: string;
         status?: string;
+        phase?: string;
       };
       const statuses = ["DRAFT", "OPEN", "STARTED", "FINISHED", "CANCELLED"];
       if (query.status && !statuses.includes(query.status))
@@ -78,11 +80,21 @@ export function createAdminRoutes(
           "Invalid match status",
           400,
         );
+      const effectivePhase = query.phase
+        ? effectiveMatchPhaseSchema.safeParse(query.phase)
+        : null;
+      if (effectivePhase && !effectivePhase.success)
+        throw new ApplicationError(
+          "invalid_moderation_state",
+          "Invalid effective match phase",
+          400,
+        );
       const page = listQuery(query);
       const rows = await service.matches({
         ...page,
         limit: page.limit + 1,
         status: query.status,
+        effectivePhase: effectivePhase?.data,
       });
       return pageResult(rows, page.limit);
     });

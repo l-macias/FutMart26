@@ -29,6 +29,32 @@ void test("effective Match phase respects exact temporal boundaries", () => {
   );
 });
 
+void test("persisted STARTED uses the same end boundary as OPEN", () => {
+  const started = { ...base, status: "STARTED" as const };
+  assert.equal(
+    effectiveMatchPhase(started, new Date(startsAt.getTime() - 1_000)),
+    "IN_PROGRESS",
+  );
+  assert.equal(
+    effectiveMatchPhase(
+      started,
+      new Date(matchEndsAt(startsAt, 60).getTime() - 1_000),
+    ),
+    "IN_PROGRESS",
+  );
+  assert.equal(
+    effectiveMatchPhase(started, matchEndsAt(startsAt, 60)),
+    "AWAITING_RESULT",
+  );
+  assert.equal(
+    effectiveMatchPhase(
+      started,
+      new Date(matchEndsAt(startsAt, 60).getTime() + 1_000),
+    ),
+    "AWAITING_RESULT",
+  );
+});
+
 void test("persisted terminal states and Voting remain authoritative", () => {
   const now = new Date("2026-09-08T21:00:00.000Z");
   assert.equal(
@@ -36,6 +62,10 @@ void test("persisted terminal states and Voting remain authoritative", () => {
     "CANCELLED",
   );
   assert.equal(effectiveMatchPhase({ ...base, status: "DRAFT" }, now), "DRAFT");
+  assert.equal(
+    effectiveMatchPhase({ ...base, status: "FINISHED" }, now),
+    "FINISHED",
+  );
   assert.equal(
     effectiveMatchPhase(
       {

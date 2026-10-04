@@ -14,6 +14,9 @@ import {
   adminGrants,
   authSession,
   authUser,
+  groupMemberships,
+  groups,
+  matches,
   players,
 } from "@football/database/schema";
 
@@ -64,9 +67,11 @@ void test(
       .values({ id: randomUUID(), displayName: "Reporter" })
       .returning();
     await connection.db.insert(adminGrants).values({ authUserId: adminId });
+    const now = new Date("2026-10-04T18:00:00.000Z");
     const service = new AdminService(
       connection.db,
       new PlayerMediaService(connection.db, new InMemoryStorageProvider()),
+      () => now,
     );
     await assert.rejects(
       service.requireAdmin(userId),
@@ -184,5 +189,121 @@ void test(
     });
     assert.equal(filteredAudit.length, 1);
     assert.equal(filteredAudit[0]?.actorEmail, `${adminId}@example.test`);
+
+    const groupName = `Admin phase ${suffix}`;
+    const [group] = await connection.db
+      .insert(groups)
+      .values({
+        id: randomUUID(),
+        name: groupName,
+        createdByPlayerId: target!.id,
+      })
+      .returning();
+    await connection.db.insert(groupMemberships).values({
+      id: randomUUID(),
+      groupId: group!.id,
+      playerId: target!.id,
+      role: "OWNER",
+    });
+    const matchIds = {
+      open: randomUUID(),
+      current: randomUUID(),
+      boundary: randomUUID(),
+      expired: randomUUID(),
+      cancelled: randomUUID(),
+      finished: randomUUID(),
+    };
+    await connection.db.insert(matches).values([
+      {
+        id: matchIds.open,
+        groupId: group!.id,
+        status: "OPEN",
+        scheduledAt: new Date(now.getTime() + 60 * 60_000),
+        durationMinutes: 60,
+        capacity: 10,
+        locationText: "Future pitch",
+        createdByPlayerId: target!.id,
+      },
+      {
+        id: matchIds.current,
+        groupId: group!.id,
+        status: "STARTED",
+        scheduledAt: new Date(now.getTime() - 30 * 60_000),
+        durationMinutes: 60,
+        capacity: 10,
+        locationText: "Current pitch",
+        createdByPlayerId: target!.id,
+      },
+      {
+        id: matchIds.boundary,
+        groupId: group!.id,
+        status: "STARTED",
+        scheduledAt: new Date(now.getTime() - 60 * 60_000),
+        durationMinutes: 60,
+        capacity: 10,
+        locationText: "Boundary pitch",
+        createdByPlayerId: target!.id,
+      },
+      {
+        id: matchIds.expired,
+        groupId: group!.id,
+        status: "STARTED",
+        scheduledAt: new Date(now.getTime() - 120 * 60_000),
+        durationMinutes: 60,
+        capacity: 10,
+        locationText: "Expired pitch",
+        createdByPlayerId: target!.id,
+      },
+      {
+        id: matchIds.cancelled,
+        groupId: group!.id,
+        status: "CANCELLED",
+        scheduledAt: new Date(now.getTime() - 120 * 60_000),
+        durationMinutes: 60,
+        capacity: 10,
+        locationText: "Cancelled pitch",
+        createdByPlayerId: target!.id,
+      },
+      {
+        id: matchIds.finished,
+        groupId: group!.id,
+        status: "FINISHED",
+        scheduledAt: new Date(now.getTime() - 120 * 60_000),
+        durationMinutes: 60,
+        capacity: 10,
+        locationText: "Finished pitch",
+        createdByPlayerId: target!.id,
+      },
+    ]);
+
+    const adminMatches = await service.matches({ q: groupName, limit: 20 });
+    const phaseById = new Map(
+      adminMatches.map((match) => [match.id, match.effectivePhase]),
+    );
+    assert.equal(phaseById.get(matchIds.open), "OPEN");
+    assert.equal(phaseById.get(matchIds.current), "IN_PROGRESS");
+    assert.equal(phaseById.get(matchIds.boundary), "AWAITING_RESULT");
+    assert.equal(phaseById.get(matchIds.expired), "AWAITING_RESULT");
+    assert.equal(phaseById.get(matchIds.cancelled), "CANCELLED");
+    assert.equal(phaseById.get(matchIds.finished), "FINISHED");
+
+    const awaiting = await service.matches({
+      q: groupName,
+      effectivePhase: "AWAITING_RESULT",
+      limit: 20,
+    });
+    assert.deepEqual(
+      awaiting.map((match) => match.id).sort(),
+      [matchIds.boundary, matchIds.expired].sort(),
+    );
+    assert.equal(
+      (await service.match(matchIds.expired)).effectivePhase,
+      "AWAITING_RESULT",
+    );
+    assert.equal(
+      (await service.match(matchIds.current)).effectivePhase,
+      "IN_PROGRESS",
+    );
+    assert.equal((await service.group(group!.id)).activeMatches, 2);
   },
 );

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 
 import type { Database } from "@football/database";
+import type { EffectiveMatchPhase } from "@football/contracts";
 import {
   abuseReports,
   accountSuspensions,
@@ -26,6 +27,11 @@ import {
 } from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
+import {
+  effectiveMatchPhase,
+  effectiveMatchPhaseSql,
+  matchIsOperationallyActiveSql,
+} from "../matches/match-effective-phase.js";
 import type { PlayerMediaService } from "../media/player-media-service.js";
 
 type AuditAction = typeof adminAuditEvents.$inferInsert.action;
@@ -35,6 +41,7 @@ export class AdminService {
   constructor(
     private readonly database: Database,
     private readonly media: PlayerMediaService,
+    private readonly now: () => Date = () => new Date(),
   ) {}
 
   async requireAdmin(authUserId: string) {
@@ -237,10 +244,24 @@ export class AdminService {
   async matches(input: {
     q?: string;
     status?: string;
+    effectivePhase?: EffectiveMatchPhase;
     limit: number;
     offset?: number;
   }) {
     const q = input.q?.trim();
+    const now = this.now();
+    const phaseSql = effectiveMatchPhaseSql(
+      {
+        status: matches.status,
+        scheduledAt: matches.scheduledAt,
+        durationMinutes: matches.durationMinutes,
+        resultConfirmedAt: matchSportingResults.confirmedAt,
+        votingStatus: votingSessions.status,
+        votingOpensAt: votingSessions.openedAt,
+        votingClosesAt: votingSessions.closesAt,
+      },
+      now,
+    );
     const rows = await this.database
       .select({
         id: matches.id,
@@ -248,11 +269,16 @@ export class AdminService {
         groupName: groups.name,
         status: matches.status,
         scheduledAt: matches.scheduledAt,
+        durationMinutes: matches.durationMinutes,
         locationText: matches.locationText,
         capacity: matches.capacity,
         confirmedCount: sql<number>`(select count(*)::int from ${matchParticipants} mp where mp.match_id = ${matches.id} and mp.status = 'CONFIRMED')`,
         scoreA: matchSportingResults.teamAGoals,
         scoreB: matchSportingResults.teamBGoals,
+        resultConfirmedAt: matchSportingResults.confirmedAt,
+        votingStatus: votingSessions.status,
+        votingOpensAt: votingSessions.openedAt,
+        votingClosesAt: votingSessions.closesAt,
       })
       .from(matches)
       .innerJoin(groups, eq(groups.id, matches.groupId))
@@ -260,6 +286,7 @@ export class AdminService {
         matchSportingResults,
         eq(matchSportingResults.matchId, matches.id),
       )
+      .leftJoin(votingSessions, eq(votingSessions.matchId, matches.id))
       .where(
         and(
           input.status
@@ -268,6 +295,9 @@ export class AdminService {
                 input.status as
                   "DRAFT" | "OPEN" | "STARTED" | "FINISHED" | "CANCELLED",
               )
+            : undefined,
+          input.effectivePhase
+            ? sql`${phaseSql} = ${input.effectivePhase}`
             : undefined,
           q
             ? or(
@@ -281,10 +311,38 @@ export class AdminService {
       .orderBy(desc(matches.scheduledAt), desc(matches.id))
       .limit(input.limit)
       .offset(input.offset ?? 0);
-    return rows.map((row) => ({
-      ...row,
-      scheduledAt: row.scheduledAt.toISOString(),
-    }));
+    return rows.map((row) => {
+      const effectivePhase = effectiveMatchPhase(
+        {
+          status: row.status,
+          scheduledAt: row.scheduledAt,
+          durationMinutes: row.durationMinutes,
+          resultConfirmedAt: row.resultConfirmedAt,
+          voting: row.votingStatus
+            ? {
+                status: row.votingStatus,
+                opensAt: row.votingOpensAt!,
+                closesAt: row.votingClosesAt!,
+              }
+            : null,
+        },
+        now,
+      );
+      return {
+        id: row.id,
+        groupId: row.groupId,
+        groupName: row.groupName,
+        status: row.status,
+        scheduledAt: row.scheduledAt.toISOString(),
+        durationMinutes: row.durationMinutes,
+        locationText: row.locationText,
+        capacity: row.capacity,
+        confirmedCount: row.confirmedCount,
+        scoreA: row.scoreA,
+        scoreB: row.scoreB,
+        effectivePhase,
+      };
+    });
   }
 
   async player(playerId: string) {
@@ -354,6 +412,7 @@ export class AdminService {
   }
 
   async group(groupId: string) {
+    const now = this.now();
     const [row] = await this.database
       .select({
         id: groups.id,
@@ -386,7 +445,7 @@ export class AdminService {
       this.database
         .select({
           members: sql<number>`count(distinct ${groupMemberships.id}) filter (where ${groupMemberships.status} = 'ACTIVE')::int`,
-          activeMatches: sql<number>`count(distinct ${matches.id}) filter (where ${matches.status} in ('DRAFT','OPEN','STARTED'))::int`,
+          activeMatches: sql<number>`count(distinct ${matches.id}) filter (where ${matchIsOperationallyActiveSql(matches, now)})::int`,
         })
         .from(groups)
         .leftJoin(groupMemberships, eq(groupMemberships.groupId, groups.id))
@@ -413,9 +472,19 @@ export class AdminService {
           id: matches.id,
           status: matches.status,
           scheduledAt: matches.scheduledAt,
+          durationMinutes: matches.durationMinutes,
           locationText: matches.locationText,
+          resultConfirmedAt: matchSportingResults.confirmedAt,
+          votingStatus: votingSessions.status,
+          votingOpensAt: votingSessions.openedAt,
+          votingClosesAt: votingSessions.closesAt,
         })
         .from(matches)
+        .leftJoin(
+          matchSportingResults,
+          eq(matchSportingResults.matchId, matches.id),
+        )
+        .leftJoin(votingSessions, eq(votingSessions.matchId, matches.id))
         .where(eq(matches.groupId, groupId))
         .orderBy(desc(matches.scheduledAt))
         .limit(12),
@@ -461,8 +530,27 @@ export class AdminService {
       activeMatches: counts[0]?.activeMatches ?? 0,
       members,
       recentMatches: recentMatches.map((item) => ({
-        ...item,
+        id: item.id,
+        status: item.status,
+        effectivePhase: effectiveMatchPhase(
+          {
+            status: item.status,
+            scheduledAt: item.scheduledAt,
+            durationMinutes: item.durationMinutes,
+            resultConfirmedAt: item.resultConfirmedAt,
+            voting: item.votingStatus
+              ? {
+                  status: item.votingStatus,
+                  opensAt: item.votingOpensAt!,
+                  closesAt: item.votingClosesAt!,
+                }
+              : null,
+          },
+          now,
+        ),
         scheduledAt: item.scheduledAt.toISOString(),
+        durationMinutes: item.durationMinutes,
+        locationText: item.locationText,
       })),
       invitations: [
         ...tokenInvitations.map((item) => ({
@@ -480,11 +568,15 @@ export class AdminService {
   }
 
   async match(matchId: string) {
+    const now = this.now();
     const [row] = await this.database
       .select({
         match: matches,
         groupName: groups.name,
         votingSessionId: votingSessions.id,
+        votingStatus: votingSessions.status,
+        votingOpensAt: votingSessions.openedAt,
+        votingClosesAt: votingSessions.closesAt,
       })
       .from(matches)
       .innerJoin(groups, eq(groups.id, matches.groupId))
@@ -565,6 +657,22 @@ export class AdminService {
       nextAdmissionOrder: row.match.nextAdmissionOrder.toString(),
       scheduledAt: row.match.scheduledAt.toISOString(),
       groupName: row.groupName,
+      effectivePhase: effectiveMatchPhase(
+        {
+          status: row.match.status,
+          scheduledAt: row.match.scheduledAt,
+          durationMinutes: row.match.durationMinutes,
+          resultConfirmedAt: result[0]?.confirmedAt,
+          voting: row.votingStatus
+            ? {
+                status: row.votingStatus,
+                opensAt: row.votingOpensAt!,
+                closesAt: row.votingClosesAt!,
+              }
+            : null,
+        },
+        now,
+      ),
       closureEditable: row.match.status === "FINISHED" && !row.votingSessionId,
       progressionMaterialized: snapshots.length > 0,
       participants,

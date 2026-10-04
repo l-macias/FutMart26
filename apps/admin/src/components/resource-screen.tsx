@@ -272,7 +272,9 @@ function GroupDetail({
               <Link href={`/matches/${text(item, "id")}`}>
                 {date(item.scheduledAt)}
               </Link>
-              <span className="metadata">{label(text(item, "status"))}</span>
+              <span className="metadata">
+                {label(text(item, "effectivePhase") || text(item, "status"))}
+              </span>
             </li>
           ))}
         </ul>
@@ -329,7 +331,8 @@ function MatchDetail({
       <Section title="Partido">
         <Facts
           rows={[
-            ["Estado", label(text(data, "status"))],
+            ["Estado operativo", label(text(data, "effectivePhase"))],
+            ["Lifecycle persistido", label(text(data, "status"))],
             ["Fecha", date(data.scheduledAt)],
             ["Sede", text(data, "locationText")],
             ["Cupo", number(data, "capacity")],
@@ -650,6 +653,9 @@ function label(value: string) {
         DRAFT: "BORRADOR",
         OPEN: "ABIERTO",
         STARTED: "EN JUEGO",
+        IN_PROGRESS: "EN JUEGO",
+        AWAITING_RESULT: "ESPERANDO RESULTADO",
+        VOTING_OPEN: "VOTACIÓN ABIERTA",
         FINISHED: "FINALIZADO",
         CANCELLED: "CANCELADO",
         CONFIRMED: "CONFIRMADO",

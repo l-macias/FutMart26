@@ -27,6 +27,7 @@ interface MatchItem {
   id: string;
   groupName: string;
   status: string;
+  effectivePhase: string;
   scheduledAt: string;
   locationText: string;
   capacity: number;
@@ -212,15 +213,15 @@ export function GroupsList() {
 
 export function MatchesList() {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
+  const [phase, setPhase] = useState("");
   const [page, setPage] = useState(0);
   const deferred = useDebouncedValue(query);
-  useEffect(() => setPage(0), [deferred, status]);
+  useEffect(() => setPage(0), [deferred, phase]);
   const result = useQuery({
-    queryKey: ["admin", "matches", deferred, status, page],
+    queryKey: ["admin", "matches", deferred, phase, page],
     queryFn: () =>
       adminApi<PageResult<MatchItem>>(
-        `/admin/matches?q=${encodeURIComponent(deferred)}&status=${status}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`,
+        `/admin/matches?q=${encodeURIComponent(deferred)}&phase=${phase}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`,
       ),
   });
   return (
@@ -239,15 +240,17 @@ export function MatchesList() {
           count={result.data?.items.length}
         />
         <label>
-          Estado
+          Fase operativa
           <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            value={phase}
+            onChange={(event) => setPhase(event.target.value)}
           >
             <option value="">Todos</option>
             <option value="DRAFT">Borrador</option>
             <option value="OPEN">Abierto</option>
-            <option value="STARTED">En juego</option>
+            <option value="IN_PROGRESS">En juego</option>
+            <option value="AWAITING_RESULT">Esperando resultado</option>
+            <option value="VOTING_OPEN">Votación abierta</option>
             <option value="FINISHED">Finalizado</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
@@ -282,11 +285,11 @@ export function MatchesList() {
                     <Cell label="Grupo">{item.groupName}</Cell>
                     <Cell label="Estado">
                       <Status
-                        value={statusLabel(item.status)}
+                        value={statusLabel(item.effectivePhase)}
                         tone={
-                          item.status === "STARTED"
+                          item.effectivePhase === "IN_PROGRESS"
                             ? "success"
-                            : item.status === "CANCELLED"
+                            : item.effectivePhase === "CANCELLED"
                               ? "danger"
                               : "warning"
                         }
@@ -449,6 +452,9 @@ function statusLabel(value: string) {
         DRAFT: "BORRADOR",
         OPEN: "ABIERTO",
         STARTED: "EN JUEGO",
+        IN_PROGRESS: "EN JUEGO",
+        AWAITING_RESULT: "ESPERANDO RESULTADO",
+        VOTING_OPEN: "VOTACIÓN ABIERTA",
         FINISHED: "FINALIZADO",
         CANCELLED: "CANCELADO",
       } as Record<string, string>
