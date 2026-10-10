@@ -224,14 +224,14 @@
     align-items: start;
   }
 
-  .positionCard {
+  .rankingLayout > .positionCard {
     grid-column: 2;
     grid-row: 1;
     position: sticky;
     inset-block-start: var(--space-4);
   }
 
-  .ranking {
+  .rankingLayout > .ranking {
     grid-column: 1;
     grid-row: 1;
   }
@@ -367,7 +367,10 @@
   color: var(--v4-text);
   font: 600 clamp(4.25rem, 10vw, 8rem)/0.72 var(--font-v4-display);
   letter-spacing: -0.025em;
+  overflow-wrap: normal;
   text-transform: uppercase;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .page:global(.ui-visual-v4) .headerIdentity > span:last-child {
@@ -640,11 +643,15 @@
 .page:global(.ui-visual-v4) .positionCard {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "portrait identity"
+    "portrait tier";
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   min-inline-size: 0;
   min-block-size: 10rem;
-  align-items: end;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.35rem 1rem;
   overflow: hidden;
   padding: 1rem;
   border: 1px solid rgb(240 217 149 / 24%);
@@ -661,13 +668,20 @@
   );
 }
 
+.page:global(.ui-visual-v4) .positionCard > :first-child {
+  grid-area: portrait;
+  align-self: end;
+}
+
 .page:global(.ui-visual-v4) .positionCard :global([class*="portraitlarge"]) {
   inline-size: 6.5rem;
 }
 
 .positionIdentity {
   display: grid;
+  grid-area: identity;
   min-inline-size: 0;
+  align-self: end;
   gap: 0.1rem;
 }
 
@@ -679,7 +693,7 @@
 
 .page:global(.ui-visual-v4) .positionIdentity strong {
   color: var(--v4-text);
-  font: 600 clamp(3.8rem, 8vw, 6rem)/0.72 var(--font-v4-display);
+  font: 600 clamp(3.2rem, 5vw, 4.5rem)/0.72 var(--font-v4-display);
 }
 
 .positionIdentity small {
@@ -691,6 +705,12 @@
 .positionIdentity p {
   margin: 0.55rem 0 0;
   color: var(--v4-muted);
+}
+
+.page:global(.ui-visual-v4) .positionCard > :global([class*="tierPlate"]) {
+  grid-area: tier;
+  align-self: start;
+  justify-self: start;
 }
 
 .page:global(.ui-visual-v4) .ranking {
@@ -819,7 +839,7 @@
   );
 }
 
-@media (min-width: 64rem) {
+@media (min-width: 80rem) {
   .rankingExperience {
     grid-template-columns: minmax(0, 1.55fr) minmax(19rem, 0.52fr);
     align-items: start;
@@ -828,6 +848,14 @@
   .topZone,
   .ranking {
     grid-column: 1;
+  }
+
+  .topZone {
+    grid-row: 1;
+  }
+
+  .ranking {
+    grid-row: 2;
   }
 
   .positionCard {
@@ -840,18 +868,18 @@
 
 @media (max-width: 48rem) {
   .page:global(.ui-visual-v4) .header {
-    grid-template-columns: 5.5rem minmax(0, 1fr);
-    min-block-size: 24rem;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    min-block-size: 20rem;
     align-content: end;
-    padding: 5rem 1rem 1.2rem;
+    padding: 4rem 1rem 1.2rem;
   }
 
   .page:global(.ui-visual-v4) .header :global([class*="rewardBadgelarge"]) {
-    inline-size: 5.5rem;
+    inline-size: 4.5rem;
   }
 
   .page:global(.ui-visual-v4) .headerIdentity h1 {
-    font-size: clamp(3.7rem, 18vw, 5.2rem);
+    font-size: clamp(3.15rem, 14vw, 4.45rem);
   }
 
   .page:global(.ui-visual-v4) .competitionMark {
@@ -866,6 +894,17 @@
 
   .page:global(.ui-visual-v4) .context {
     grid-template-columns: 1fr;
+  }
+
+  .page:global(.ui-visual-v4) .listHeading > strong {
+    display: none;
+  }
+
+  .topZoneHeading h2,
+  .listHeading h2 {
+    overflow-wrap: normal;
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   .topGrid {
@@ -894,12 +933,13 @@
   }
 
   .page:global(.ui-visual-v4) .positionCard {
-    grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+    grid-template-columns: 5rem minmax(0, 1fr);
     min-block-size: 8.5rem;
+    padding: 0.85rem;
   }
 
   .page:global(.ui-visual-v4) .positionCard :global([class*="portraitlarge"]) {
-    inline-size: 5.5rem;
+    inline-size: 5rem;
   }
 
   .page:global(.ui-visual-v4) .row a {
@@ -921,12 +961,7 @@
     font-size: 1.25rem;
   }
 
-  .page:global(.ui-visual-v4) .positionCard {
-    grid-template-columns: 4.5rem minmax(0, 1fr);
-  }
-
-  .page:global(.ui-visual-v4) .positionCard > :global([class*="tierPlate"]) {
-    grid-column: 1 / -1;
-    justify-self: start;
+  .page:global(.ui-visual-v4) .positionIdentity strong {
+    font-size: 3rem;
   }
 }
