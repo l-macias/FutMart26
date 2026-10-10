@@ -21,6 +21,12 @@ import { ReportControl } from "@/components/report-control/report-control";
 import styles from "./matches.module.css";
 import { InviteConnectionControl } from "@/features/directed-invitations/invite-connection-control";
 import { matchInformationArchitecture } from "./match-information-architecture";
+import {
+  canShowJoinAction,
+  matchJoinLabel,
+  matchRecruitmentCopy,
+  matchRecruitmentStripCopy,
+} from "./match-open-presentation";
 
 export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
   const queryClient = useQueryClient();
@@ -278,7 +284,10 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
     );
 
   const current = roster.data.currentParticipation;
-  const canJoin = match.data.effectivePhase === "OPEN" && !current;
+  const canJoin = canShowJoinAction(
+    match.data.effectivePhase,
+    Boolean(current),
+  );
   const isOpen = match.data.effectivePhase === "OPEN";
   const date = new Date(match.data.scheduledAt);
   const location = [
@@ -381,11 +390,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
           </Text>
           {isOpen && (
             <Text className={styles.heroStatus} tone="muted" variant="metadata">
-              {match.data.recruitment.effectiveStatus === "CLOSED"
-                ? "Convocatoria cerrada"
-                : match.data.recruitment.effectiveStatus === "FULL"
-                  ? "Cupo completo"
-                  : "Convocatoria abierta"}
+              {matchRecruitmentCopy(match.data.recruitment.effectiveStatus)}
             </Text>
           )}
         </div>
@@ -408,13 +413,11 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
         </div>
         {isOpen ? (
           <div className={styles.heroMatchStrip}>
-            <span>CONVOCATORIA</span>
+            <span>BÚSQUEDA DE JUGADORES</span>
             <strong>
-              {match.data.recruitment.effectiveStatus === "OPEN"
-                ? "ABIERTA"
-                : match.data.recruitment.effectiveStatus === "FULL"
-                  ? "COMPLETA"
-                  : "CERRADA"}
+              {matchRecruitmentStripCopy(
+                match.data.recruitment.effectiveStatus,
+              )}
             </strong>
           </div>
         ) : null}
@@ -467,7 +470,7 @@ export function RealMatchScreen({ matchId }: Readonly<{ matchId: string }>) {
             )}
             {canJoin && (
               <Button disabled={join.isPending} onClick={() => join.mutate()}>
-                Anotarme
+                {matchJoinLabel(match.data.recruitment.effectiveStatus)}
               </Button>
             )}
             {isOpen && current && (

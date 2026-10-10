@@ -279,6 +279,15 @@
   .shell:has(.content :global(.ui-visual-v3)) .navigationItem {
     font-size: 0.62rem;
   }
+
+  .shell:global(.ui-visual-v4) .navigation,
+  .shell:has(.content :global(.ui-visual-v4)) .navigation {
+    inset-inline: 0;
+    inset-block-end: 0;
+    border-inline: 0;
+    border-block-end: 0;
+    clip-path: none;
+  }
 }
 
 .shell:global(.ui-visual-v4),
