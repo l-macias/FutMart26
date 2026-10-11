@@ -74,6 +74,8 @@ export type ApplicationErrorCode =
   | "media_feature_unavailable"
   | "media_storage_unavailable"
   | "media_rate_limited"
+  | "avatar_source_unavailable"
+  | "avatar_revision_conflict"
   | "invalid_media_upload"
   | "media_too_large"
   | "media_format_not_allowed"

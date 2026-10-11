@@ -112,6 +112,10 @@ export function userMessageForApiError(code: string, status = 0) {
       "La carga de imágenes todavía no está configurada en este entorno.",
     media_rate_limited:
       "Hiciste demasiados intentos. Esperá unos minutos antes de subir otra foto.",
+    avatar_source_unavailable:
+      "Este avatar es anterior al editor. Seleccioná la foto nuevamente para ajustar el encuadre.",
+    avatar_revision_conflict:
+      "El encuadre cambió en otra sesión. Recargá la página antes de volver a guardar.",
     compliance_required:
       "Completá la verificación de edad y privacidad antes de continuar.",
     underage: "Esta beta está disponible sólo para mayores de 18 años.",

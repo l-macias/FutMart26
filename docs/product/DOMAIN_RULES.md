@@ -130,15 +130,28 @@
     autenticación permanecen privados.
 11. Editar roles F5, disponibilidad de arquero o fortalezas autodeclaradas no
     modifica PlayerPerformance, snapshots ni evidencia deportiva histórica.
-12. La foto deportiva pertenece al Player y se representa mediante un
+12. La foto deportiva pública pertenece al Player y se representa mediante un
     `MediaAsset` `PLAYER_AVATAR` READY; Player nunca persiste URLs externas ni
-    detalles del provider.
-13. Sólo el actor puede reemplazar o eliminar su avatar. El replacement activa
-    primero el nuevo asset y retira el anterior después; un fallo de storage no
-    puede romper la referencia previamente activa.
-14. Se conserva únicamente una rendition WebP saneada 4:5. Original, EXIF,
-    ubicación y metadata del dispositivo no forman parte del dominio.
-15. El avatar mostrado en Profile, ficha pública y Progression es siempre la
+    detalles del provider y sólo referencia la rendition final.
+13. Un upload nuevo conserva dos assets privados: una fuente saneada
+    `PLAYER_AVATAR_SOURCE` y una rendition WebP 800×1000
+    `PLAYER_AVATAR`. La fuente se autorota, elimina EXIF y metadata, se limita
+    a 2400×2400 sin ampliación y se codifica WebP quality 90; nunca se conserva
+    el archivo original.
+14. `PlayerAvatarState` vincula fuente y rendition y persiste
+    `cropX`/`cropY` normalizados, `zoom`, revisión y timestamps. El editor del
+    propietario es el único consumidor de la fuente. Profile, Search, Rankings
+    y PlayerCard sólo pueden resolver la rendition.
+15. Reencuadrar siempre deriva una rendition nueva desde la fuente saneada,
+    nunca desde la rendition anterior. El guard de revisión rechaza escrituras
+    obsoletas; el asset fallido se compensa sin alterar la referencia vigente.
+16. Reemplazar activa atómicamente la pareja nueva antes de retirar la pareja
+    anterior. Eliminar o anonimizar retira fuente, rendition y estado, limpia la
+    referencia del Player y devuelve la silueta neutral.
+17. Avatares anteriores a esta regla continúan renderizando como
+    `PLAYER_AVATAR` sin fuente. Para reencuadrarlos se solicita una única
+    reselección; no se fabrica ni reconstruye una fuente.
+18. El avatar mostrado en Profile, ficha pública y Progression es siempre la
     imagen actual. No es evidencia histórica ni se snapshottea por Match.
 
 ## Discipline

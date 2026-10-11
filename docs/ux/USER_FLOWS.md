@@ -490,22 +490,32 @@ permanecen fuera de esta integración.
 ## UF30 — Foto deportiva y PlayerCard de lanzamiento
 
 1. Desde `/profile/edit`, el Player selecciona una imagen JPEG, PNG o WebP de
-   hasta 8 MB, ajusta posición/zoom en un encuadre 4:5 y confirma el upload.
-2. El API valida bytes reales, normaliza orientación, elimina metadata,
-   recorta y genera una única rendition WebP 800×1000. El original no se
-   conserva.
-3. Profile, ficha pública autenticada, History y Reveal usan la misma foto
-   actual dentro de la PlayerCard SVG. Sin foto o ante un fallo de delivery, la
-   Card conserva una silueta final y todos los datos deportivos.
-4. Reemplazar crea un asset nuevo antes de cambiar la referencia. Eliminar
-   desasocia el avatar y vuelve al fallback sin modificar identidad, OVR,
-   atributos ni snapshots.
-5. El contenido se entrega autenticado desde `/media/:assetId/content`; bucket,
-   storage key, endpoint y provider nunca forman parte del contrato público.
+   hasta 8 MB, ajusta posición/zoom en el aperture 4:5 de la PlayerCard mediante
+   drag por Pointer Events o controles accesibles y confirma.
+2. El API valida bytes reales, normaliza orientación, elimina metadata y crea
+   una fuente WebP privada de hasta 2400×2400 sin ampliación. Persiste crop
+   normalizado y deriva una rendition WebP 800×1000.
+3. Para un avatar nuevo, `Editar encuadre` carga únicamente al propietario la
+   fuente saneada y restaura el crop persistido. Guardar deriva una nueva
+   rendition desde esa fuente y avanza la revisión.
+4. Si dos editores abren la misma revisión, sólo el primero en guardar puede
+   avanzarla. El segundo recibe un conflicto claro y debe recargar; nunca pisa
+   silenciosamente el encuadre vigente.
+5. Un avatar legado sin fuente sigue visible. `Editar encuadre` explica que
+   debe seleccionarse la imagen una vez; no usa la rendition como fuente.
+6. Profile, ficha pública autenticada, History y Reveal consumen únicamente la
+   rendition actual. La fuente no tiene ruta pública ni se expone a otro
+   Player. La PlayerCard no aplica un segundo zoom a fotos de usuario.
+7. Reemplazar activa fuente, crop y rendition nuevos antes de retirar la pareja
+   anterior. Eliminar o anonimizar retira ambos assets y el estado, y vuelve a
+   la silueta sin modificar identidad, OVR, atributos ni snapshots.
+8. `/media/:assetId/content` entrega sólo la rendition activa con cache
+   immutable por asset id. La fuente usa una ruta owner-only sin cache; bucket,
+   storage key, credenciales, endpoint y provider permanecen internos.
 
-La foto actual no es una evidencia histórica. Group crest, Match media,
-galerías, video, CDN, upload directo a object storage y media anónima permanecen
-fuera de esta integración.
+La foto actual no es evidencia histórica. Group crest, Match media, galerías,
+video, CDN, upload directo a object storage y media anónima permanecen fuera de
+esta integración.
 
 ## UF29 — Administración operativa de Group
 

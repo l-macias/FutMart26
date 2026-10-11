@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  avatarEditorStateSchema,
+  avatarReframeRequestSchema,
   createdInvitationSchema,
   footballPreferencesSchema,
   groupSchema,
@@ -116,6 +118,16 @@ export const api = {
     apiRequest("/me/player/avatar", {
       method: "POST",
       body: form,
+      schema: playerImageSchema,
+    }),
+  avatarEditorState: () =>
+    apiRequest("/me/player/avatar/editor", {
+      schema: avatarEditorStateSchema,
+    }),
+  reframeAvatar: (input: z.infer<typeof avatarReframeRequestSchema>) =>
+    apiRequest("/me/player/avatar/crop", {
+      method: "PATCH",
+      body: JSON.stringify(input),
       schema: playerImageSchema,
     }),
   removeAvatar: () =>

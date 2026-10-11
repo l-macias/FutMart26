@@ -1,5 +1,6 @@
 export const queryKeys = {
   me: ["me"] as const,
+  avatarEditor: ["me", "player", "avatar-editor"] as const,
   ownProfile: ["me", "profile"] as const,
   compliance: ["me", "compliance"] as const,
   publicPlayerProfile: (playerId: string) =>

@@ -113,6 +113,12 @@ void test("legal and support surfaces use shared layout tokens without technical
   );
 });
 
+void test("avatar edit failures use explicit product language", () => {
+  assert.equal(apiClient.includes("avatar_source_unavailable:"), true);
+  assert.equal(apiClient.includes("avatar_revision_conflict:"), true);
+  assert.equal(apiClient.includes("El encuadre cambió en otra sesión."), true);
+});
+
 void test("compact connection metrics keep the value before the OVR label", () => {
   assert.equal(
     connections.includes("`OVR ${Math.round(item.overall)}`"),

@@ -6,6 +6,7 @@ import { ApplicationError } from "../errors.js";
 export const AVATAR_INPUT_MAX_BYTES = 8 * 1024 * 1024;
 export const AVATAR_WIDTH = 800;
 export const AVATAR_HEIGHT = 1000;
+export const AVATAR_SOURCE_MAX_EDGE = 2400;
 const MAX_INPUT_PIXELS = 40_000_000;
 const MIN_INPUT_EDGE = 320;
 const OUTPUT_MIME_TYPE = "image/webp";
@@ -17,10 +18,15 @@ const inputMimeByFormat = {
 } as const;
 
 export interface ProcessedAvatar {
+  source: ProcessedImage;
+  rendition: ProcessedImage;
+}
+
+export interface ProcessedImage {
   body: Buffer;
   mimeType: typeof OUTPUT_MIME_TYPE;
-  width: typeof AVATAR_WIDTH;
-  height: typeof AVATAR_HEIGHT;
+  width: number;
+  height: number;
 }
 
 export async function processAvatar(input: {
@@ -85,25 +91,26 @@ export async function processAvatar(input: {
         422,
       );
 
-    const extraction = avatarCropRectangle(
-      rotated.info.width,
-      rotated.info.height,
-      input.crop,
-    );
-    const rendition = await sharp(rotated.data, {
+    const sourceOutput = await sharp(rotated.data, {
       limitInputPixels: MAX_INPUT_PIXELS,
     })
-      .extract(extraction)
-      .resize(AVATAR_WIDTH, AVATAR_HEIGHT, { fit: "fill" })
-      .webp({ quality: 82, effort: 4 })
-      .toBuffer();
-
-    return {
-      body: rendition,
+      .resize({
+        width: AVATAR_SOURCE_MAX_EDGE,
+        height: AVATAR_SOURCE_MAX_EDGE,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 90, effort: 4 })
+      .toBuffer({ resolveWithObject: true });
+    const source: ProcessedImage = {
+      body: sourceOutput.data,
       mimeType: OUTPUT_MIME_TYPE,
-      width: AVATAR_WIDTH,
-      height: AVATAR_HEIGHT,
+      width: sourceOutput.info.width,
+      height: sourceOutput.info.height,
     };
+    const rendition = await renderAvatarRendition(source, input.crop);
+
+    return { source, rendition };
   } catch (error) {
     if (error instanceof ApplicationError) throw error;
     throw new ApplicationError(
@@ -112,4 +119,22 @@ export async function processAvatar(input: {
       422,
     );
   }
+}
+
+export async function renderAvatarRendition(
+  source: ProcessedImage,
+  crop: { cropX: number; cropY: number; zoom: number },
+): Promise<ProcessedImage> {
+  const extraction = avatarCropRectangle(source.width, source.height, crop);
+  const body = await sharp(source.body, { limitInputPixels: MAX_INPUT_PIXELS })
+    .extract(extraction)
+    .resize(AVATAR_WIDTH, AVATAR_HEIGHT, { fit: "fill" })
+    .webp({ quality: 82, effort: 4 })
+    .toBuffer();
+  return {
+    body,
+    mimeType: OUTPUT_MIME_TYPE,
+    width: AVATAR_WIDTH,
+    height: AVATAR_HEIGHT,
+  };
 }

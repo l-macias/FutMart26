@@ -96,6 +96,7 @@ void test(
         "media_assets",
         "notifications",
         "player_achievements",
+        "player_avatar_states",
         "player_connections",
         "player_evaluations",
         "player_football_preferences",
@@ -135,7 +136,7 @@ void test(
     const primaryKeys = await connection.client.unsafe<{ count: string }[]>(
       "select count(*)::text as count from pg_constraint where contype = 'p' and connamespace = 'public'::regnamespace",
     );
-    assert.equal(primaryKeys[0]?.count, "41");
+    assert.equal(primaryKeys[0]?.count, "42");
     const foreignKeys = await connection.client.unsafe<
       { conname: string; definition: string }[]
     >(

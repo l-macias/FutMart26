@@ -83,7 +83,12 @@ export function PlayerCard({
       <div aria-hidden="true" className={styles.artworkLayer}>
         {photoSrc && !photoFailed ? (
           // The Player name is already announced by the figure label.
-          <img alt="" onError={() => setPhotoFailed(true)} src={photoSrc} />
+          <img
+            alt=""
+            className={styles.playerPhoto}
+            onError={() => setPhotoFailed(true)}
+            src={photoSrc}
+          />
         ) : (
           <img
             alt=""

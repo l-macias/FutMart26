@@ -142,6 +142,7 @@ export const venueStatus = pgEnum("venue_status", ["ACTIVE", "ARCHIVED"]);
 export const venueProvenance = pgEnum("venue_provenance", ["USER_CREATED"]);
 export const mediaAssetPurpose = pgEnum("media_asset_purpose", [
   "PLAYER_AVATAR",
+  "PLAYER_AVATAR_SOURCE",
 ]);
 export const mediaAssetStatus = pgEnum("media_asset_status", [
   "PENDING",
@@ -360,6 +361,40 @@ export const mediaAssets = pgTable(
       sql`${table.width} > 0 and ${table.height} > 0`,
     ),
     check("media_assets_version_positive_ck", sql`${table.version} > 0`),
+  ],
+);
+
+export const playerAvatarStates = pgTable(
+  "player_avatar_states",
+  {
+    playerId: uuid("player_id")
+      .primaryKey()
+      .references(() => players.id, { onDelete: "restrict" }),
+    sourceMediaAssetId: uuid("source_media_asset_id")
+      .notNull()
+      .unique()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    renditionMediaAssetId: uuid("rendition_media_asset_id")
+      .notNull()
+      .unique()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    cropX: numeric("crop_x", { precision: 6, scale: 5 }).notNull(),
+    cropY: numeric("crop_y", { precision: 6, scale: 5 }).notNull(),
+    zoom: numeric("zoom", { precision: 6, scale: 5 }).notNull(),
+    revision: integer("revision").default(1).notNull(),
+    ...timestamps,
+  },
+  () => [
+    check(
+      "player_avatar_states_crop_x_ck",
+      sql.raw("crop_x >= 0 and crop_x <= 1"),
+    ),
+    check(
+      "player_avatar_states_crop_y_ck",
+      sql.raw("crop_y >= 0 and crop_y <= 1"),
+    ),
+    check("player_avatar_states_zoom_ck", sql.raw("zoom >= 1 and zoom <= 3")),
+    check("player_avatar_states_revision_ck", sql.raw("revision > 0")),
   ],
 );
 

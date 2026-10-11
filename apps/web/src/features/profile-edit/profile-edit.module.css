@@ -59,14 +59,55 @@
 }
 
 .cropPreview {
+  display: grid;
   position: relative;
   overflow: hidden;
   aspect-ratio: 4 / 5;
-  clip-path: polygon(8% 0, 92% 0, 100% 8%, 100% 100%, 0 100%, 0 8%);
+  clip-path: polygon(
+    7% 0,
+    93% 0,
+    100% 8%,
+    96% 92%,
+    82% 100%,
+    18% 100%,
+    4% 92%,
+    0 8%
+  );
   border: 1px solid rgb(216 181 100 / 22%);
   background:
     linear-gradient(180deg, rgb(216 181 100 / 8%), transparent),
     var(--v4-canvas);
+}
+
+.cropPreview[data-editing="true"] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.cropPreview[data-editing="true"]:active {
+  cursor: grabbing;
+}
+
+.dragHint {
+  position: absolute;
+  z-index: 2;
+  inset-inline: var(--space-3);
+  inset-block-end: var(--space-3);
+  justify-self: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  background: rgb(4 9 18 / 82%);
+  color: var(--v4-text);
+  font-size: var(--type-label-size);
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.legacyNotice {
+  margin: 0;
+  color: var(--v4-muted);
+  font-size: var(--type-body-sm-size);
+  line-height: 1.45;
 }
 
 .cropPreview img {

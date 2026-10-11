@@ -169,6 +169,13 @@
       "when": 1788371890300,
       "tag": "0023_perpetual_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791666195299,
+      "tag": "0024_heavy_gamora",
+      "breakpoints": true
     }
   ]
 }

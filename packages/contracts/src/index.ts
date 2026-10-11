@@ -78,6 +78,25 @@ export const avatarCropSchema = z
     zoom: z.coerce.number().min(1).max(3).default(1),
   })
   .strict();
+export const avatarReframeRequestSchema = avatarCropSchema.extend({
+  expectedRevision: z.number().int().positive(),
+});
+export const avatarEditorStateSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("EMPTY") }),
+  z.object({ status: z.literal("LEGACY"), image: playerImageSchema }),
+  z.object({
+    status: z.literal("EDITABLE"),
+    image: playerImageSchema,
+    source: z.object({
+      url: z.literal("/me/player/avatar/source"),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    }),
+    crop: avatarCropSchema,
+    revision: z.number().int().positive(),
+  }),
+]);
+export type AvatarEditorState = z.infer<typeof avatarEditorStateSchema>;
 export function avatarCropRectangle(
   width: number,
   height: number,

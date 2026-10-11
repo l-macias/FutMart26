@@ -4,6 +4,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { resolveAuthIdentity, type FootballAuth } from "@football/auth";
 import {
   avatarCropSchema,
+  avatarEditorStateSchema,
+  avatarReframeRequestSchema,
   mediaAssetParamsSchema,
   playerImageSchema,
 } from "@football/contracts";
@@ -106,6 +108,40 @@ export function createMediaRoutes(
       return playerImageSchema.parse(
         await media.uploadAvatar(player.id, { ...file, crop }),
       );
+    });
+
+    app.get("/me/player/avatar/editor", async (request) => {
+      const player = await actor(request);
+      return avatarEditorStateSchema.parse(
+        await media.getAvatarEditorState(player.id),
+      );
+    });
+
+    app.patch("/me/player/avatar/crop", async (request) => {
+      const player = await actor(request);
+      const input = avatarReframeRequestSchema.parse(request.body);
+      return playerImageSchema.parse(
+        await media.reframeAvatar(player.id, input),
+      );
+    });
+
+    app.get("/me/player/avatar/source", async (request, reply) => {
+      const player = await actor(request);
+      const content = await media.sourceContent(player.id);
+      const etag = content.etag?.startsWith('"')
+        ? content.etag
+        : content.etag
+          ? `"${content.etag}"`
+          : null;
+      if (etag && request.headers["if-none-match"] === etag)
+        return reply.status(304).send();
+      reply.header("cache-control", "private, no-store");
+      reply.header("content-type", content.contentType);
+      reply.header("content-length", String(content.contentLength));
+      reply.header("content-disposition", "inline");
+      reply.header("x-content-type-options", "nosniff");
+      if (etag) reply.header("etag", etag);
+      return reply.send(content.body);
     });
 
     app.delete("/me/player/avatar", async (request, reply) => {

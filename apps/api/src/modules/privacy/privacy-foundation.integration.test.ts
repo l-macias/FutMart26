@@ -5,6 +5,7 @@ import test from "node:test";
 
 import { eq } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
+import sharp from "sharp";
 
 import type { FootballAuth } from "@football/auth";
 import { createDatabase } from "@football/database";
@@ -12,6 +13,8 @@ import {
   abuseReports,
   authUser,
   groups,
+  mediaAssets,
+  playerAvatarStates,
   playerConnections,
   playerFootballPreferences,
   players,
@@ -226,10 +229,38 @@ void test(
       status: "ACCEPTED",
       acceptedAt: now,
     });
+    const avatarStorage = new InMemoryStorageProvider();
+    const playerMedia = new PlayerMediaService(connection.db, avatarStorage);
+    const avatarBody = await sharp({
+      create: {
+        width: 900,
+        height: 1200,
+        channels: 3,
+        background: "#263b31",
+      },
+    })
+      .jpeg()
+      .toBuffer();
+    await playerMedia.uploadAvatar(reporter.id, {
+      body: avatarBody,
+      claimedMimeType: "image/jpeg",
+      crop: { cropX: 0.5, cropY: 0.5, zoom: 1.1 },
+    });
+    const [avatarStateBeforeDeletion] = await connection.db
+      .select()
+      .from(playerAvatarStates)
+      .where(eq(playerAvatarStates.playerId, reporter.id));
+    assert.ok(avatarStateBeforeDeletion);
+    const avatarAssetsBeforeDeletion = await connection.db
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.ownerPlayerId, reporter.id));
+    assert.equal(avatarAssetsBeforeDeletion.length, 2);
+
     const deletion = new AccountDeletionService(
       connection.db,
       groupService,
-      new PlayerMediaService(connection.db, new InMemoryStorageProvider()),
+      playerMedia,
     );
     await deletion.anonymizeBeforeAuthDeletion(reporterAuthId);
     const [anonymized] = await connection.db
@@ -240,6 +271,27 @@ void test(
     assert.equal(anonymized?.accountStatus, "ANONYMIZED");
     assert.equal(anonymized?.profileVisibility, "PRIVATE");
     assert.equal(anonymized?.dateOfBirth, null);
+    assert.equal(
+      (
+        await connection.db
+          .select()
+          .from(playerAvatarStates)
+          .where(eq(playerAvatarStates.playerId, reporter.id))
+      ).length,
+      0,
+    );
+    for (const asset of avatarAssetsBeforeDeletion) {
+      assert.equal(avatarStorage.objects.has(asset.storageKey), false);
+      assert.equal(
+        (
+          await connection.db
+            .select({ status: mediaAssets.status })
+            .from(mediaAssets)
+            .where(eq(mediaAssets.id, asset.id))
+        )[0]?.status,
+        "DELETED",
+      );
+    }
     const publicProfiles = new PublicPlayerProfileService(
       connection.db,
       {} as never,

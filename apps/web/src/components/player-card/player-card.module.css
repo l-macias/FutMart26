@@ -470,12 +470,11 @@
   transform-origin: 50% 16%;
 }
 
-:global(.ui-visual-v4) .artworkLayer > img {
-  object-position: 50% 12%;
+:global(.ui-visual-v4) .playerPhoto {
+  object-position: 50% 50%;
   filter: saturate(0.86) contrast(1.08)
     drop-shadow(0 0.75rem 0.75rem rgb(0 0 0 / 48%));
-  transform: scale(1.09);
-  transform-origin: 50% 16%;
+  transform: none;
 }
 
 :global(.ui-visual-v4) .dataLayer {

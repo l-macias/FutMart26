@@ -12,11 +12,17 @@ import { ZodError } from "zod";
 import type { FootballAuth } from "@football/auth";
 import {
   avatarCropRectangle,
+  avatarEditorStateSchema,
   playerImageSchema,
   playerWithImageSchema,
 } from "@football/contracts";
 import { createDatabase } from "@football/database";
-import { authUser, mediaAssets, players } from "@football/database/schema";
+import {
+  authUser,
+  mediaAssets,
+  playerAvatarStates,
+  players,
+} from "@football/database/schema";
 
 import { ApplicationError } from "../errors.js";
 import { FootballPreferencesService } from "../identity/football-preferences-service.js";
@@ -28,8 +34,10 @@ import { RewardService } from "../rewards/reward-service.js";
 import {
   AVATAR_HEIGHT,
   AVATAR_INPUT_MAX_BYTES,
+  AVATAR_SOURCE_MAX_EDGE,
   AVATAR_WIDTH,
   processAvatar,
+  renderAvatarRendition,
 } from "./avatar-image-processor.js";
 import { createMediaRoutes } from "./media-routes.js";
 import { PlayerMediaService } from "./player-media-service.js";
@@ -55,12 +63,12 @@ void test("avatar processing validates real raster content and emits one sanitiz
       claimedMimeType: mimeTypes[index]!,
       crop: { cropX: 0.35, cropY: 0.45, zoom: 1.2 },
     });
-    const metadata = await sharp(output.body).metadata();
+    const metadata = await sharp(output.rendition.body).metadata();
     assert.equal(metadata.format, "webp");
     assert.equal(metadata.width, AVATAR_WIDTH);
     assert.equal(metadata.height, AVATAR_HEIGHT);
     assert.equal(metadata.exif, undefined);
-    assert.ok(output.body.byteLength < 500_000);
+    assert.ok(output.rendition.body.byteLength < 500_000);
   }
 
   const oriented = await sharp({
@@ -80,8 +88,27 @@ void test("avatar processing validates real raster content and emits one sanitiz
     crop: { cropX: 0.5, cropY: 0.5, zoom: 1 },
   });
   assert.deepEqual(
-    (await sharp(normalized.body).metadata()).orientation,
+    (await sharp(normalized.source.body).metadata()).orientation,
     undefined,
+  );
+
+  const oversizedSource = await processAvatar({
+    body: await sharp({
+      create: {
+        width: 3000,
+        height: 1800,
+        channels: 3,
+        background: "#334433",
+      },
+    })
+      .jpeg()
+      .toBuffer(),
+    claimedMimeType: "image/jpeg",
+    crop: { cropX: 0.5, cropY: 0.5, zoom: 1 },
+  });
+  assert.equal(
+    Math.max(oversizedSource.source.width, oversizedSource.source.height),
+    AVATAR_SOURCE_MAX_EDGE,
   );
 
   await rejectsWithCode(
@@ -297,6 +324,64 @@ void test(
       400,
     );
 
+    const [firstState] = await connection.db
+      .select()
+      .from(playerAvatarStates)
+      .where(eq(playerAvatarStates.playerId, actor.id));
+    assert.equal(firstState?.renditionMediaAssetId, first.assetId);
+    assert.equal(firstState?.revision, 1);
+    assert.deepEqual(
+      [
+        Number(firstState?.cropX),
+        Number(firstState?.cropY),
+        Number(firstState?.zoom),
+      ],
+      [0.5, 0.5, 1.2],
+    );
+    assert.ok(firstState);
+    const [firstSourceAsset] = await connection.db
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.id, firstState.sourceMediaAssetId));
+    assert.equal(firstSourceAsset?.purpose, "PLAYER_AVATAR_SOURCE");
+    assert.equal(firstSourceAsset?.status, "READY");
+    assert.ok(firstSourceAsset);
+    const editor = await app.inject({
+      url: "/me/player/avatar/editor",
+      headers: { "x-test-auth-user": actor.authUserId },
+    });
+    assert.equal(editor.statusCode, 200, editor.body);
+    const editorState = avatarEditorStateSchema.parse(editor.json());
+    assert.equal(editorState.status, "EDITABLE");
+    if (editorState.status !== "EDITABLE")
+      throw new Error("Expected editable avatar state");
+    assert.equal(editorState.revision, 1);
+    assert.deepEqual(editorState.crop, {
+      cropX: 0.5,
+      cropY: 0.5,
+      zoom: 1.2,
+    });
+    const source = await app.inject({
+      url: "/me/player/avatar/source",
+      headers: { "x-test-auth-user": actor.authUserId },
+    });
+    assert.equal(source.statusCode, 200, source.body);
+    assert.equal(source.headers["content-type"], "image/webp");
+    assert.match(source.headers["cache-control"] ?? "", /no-store/);
+    const sourceMetadata = await sharp(source.rawPayload).metadata();
+    assert.ok((sourceMetadata.width ?? 0) <= 2400);
+    assert.ok((sourceMetadata.height ?? 0) <= 2400);
+    assert.equal(sourceMetadata.exif, undefined);
+    assert.equal(
+      (
+        await app.inject({
+          url: "/me/player/avatar/source",
+          headers: { "x-test-auth-user": other.authUserId },
+        })
+      ).statusCode,
+      404,
+    );
+
     storage.failNextPut = true;
     await assert.rejects(
       media.uploadAvatar(actor.id, {
@@ -311,6 +396,80 @@ void test(
     assert.equal(
       (await media.getPlayerImage(actor.id))?.assetId,
       first.assetId,
+    );
+
+    const reframeOutcomes = await Promise.allSettled([
+      media.reframeAvatar(actor.id, {
+        expectedRevision: 1,
+        cropX: 0.35,
+        cropY: 0.4,
+        zoom: 1.35,
+      }),
+      media.reframeAvatar(actor.id, {
+        expectedRevision: 1,
+        cropX: 0.65,
+        cropY: 0.6,
+        zoom: 1.5,
+      }),
+    ]);
+    const successfulReframe = reframeOutcomes.find(
+      (item) => item.status === "fulfilled",
+    );
+    const rejectedReframe = reframeOutcomes.find(
+      (item) => item.status === "rejected",
+    );
+    assert.ok(successfulReframe?.status === "fulfilled");
+    assert.ok(rejectedReframe?.status === "rejected");
+    assert.ok(
+      rejectedReframe.reason instanceof ApplicationError &&
+        rejectedReframe.reason.code === "avatar_revision_conflict",
+    );
+    const reframed = successfulReframe.value;
+    const editorAfterReframe = await media.getAvatarEditorState(actor.id);
+    assert.equal(editorAfterReframe.status, "EDITABLE");
+    if (editorAfterReframe.status !== "EDITABLE")
+      throw Error("Expected editable avatar");
+    assert.equal(editorAfterReframe.revision, 2);
+    assert.equal(editorAfterReframe.image.assetId, reframed.assetId);
+    const [stateAfterReframe] = await connection.db
+      .select()
+      .from(playerAvatarStates)
+      .where(eq(playerAvatarStates.playerId, actor.id));
+    assert.ok(stateAfterReframe);
+    assert.equal(stateAfterReframe.sourceMediaAssetId, firstSourceAsset.id);
+    const [reframedAsset] = await connection.db
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.id, reframed.assetId));
+    assert.equal(reframedAsset?.status, "READY");
+    const expectedReframe = await renderAvatarRendition(
+      {
+        body: storage.objects.get(firstSourceAsset.storageKey)!.body,
+        mimeType: "image/webp",
+        width: firstSourceAsset.width,
+        height: firstSourceAsset.height,
+      },
+      {
+        cropX: Number(stateAfterReframe.cropX),
+        cropY: Number(stateAfterReframe.cropY),
+        zoom: Number(stateAfterReframe.zoom),
+      },
+    );
+    assert.ok(reframedAsset);
+    const reframedObject = storage.objects.get(reframedAsset.storageKey);
+    assert.ok(reframedObject);
+    assert.deepEqual(reframedObject.body, expectedReframe.body);
+    assert.equal(storage.objects.size, 2);
+    assert.equal(storage.objects.has(firstSourceAsset.storageKey), true);
+    assert.equal(storage.objects.has(firstAsset.storageKey), false);
+    await rejectsWithCode(
+      media.reframeAvatar(actor.id, {
+        expectedRevision: 1,
+        cropX: 0.5,
+        cropY: 0.5,
+        zoom: 1,
+      }),
+      "avatar_revision_conflict",
     );
 
     const second = await media.uploadAvatar(actor.id, {
@@ -333,6 +492,22 @@ void test(
       "DELETED",
     );
     assert.equal(storage.objects.has(firstAsset.storageKey), false);
+    assert.equal(storage.objects.has(firstSourceAsset.storageKey), false);
+    assert.equal(storage.objects.has(reframedAsset.storageKey), false);
+    const [secondState] = await connection.db
+      .select()
+      .from(playerAvatarStates)
+      .where(eq(playerAvatarStates.playerId, actor.id));
+    const secondPair = await connection.db
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.ownerPlayerId, actor.id));
+    const secondSourceAsset = secondPair.find(
+      (asset) =>
+        asset.id === secondState?.sourceMediaAssetId &&
+        asset.status === "READY",
+    );
+    assert.ok(secondSourceAsset);
 
     const publicProfiles = new PublicPlayerProfileService(
       connection.db,
@@ -373,14 +548,21 @@ void test(
       second.assetId,
     );
 
-    await media.removeAvatar(other.id);
-    assert.equal(
-      (await media.getPlayerImage(actor.id))?.assetId,
-      second.assetId,
-    );
-    storage.failNextDelete = true;
     await media.removeAvatar(actor.id);
     assert.equal(await media.getPlayerImage(actor.id), null);
+    assert.equal(
+      (
+        await connection.db
+          .select()
+          .from(playerAvatarStates)
+          .where(eq(playerAvatarStates.playerId, actor.id))
+      ).length,
+      0,
+    );
+    assert.equal(storage.objects.has(secondSourceAsset.storageKey), false);
+    const secondAsset = secondPair.find((asset) => asset.id === second.assetId);
+    assert.ok(secondAsset);
+    assert.equal(storage.objects.has(secondAsset.storageKey), false);
     assert.equal(
       (
         await connection.db
@@ -414,6 +596,49 @@ void test(
     if (profileWithoutImage.visibility !== "PUBLIC")
       throw new Error("Expected public profile");
     assert.equal(profileWithoutImage.player.image, null);
+
+    const legacyId = randomUUID();
+    const legacyKey = "player-avatar/" + legacyId + "/v1.webp";
+    const legacyRendition = (
+      await processAvatar({
+        body: jpeg,
+        claimedMimeType: "image/jpeg",
+        crop: { cropX: 0.5, cropY: 0.5, zoom: 1 },
+      })
+    ).rendition;
+    await storage.putObject({
+      key: legacyKey,
+      body: legacyRendition.body,
+      contentType: legacyRendition.mimeType,
+    });
+    await connection.db.insert(mediaAssets).values({
+      id: legacyId,
+      ownerPlayerId: other.id,
+      purpose: "PLAYER_AVATAR",
+      storageKey: legacyKey,
+      mimeType: legacyRendition.mimeType,
+      byteSize: legacyRendition.body.byteLength,
+      width: legacyRendition.width,
+      height: legacyRendition.height,
+      status: "READY",
+    });
+    await connection.db
+      .update(players)
+      .set({ avatarMediaAssetId: legacyId })
+      .where(eq(players.id, other.id));
+    assert.equal((await media.getAvatarEditorState(other.id)).status, "LEGACY");
+    await rejectsWithCode(
+      media.reframeAvatar(other.id, {
+        expectedRevision: 1,
+        cropX: 0.5,
+        cropY: 0.5,
+        zoom: 1.2,
+      }),
+      "avatar_source_unavailable",
+    );
+    await media.removeAvatar(other.id);
+    assert.equal(await media.getPlayerImage(other.id), null);
+    assert.equal(storage.objects.has(legacyKey), false);
   },
 );
 

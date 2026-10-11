@@ -2,7 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import {
   avatarCropRectangle,
@@ -15,6 +22,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { mediaContentUrl } from "@/lib/api/client";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
+import { avatarCropAfterDrag, type AvatarCrop } from "./avatar-crop-model";
 import { refreshPlayerIdentityProjections } from "@/lib/api/player-projection-cache";
 import { SettingsFrame } from "@/features/profile-settings/settings-visual";
 
@@ -196,11 +204,24 @@ function PrivacyEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
 
 function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
   const queryClient = useQueryClient();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const drag = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
+  const editor = useQuery({
+    queryKey: queryKeys.avatarEditor,
+    queryFn: api.avatarEditorState,
+  });
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [cropX, setCropX] = useState(0.5);
-  const [cropY, setCropY] = useState(0.5);
-  const [zoom, setZoom] = useState(1);
+  const [editingExisting, setEditingExisting] = useState(false);
+  const [crop, setCrop] = useState<AvatarCrop>({
+    cropX: 0.5,
+    cropY: 0.5,
+    zoom: 1,
+  });
   const [imageSize, setImageSize] = useState<{
     width: number;
     height: number;
@@ -216,24 +237,40 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
     [previewUrl],
   );
 
+  async function refreshAvatar(image: PrivatePlayer["image"]) {
+    await Promise.all([
+      refreshPlayerIdentityProjections(queryClient, { ...player, image }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.avatarEditor }),
+    ]);
+  }
+
   const upload = useMutation({
     mutationFn: api.uploadAvatar,
     onSuccess: async (image) => {
       setFile(null);
       setPreviewUrl(null);
+      setEditingExisting(false);
+      setImageSize(null);
       setFeedback("Tu foto deportiva quedó actualizada.");
-      await refreshPlayerIdentityProjections(queryClient, { ...player, image });
+      await refreshAvatar(image);
+    },
+  });
+  const reframe = useMutation({
+    mutationFn: api.reframeAvatar,
+    onSuccess: async (image) => {
+      setEditingExisting(false);
+      setImageSize(null);
+      setFeedback("El encuadre de tu Card quedó actualizado.");
+      await refreshAvatar(image);
     },
   });
   const remove = useMutation({
     mutationFn: api.removeAvatar,
     onSuccess: async () => {
       setConfirmRemove(false);
+      setEditingExisting(false);
       setFeedback("Tu foto fue eliminada. La Card volvió al diseño base.");
-      await refreshPlayerIdentityProjections(queryClient, {
-        ...player,
-        image: null,
-      });
+      await refreshAvatar(null);
     },
   });
 
@@ -250,26 +287,96 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
       setValidationError("La foto puede pesar hasta 8 MB.");
       return;
     }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(selected);
-    setCropX(0.5);
-    setCropY(0.5);
-    setZoom(1);
+    setEditingExisting(false);
+    setCrop({ cropX: 0.5, cropY: 0.5, zoom: 1 });
     setImageSize(null);
     setPreviewUrl(URL.createObjectURL(selected));
   }
 
-  function saveAvatar() {
-    if (!file || upload.isPending) return;
-    const form = new FormData();
-    form.append("cropX", String(cropX));
-    form.append("cropY", String(cropY));
-    form.append("zoom", String(zoom));
-    form.append("avatar", file);
-    upload.mutate(form);
+  function beginExistingEdit() {
+    if (editor.data?.status === "EDITABLE") {
+      setFeedback(null);
+      setValidationError(null);
+      setCrop(editor.data.crop);
+      setImageSize({
+        width: editor.data.source.width,
+        height: editor.data.source.height,
+      });
+      setEditingExisting(true);
+      return;
+    }
+    setFeedback(
+      "Este avatar es anterior al editor. Seleccioná la foto una vez más para habilitar futuros ajustes.",
+    );
+    fileInput.current?.click();
   }
 
+  function saveAvatar() {
+    if (upload.isPending || reframe.isPending) return;
+    if (file) {
+      const form = new FormData();
+      form.append("cropX", String(crop.cropX));
+      form.append("cropY", String(crop.cropY));
+      form.append("zoom", String(crop.zoom));
+      form.append("avatar", file);
+      upload.mutate(form);
+      return;
+    }
+    if (editingExisting && editor.data?.status === "EDITABLE")
+      reframe.mutate({
+        ...crop,
+        expectedRevision: editor.data.revision,
+      });
+  }
+
+  const isEditing = Boolean(file) || editingExisting;
   const currentUrl = player.image ? mediaContentUrl(player.image.url) : null;
-  const visibleUrl = previewUrl ?? currentUrl;
+  const sourceUrl =
+    editingExisting && editor.data?.status === "EDITABLE"
+      ? mediaContentUrl(editor.data.source.url)
+      : null;
+  const visibleUrl = previewUrl ?? sourceUrl ?? currentUrl;
+
+  function pointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!isEditing || !imageSize) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+    event.preventDefault();
+  }
+
+  function pointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const previous = drag.current;
+    if (!previous || previous.pointerId !== event.pointerId || !imageSize)
+      return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setCrop((current) =>
+      avatarCropAfterDrag(imageSize, current, {
+        deltaX: event.clientX - previous.clientX,
+        deltaY: event.clientY - previous.clientY,
+        viewportWidth: bounds.width,
+        viewportHeight: bounds.height,
+      }),
+    );
+    drag.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+    event.preventDefault();
+  }
+
+  function pointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    if (drag.current?.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    drag.current = null;
+  }
 
   return (
     <section className={styles.module} aria-labelledby="avatar-title">
@@ -277,19 +384,31 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
         <span>FOTO DEL JUGADOR</span>
         <h2 id="avatar-title">Tu imagen en la Card</h2>
         <p>
-          Se publica en tu ficha deportiva autenticada. Guardamos únicamente una
-          versión WebP saneada, sin EXIF ni ubicación.
+          Conservamos una fuente WebP saneada y privada para que puedas ajustar
+          el encuadre sin perder calidad. Nunca guardamos EXIF ni ubicación.
         </p>
       </header>
 
       <div className={styles.avatarWorkspace}>
-        <div className={styles.cropPreview}>
+        <div
+          aria-label={
+            isEditing
+              ? "Vista previa editable del encuadre en la Card"
+              : "Vista previa del encuadre en la Card"
+          }
+          className={styles.cropPreview}
+          data-editing={isEditing}
+          onPointerCancel={pointerEnd}
+          onPointerDown={pointerDown}
+          onPointerMove={pointerMove}
+          onPointerUp={pointerEnd}
+        >
           {visibleUrl ? (
-            // This is a local preview or the authenticated media endpoint.
             <img
               alt="Vista previa del encuadre"
+              draggable={false}
               onLoad={(event) => {
-                if (previewUrl)
+                if (isEditing)
                   setImageSize({
                     width: event.currentTarget.naturalWidth,
                     height: event.currentTarget.naturalHeight,
@@ -297,8 +416,8 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
               }}
               src={visibleUrl}
               style={
-                previewUrl && imageSize
-                  ? avatarPreviewStyle(imageSize, { cropX, cropY, zoom })
+                isEditing && imageSize
+                  ? avatarPreviewStyle(imageSize, crop)
                   : undefined
               }
             />
@@ -307,85 +426,119 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
               <span />
             </div>
           )}
+          {isEditing ? (
+            <span className={styles.dragHint}>Arrastrá para encuadrar</span>
+          ) : null}
         </div>
 
         <div className={styles.avatarControls}>
           <label className={styles.fileControl}>
-            Seleccionar foto
+            {player.image ? "Seleccionar otra foto" : "Seleccionar foto"}
             <input
               accept="image/jpeg,image/png,image/webp"
               onChange={selectFile}
+              ref={fileInput}
               type="file"
             />
           </label>
-          {file && (
+          {isEditing ? (
             <>
               <RangeControl
                 label="Encuadre horizontal"
-                onChange={setCropX}
-                value={cropX}
+                onChange={(cropX) =>
+                  setCrop((current) => ({ ...current, cropX }))
+                }
+                value={crop.cropX}
               />
               <RangeControl
                 label="Encuadre vertical"
-                onChange={setCropY}
-                value={cropY}
+                onChange={(cropY) =>
+                  setCrop((current) => ({ ...current, cropY }))
+                }
+                value={crop.cropY}
               />
               <RangeControl
                 label="Zoom"
                 maximum={3}
                 minimum={1}
-                onChange={setZoom}
+                onChange={(zoom) =>
+                  setCrop((current) => ({ ...current, zoom }))
+                }
                 step={0.05}
-                value={zoom}
+                value={crop.zoom}
               />
             </>
-          )}
+          ) : null}
+          {player.image && !isEditing ? (
+            <Button
+              disabled={editor.isPending}
+              onClick={beginExistingEdit}
+              variant="secondary"
+            >
+              Editar encuadre
+            </Button>
+          ) : null}
+          {editor.data?.status === "LEGACY" && !isEditing ? (
+            <p className={styles.legacyNotice}>
+              Para editar este avatar anterior, seleccioná nuevamente la foto
+              una sola vez.
+            </p>
+          ) : null}
         </div>
       </div>
 
-      {validationError && (
+      {validationError ? (
         <p className={styles.error} role="alert">
           {validationError}
         </p>
-      )}
-      {upload.isError && (
+      ) : null}
+      {editor.isError ? (
         <p className={styles.error} role="alert">
-          {upload.error.message}
+          No pudimos cargar el editor de foto.
         </p>
-      )}
-      {remove.isError && (
+      ) : null}
+      {upload.isError || reframe.isError || remove.isError ? (
         <p className={styles.error} role="alert">
-          {remove.error.message}
+          {(upload.error ?? reframe.error ?? remove.error)?.message}
         </p>
-      )}
-      {feedback && (
+      ) : null}
+      {feedback ? (
         <p className={styles.feedback} role="status">
           {feedback}
         </p>
-      )}
+      ) : null}
 
       <div className={styles.actions}>
-        {file && (
-          <Button disabled={upload.isPending} onClick={saveAvatar}>
-            {upload.isPending ? "Procesando…" : "Guardar foto"}
+        {isEditing ? (
+          <Button
+            disabled={upload.isPending || reframe.isPending}
+            onClick={saveAvatar}
+          >
+            {upload.isPending || reframe.isPending
+              ? "Procesando…"
+              : file
+                ? "Guardar foto"
+                : "Guardar encuadre"}
           </Button>
-        )}
-        {file && (
+        ) : null}
+        {isEditing ? (
           <Button
             onClick={() => {
               setFile(null);
               setPreviewUrl(null);
+              setEditingExisting(false);
+              setImageSize(null);
             }}
             variant="secondary"
           >
-            Cancelar selección
+            {file ? "Cancelar selección" : "Cancelar"}
           </Button>
-        )}
-        {player.image && !file && (
+        ) : null}
+        {player.image && !isEditing ? (
           <Button onClick={() => setConfirmRemove(true)} variant="quiet">
             Eliminar foto
           </Button>
-        )}
+        ) : null}
       </div>
 
       <ConfirmDialog
@@ -403,7 +556,7 @@ function AvatarEditor({ player }: Readonly<{ player: PrivatePlayer }>) {
 
 function avatarPreviewStyle(
   image: { width: number; height: number },
-  crop: { cropX: number; cropY: number; zoom: number },
+  crop: AvatarCrop,
 ) {
   const rectangle = avatarCropRectangle(image.width, image.height, crop);
   return {
