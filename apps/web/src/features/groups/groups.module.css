@@ -1395,3 +1395,217 @@
     grid-template-columns: auto 3.5rem minmax(0, 1fr) auto;
   }
 }
+
+/* V4 groups index: club identity replaces the legacy text-row treatment. */
+.page:global(.ui-visual-v4) .hero {
+  position: relative;
+  display: grid;
+  min-block-size: 18rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(4rem, 9vw, 7rem) clamp(1rem, 4vw, 2.5rem) 1.35rem;
+  border: 1px solid rgb(240 217 149 / 20%);
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 94%), rgb(4 8 16 / 40%)),
+    linear-gradient(0deg, var(--v4-canvas), transparent 78%),
+    url("/fifar-v4/group-ranking-scenes/group-club-night.webp") center 58% /
+      cover;
+  clip-path: polygon(0 0, calc(100% - 1rem) 0, 100% 1rem, 100% 100%, 0 100%);
+}
+
+.page:global(.ui-visual-v4) .hero::after {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 0.25rem;
+  background: linear-gradient(var(--v4-gold-light), var(--v4-gold));
+  content: "";
+}
+
+.page:global(.ui-visual-v4) .hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.page:global(.ui-visual-v4) .hero > div {
+  gap: 0.15rem;
+}
+
+.page:global(.ui-visual-v4) .hero h1 {
+  color: var(--v4-text);
+  font: 600 clamp(3.2rem, 9vw, 6.5rem) / 0.82 var(--font-v4-display);
+  overflow-wrap: normal;
+  text-transform: uppercase;
+  word-break: normal;
+}
+
+.page:global(.ui-visual-v4) .createForm {
+  padding: 1rem;
+  border: 1px solid rgb(240 217 149 / 22%);
+  border-inline-start: 0.22rem solid var(--v4-gold);
+  background: var(--v4-surface);
+  clip-path: polygon(
+    0.65rem 0,
+    100% 0,
+    100% calc(100% - 0.65rem),
+    calc(100% - 0.65rem) 100%,
+    0 100%,
+    0 0.65rem
+  );
+}
+
+.page:global(.ui-visual-v4) .groupList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.page:global(.ui-visual-v4) .groupList > h2 {
+  grid-column: 1 / -1;
+  color: var(--v4-muted);
+  font: 600 2rem / 0.9 var(--font-v4-display);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.page:global(.ui-visual-v4) .groupRow {
+  position: relative;
+  min-block-size: 10rem;
+  grid-template-columns: 5rem auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 1rem;
+  border: 1px solid rgb(244 243 239 / 12%);
+  background:
+    linear-gradient(90deg, rgb(7 13 25 / 94%), rgb(18 31 51 / 78%)),
+    url("/fifar-v4/group-ranking-scenes/group-club-night.webp") center / cover;
+  clip-path: polygon(
+    0.6rem 0,
+    100% 0,
+    100% calc(100% - 0.6rem),
+    calc(100% - 0.6rem) 100%,
+    0 100%,
+    0 0.6rem
+  );
+  color: inherit;
+  text-decoration: none;
+}
+
+.page:global(.ui-visual-v4) .groupRow::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(
+    112deg,
+    transparent 64%,
+    rgb(216 181 100 / 8%) 64% 64.4%,
+    transparent 64.4%
+  );
+  content: "";
+}
+
+.page:global(.ui-visual-v4) .groupRow:hover,
+.page:global(.ui-visual-v4) .groupRow:focus-visible {
+  border-color: rgb(240 217 149 / 50%);
+}
+
+.page:global(.ui-visual-v4) .groupRow :global([class*="crestlarge"]) {
+  inline-size: 5rem;
+}
+
+.page:global(.ui-visual-v4) .groupRow > span:nth-last-child(2) {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.18rem;
+}
+
+.page:global(.ui-visual-v4) .groupRow strong {
+  color: var(--v4-text);
+  font: 600 clamp(1.65rem, 3vw, 2.2rem) / 0.92 var(--font-v4-display);
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.page:global(.ui-visual-v4) .groupRow small {
+  color: var(--v4-gold-light);
+  font: 700 0.62rem / 1 var(--font-v4-interface);
+  letter-spacing: 0.12em;
+}
+
+.page:global(.ui-visual-v4) .index {
+  align-self: start;
+  color: rgb(240 217 149 / 65%);
+  font: 600 1.35rem / 1 var(--font-v4-display);
+}
+
+.page:global(.ui-visual-v4) .empty {
+  position: relative;
+  max-inline-size: none;
+  min-block-size: 18rem;
+  align-content: end;
+  padding: clamp(5rem, 12vw, 8rem) 1.2rem 1.2rem;
+  border-inline-start: 0.22rem solid var(--v4-gold);
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 92%), rgb(4 8 16 / 48%)),
+    url("/fifar-v4/match-scenes/home-empty-pitch.webp") center / cover;
+  clip-path: polygon(
+    0.75rem 0,
+    100% 0,
+    100% calc(100% - 0.75rem),
+    calc(100% - 0.75rem) 100%,
+    0 100%,
+    0 0.75rem
+  );
+}
+
+/* Long roster names use two lines; the player rail owns enough width to show them. */
+.page:global(.ui-visual-v4) .memberIdentity strong {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 0.94;
+  text-overflow: clip;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (max-width: 48rem) {
+  .page:global(.ui-visual-v4) .hero {
+    min-block-size: 20rem;
+    grid-template-columns: 1fr;
+    align-items: end;
+    gap: 1rem;
+    padding: 5rem 1rem 1rem;
+  }
+
+  .page:global(.ui-visual-v4) .hero > button {
+    inline-size: 100%;
+  }
+
+  .page:global(.ui-visual-v4) .groupList {
+    grid-template-columns: 1fr;
+  }
+
+  .page:global(.ui-visual-v4) .groupRow {
+    min-block-size: 9rem;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  }
+
+  .page:global(.ui-visual-v4) .groupRow :global([class*="crestlarge"]) {
+    inline-size: 4.5rem;
+  }
+
+  .page:global(.ui-visual-v4) .groupRow .index {
+    position: absolute;
+    inset-block-start: 0.6rem;
+    inset-inline-end: 0.7rem;
+  }
+
+  .page:global(.ui-visual-v4) .memberList {
+    grid-auto-columns: minmax(13.5rem, 62%);
+  }
+}

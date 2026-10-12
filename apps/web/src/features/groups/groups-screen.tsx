@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { Button, Text } from "@football/ui";
+
+import { V4GroupCrest } from "@/components/visual-v4/profile-assets";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 import styles from "./groups.module.css";
@@ -27,7 +29,7 @@ export function GroupsScreen() {
   const archivedGroups =
     groups.data?.filter((group) => group.status === "ARCHIVED") ?? [];
   return (
-    <div className={styles.page}>
+    <div className={[styles.page, "ui-visual-v4"].join(" ")}>
       <header className={styles.hero}>
         <div>
           <Text tone="accent" variant="label">
@@ -96,6 +98,7 @@ export function GroupsScreen() {
                 href={`/groups/${group.id}`}
                 key={group.id}
               >
+                <V4GroupCrest name={group.name} seed={group.id} size="large" />
                 <span className={styles.index}>
                   {String(index + 1).padStart(2, "0")}
                 </span>
@@ -121,6 +124,11 @@ export function GroupsScreen() {
                   href={`/groups/${group.id}`}
                   key={group.id}
                 >
+                  <V4GroupCrest
+                    name={group.name}
+                    seed={group.id}
+                    size="large"
+                  />
                   <span className={styles.index}>
                     {String(index + 1).padStart(2, "0")}
                   </span>

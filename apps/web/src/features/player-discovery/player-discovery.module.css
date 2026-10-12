@@ -76,8 +76,10 @@
 
 .headerCopy h1 {
   color: var(--v4-text);
-  font: 600 clamp(4rem, 16vw, 7rem) / 0.72 var(--font-v4-display);
+  font: 600 clamp(3.7rem, 15vw, 7rem) / 0.84 var(--font-v4-display);
+  overflow-wrap: normal;
   text-transform: uppercase;
+  word-break: normal;
 }
 
 .search {
@@ -424,13 +426,21 @@
 .discoveryStateCopy {
   justify-items: start;
   gap: 0.25rem;
+  max-inline-size: 100%;
 }
 
 .discoveryStateCopy h2 {
-  max-inline-size: 11ch;
+  max-inline-size: 12ch;
   color: var(--v4-text);
-  font: 600 clamp(3rem, 11vw, 5.5rem) / 0.77 var(--font-v4-display);
+  font: 600 clamp(2.75rem, 10vw, 5.5rem) / 0.84 var(--font-v4-display);
+  overflow-wrap: normal;
   text-transform: uppercase;
+  word-break: normal;
+}
+
+.discoveryStateCopy p {
+  max-inline-size: 42ch;
+  overflow-wrap: anywhere;
 }
 
 .loadingGrid {
@@ -494,6 +504,41 @@
   }
 }
 
+@media (min-width: 30.01rem) and (max-width: 63.99rem) {
+  .discoveryState {
+    min-block-size: 27rem;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 11rem auto;
+    align-items: end;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .discoveryScene {
+    background:
+      linear-gradient(0deg, var(--v4-canvas), transparent 82%),
+      linear-gradient(90deg, rgb(5 10 20 / 78%), rgb(5 10 20 / 42%)),
+      url("/fifar-v4/backgrounds-raster/night-pitch.webp") center / cover;
+  }
+
+  .discoveryEntities {
+    inline-size: min(100%, 14rem);
+    align-self: end;
+  }
+
+  .discoveryStateCopy {
+    position: relative;
+    z-index: 2;
+    padding: 0.85rem;
+    background: linear-gradient(90deg, rgb(7 13 25 / 96%), rgb(7 13 25 / 78%));
+  }
+
+  .discoveryStateCopy h2 {
+    max-inline-size: 100%;
+    font-size: clamp(3rem, 9vw, 4.5rem);
+  }
+}
+
 @media (max-width: 30rem) {
   .searchControl {
     grid-template-columns: auto minmax(0, 1fr);
@@ -523,15 +568,44 @@
   }
 
   .discoveryState {
-    grid-template-columns: 7.5rem minmax(0, 1fr);
+    min-block-size: 25rem;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 9rem auto;
+    align-items: end;
+    gap: 0.5rem;
+    padding: 0.85rem;
+  }
+
+  .discoveryScene {
+    background:
+      linear-gradient(0deg, var(--v4-canvas), transparent 82%),
+      linear-gradient(90deg, rgb(5 10 20 / 78%), rgb(5 10 20 / 42%)),
+      url("/fifar-v4/backgrounds-raster/night-pitch.webp") center / cover;
+  }
+
+  .discoveryEntities {
+    inline-size: min(100%, 12rem);
+    align-self: end;
   }
 
   .discoveryEntities :global([class*="portraitlarge"]) {
     inline-size: 6.5rem;
   }
+
+  .discoveryStateCopy {
+    position: relative;
+    z-index: 2;
+    padding: 0.75rem;
+    background: linear-gradient(90deg, rgb(7 13 25 / 96%), rgb(7 13 25 / 78%));
+  }
+
+  .discoveryStateCopy h2 {
+    max-inline-size: 100%;
+    font-size: clamp(2.7rem, 14vw, 4rem);
+  }
 }
 
-@media (min-width: 48rem) {
+@media (min-width: 72rem) {
   .discoveryHeader {
     grid-template-columns: minmax(14rem, 0.62fr) minmax(24rem, 1.38fr);
     align-items: end;

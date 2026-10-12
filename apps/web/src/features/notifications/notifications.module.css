@@ -85,8 +85,10 @@
 
 .headerCopy h1 {
   color: var(--v4-text);
-  font: 600 clamp(3.5rem, 14vw, 6.5rem) / 0.73 var(--font-v4-display);
+  font: 600 clamp(3rem, 12.5vw, 6.5rem) / 0.84 var(--font-v4-display);
+  overflow-wrap: normal;
   text-transform: uppercase;
+  word-break: normal;
 }
 
 .unreadSummary {

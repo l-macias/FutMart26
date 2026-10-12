@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { Text } from "@football/ui";
 
+import { V4GroupCrest } from "@/components/visual-v4/profile-assets";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -65,7 +66,7 @@ export function DirectedInvitationsScreen() {
       </div>
     );
   return (
-    <div className={styles.page}>
+    <div className={[styles.page, "ui-visual-v4"].join(" ")}>
       <header className={styles.header}>
         <Text as="span" tone="accent" variant="label">
           PROPUESTAS DE JUEGO
@@ -83,8 +84,13 @@ export function DirectedInvitationsScreen() {
         </Text>
         <ul className={`${styles.list} ui-list`}>
           {invitations.data.groupInvitations.map((invite) => (
-            <li className="ui-row" key={invite.id}>
-              <div className="ui-row__content">
+            <li
+              className={styles.invitationRow}
+              data-kind="group"
+              key={invite.id}
+            >
+              <V4GroupCrest name={invite.group.name} seed={invite.group.id} />
+              <div className={styles.invitationIdentity}>
                 <strong className="ui-row__primary">{invite.group.name}</strong>
                 <span className="ui-row__secondary">
                   {invite.invitedBy.displayName} te invitó
@@ -124,8 +130,16 @@ export function DirectedInvitationsScreen() {
         </Text>
         <ul className={`${styles.list} ui-list`}>
           {invitations.data.matchInvitations.map((invite) => (
-            <li className="ui-row" key={invite.id}>
-              <div className="ui-row__content">
+            <li
+              className={styles.invitationRow}
+              data-kind="match"
+              key={invite.id}
+            >
+              <V4GroupCrest
+                name={invite.match.groupName}
+                seed={invite.match.groupId}
+              />
+              <div className={styles.invitationIdentity}>
                 <Link href={`/play/matches/${invite.match.id}`}>
                   <strong className="ui-row__primary">
                     {invite.match.groupName}

@@ -82,11 +82,14 @@ void test("time-bearing primary surfaces explicitly use a 24-hour cycle", () => 
   }
 });
 
-void test("secondary social collections use the shared compact row language", () => {
-  for (const item of [connections, directedInvitations]) {
-    assert.equal(item.includes("ui-list"), true);
-    assert.equal(item.includes('className="ui-row"'), true);
-  }
+void test("secondary social collections use bounded V4 identity modules", () => {
+  assert.equal(connections.includes('"ui-visual-v4"'), true);
+  assert.equal(connections.includes("<V4Portrait"), true);
+  assert.equal(connections.includes("styles.connectionRow"), true);
+  assert.equal(connections.includes("styles.requestRow"), true);
+  assert.equal(directedInvitations.includes('"ui-visual-v4"'), true);
+  assert.equal(directedInvitations.includes("<V4GroupCrest"), true);
+  assert.equal(directedInvitations.includes("styles.invitationRow"), true);
   for (const item of [connectionsStyles, directedInvitationStyles]) {
     assert.equal(item.includes("!important"), false);
   }

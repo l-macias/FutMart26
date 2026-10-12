@@ -77,3 +77,163 @@
     align-items: center;
   }
 }
+
+.page:global(.ui-visual-v4) {
+  position: relative;
+  inline-size: min(100%, 76rem);
+  gap: clamp(1rem, 3vw, 2rem);
+  overflow-x: clip;
+  font-family: var(--font-v4-interface);
+}
+
+.page:global(.ui-visual-v4) .header {
+  position: relative;
+  min-block-size: 17rem;
+  align-content: end;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(4rem, 9vw, 7rem) clamp(1rem, 4vw, 2rem) 1.25rem;
+  border: 1px solid rgb(240 217 149 / 20%);
+  background:
+    linear-gradient(90deg, rgb(4 8 16 / 94%), rgb(4 8 16 / 43%)),
+    linear-gradient(0deg, var(--v4-canvas), transparent 76%),
+    url("/fifar-v4/match-scenes/match-open-night.webp") center 48% / cover;
+  clip-path: polygon(0 0, calc(100% - 1rem) 0, 100% 1rem, 100% 100%, 0 100%);
+}
+
+.page:global(.ui-visual-v4) .header::after {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 0.24rem;
+  background: linear-gradient(var(--v4-gold-light), var(--v4-gold));
+  content: "";
+}
+
+.page:global(.ui-visual-v4) .header h1 {
+  color: var(--v4-text);
+  font: 600 clamp(3.1rem, 9vw, 6rem) / 0.84 var(--font-v4-display);
+  overflow-wrap: normal;
+  text-transform: uppercase;
+  word-break: normal;
+}
+
+.page:global(.ui-visual-v4) .section {
+  gap: 0.75rem;
+}
+
+.page:global(.ui-visual-v4) .section h2 {
+  color: var(--v4-text);
+  font: 600 clamp(2rem, 5vw, 3rem) / 0.92 var(--font-v4-display);
+  text-transform: uppercase;
+}
+
+.page:global(.ui-visual-v4) .list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.page:global(.ui-visual-v4) .invitationRow {
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 0.75rem;
+  border: 1px solid rgb(244 243 239 / 11%);
+  background:
+    linear-gradient(100deg, rgb(7 13 25 / 96%), rgb(18 31 51 / 80%)),
+    url("/fifar-v4/group-ranking-scenes/group-club-night.webp") center / cover;
+  clip-path: polygon(
+    0.55rem 0,
+    100% 0,
+    100% calc(100% - 0.55rem),
+    calc(100% - 0.55rem) 100%,
+    0 100%,
+    0 0.55rem
+  );
+}
+
+.page:global(.ui-visual-v4) .invitationRow[data-kind="match"] {
+  background:
+    linear-gradient(100deg, rgb(7 13 25 / 96%), rgb(18 31 51 / 80%)),
+    url("/fifar-v4/match-scenes/match-open-night.webp") center / cover;
+}
+
+.page:global(.ui-visual-v4) .invitationRow :global([class*="crestdefault"]) {
+  inline-size: 4.5rem;
+}
+
+.page:global(.ui-visual-v4) .invitationIdentity {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.18rem;
+}
+
+.page:global(.ui-visual-v4) .invitationIdentity > a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page:global(.ui-visual-v4) .invitationIdentity strong {
+  display: block;
+  min-inline-size: 0;
+  color: var(--v4-text);
+  font: 600 1.65rem / 0.94 var(--font-v4-display);
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.page:global(.ui-visual-v4) .invitationIdentity span {
+  color: var(--v4-muted);
+  font: 700 0.66rem / 1.25 var(--font-v4-interface);
+  letter-spacing: 0.05em;
+  text-transform: none;
+}
+
+.page:global(.ui-visual-v4) .actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.45rem;
+}
+
+.page:global(.ui-visual-v4) .section > p:not(.feedback) {
+  margin: 0;
+  padding: 1rem;
+  border-inline-start: 0.2rem solid rgb(216 181 100 / 48%);
+  background: color-mix(in srgb, var(--v4-surface) 88%, transparent);
+}
+
+.page:global(.ui-visual-v4) .feedback {
+  padding: 0.8rem 1rem;
+  border-inline-start: 0.2rem solid var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 10%, var(--v4-surface));
+}
+
+@media (max-width: 43rem) {
+  .page:global(.ui-visual-v4) .header {
+    min-block-size: 18rem;
+    padding: 5rem 1rem 1rem;
+  }
+
+  .page:global(.ui-visual-v4) .invitationRow {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  .page:global(.ui-visual-v4) .invitationRow :global([class*="crestdefault"]) {
+    inline-size: 4rem;
+  }
+
+  .page:global(.ui-visual-v4) .actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+  }
+
+  .page:global(.ui-visual-v4) .actions > button {
+    flex: 1 1 8rem;
+  }
+}

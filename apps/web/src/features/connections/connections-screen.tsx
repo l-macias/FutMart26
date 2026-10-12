@@ -9,6 +9,7 @@ import Link from "next/link";
 
 import { Text } from "@football/ui";
 
+import { V4Portrait } from "@/components/visual-v4/profile-assets";
 import { api } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/api/query-keys";
 
@@ -27,7 +28,7 @@ export function ConnectionsScreen() {
   const outgoing = useConnectionRequests("outgoing");
 
   return (
-    <div className={styles.page}>
+    <div className={[styles.page, "ui-visual-v4"].join(" ")}>
       <header className={styles.header}>
         <Text as="span" tone="accent" variant="label">
           RED DE JUEGO
@@ -63,11 +64,12 @@ export function ConnectionsScreen() {
           {connections.data?.pages
             .flatMap((page) => page.items)
             .map((item) => (
-              <li className="ui-row" key={item.player.id}>
+              <li className={styles.connectionRow} key={item.player.id}>
                 <Link
-                  className="ui-row__content"
+                  className={styles.playerLink}
                   href={`/players/${item.player.id}`}
                 >
+                  <V4Portrait name={item.player.displayName} />
                   <strong className="ui-row__primary">
                     {item.player.displayName}
                   </strong>
@@ -159,8 +161,9 @@ function RequestSection({
       )}
       <ul className={`${styles.list} ui-list`}>
         {items.map((item) => (
-          <li className="ui-row" key={item.player.id}>
-            <div className="ui-row__content">
+          <li className={styles.requestRow} key={item.player.id}>
+            <div className={styles.requestIdentity}>
+              <V4Portrait name={item.player.displayName} />
               <Link href={`/players/${item.player.id}`}>
                 <strong className="ui-row__primary">
                   {item.player.displayName}
